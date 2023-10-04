@@ -168,7 +168,7 @@ export class CreatePropertyDto {
   @IsString()
   phone: string
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
   cellPhone: string
 }

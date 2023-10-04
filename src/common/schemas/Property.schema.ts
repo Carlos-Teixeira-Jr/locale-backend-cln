@@ -39,7 +39,7 @@ export interface IProperty extends BaseModel, Document {
   owner: Schema.Types.ObjectId
   ownerInfo: {
     name: string
-    phones: string[]
+    phones?: string[]
     creci: string
   }
   size: {
