@@ -41,6 +41,7 @@ export class PropertyOwnerInfoDto {
   @IsString()
   name: string
 
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   phones: string[]
