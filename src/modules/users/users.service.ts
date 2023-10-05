@@ -194,7 +194,7 @@ export class UsersService {
         },
       )
 
-      if (body.owner) {
+      if (ownerId) {
         const owner = await this.ownerModel.findById(ownerId)
 
         if (!owner) {
