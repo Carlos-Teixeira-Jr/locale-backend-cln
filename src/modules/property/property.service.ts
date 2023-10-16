@@ -512,6 +512,8 @@ export class PropertyService {
       const limit = 10
 
       let ownerProperties: IProperty[]
+      let count: number;
+      let totalPages: number;
 
       // Verifica se o userId recebido é um owner;
 
@@ -524,17 +526,17 @@ export class PropertyService {
           .find({ owner: userIsOwner._id })
           .skip(skip)
           .limit(limit)
-          .lean()
+          .lean();
+
+        count = await this.propertyModel.countDocuments({
+          owner: userIsOwner._id,
+        })
+        totalPages = Math.ceil(count / limit)
       }
 
       const messages: IMessageOwner[] = await this.messageModel
         .find({ owner_id: ownerId })
         .lean()
-
-      const count = await this.propertyModel.countDocuments({
-        owner: userIsOwner._id,
-      })
-      const totalPages = Math.ceil(count / limit)
 
       return {
         docs: ownerProperties,
