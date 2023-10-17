@@ -24,6 +24,12 @@ export type User_Owner = {
   owner: IOwner
 }
 
+export interface IFavPropertiesReturn {
+  docs: any[]
+  totalPages: number
+  count: number
+}
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -234,25 +240,45 @@ export class UsersService {
 
   async getFavouritesByUser(
     body: GetFavouritesByUserDto,
-  ): Promise<IProperty[]> {
+  ): Promise<IFavPropertiesReturn> {
     try {
       this.logger.log({ body }, 'favourite property')
 
-      const { id } = body
+      const { id, page } = body;
+      const skip = (page - 1) * 10;
+      const limit = 10;
 
-      const user = await this.userModel.findById(id)
+      const user = await this.userModel.findById(id);
 
       if (!user) {
         throw new NotFoundException('Usuário não encontrado')
       }
 
-      const favouritedProperties = user.favourited
+      const favouritedProperties = user.favourited;
 
-      const favouriteProperties = await this.propertyModel.find({
-        _id: { $in: favouritedProperties },
-      })
+      const favouritePropertiesDocs = await this.propertyModel
+        .find({
+          _id: { $in: favouritedProperties },
+        })
+        .skip(skip)
+        .limit(limit)
+        .lean();
 
-      return favouriteProperties
+      let count;
+      let totalPages;
+
+      if (favouritePropertiesDocs.length > 0) {
+        count = await this.propertyModel.countDocuments({
+          _id: { $in: favouritedProperties }
+        });
+        totalPages = Math.ceil(count / limit);
+      }
+
+      return {
+        docs: favouritePropertiesDocs,
+        count,
+        totalPages
+      }
     } catch (error) {
       this.logger.error({
         error: JSON.stringify(error),

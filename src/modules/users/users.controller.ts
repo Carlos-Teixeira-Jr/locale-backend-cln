@@ -45,7 +45,7 @@ export class UsersController {
   @Post('favourite')
   async getFavouritesByUser(
     @Body() body: GetFavouritesByUserDto,
-  ): Promise<IProperty[]> {
+  ): Promise<any> {
     return this.usersService.getFavouritesByUser(body)
   }
 
