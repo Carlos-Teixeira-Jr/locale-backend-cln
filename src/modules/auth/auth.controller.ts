@@ -48,18 +48,6 @@ export class AuthController {
     return await this.authService.socialRegister(socialRegister)
   }
 
-  // @Get('google')
-  // @UseGuards(AuthGuard('google'))
-  // async googleLogin() {
-  //   return
-  // }
-
-  // @Get('google/redirect')
-  // @UseGuards(AuthGuard('google'))
-  // async googleLoginRedirect(@Req() req) {
-  //   return await this.authService.login(req.user._json)
-  // }
-
   //Rota para testar o middleware que exige e verifica o token jwt;
   @Get('protected')
   @UseGuards(JwtAuthGuard)

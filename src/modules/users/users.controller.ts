@@ -10,7 +10,6 @@ import { GetOwnerByUserId } from './dto/get-owner-by-user-id'
 import { EditUserDto } from './dto/edit-user.dto'
 import { EditFavouriteDto } from './dto/edit-favourite.dto'
 import { GetFavouritesByUserDto } from './dto/favourite-property.dto'
-import { IProperty } from 'common/schemas/Property.schema'
 import { IUser } from 'common/schemas/User.schema'
 
 @ApiTags('users')
@@ -45,7 +44,7 @@ export class UsersController {
   @Post('favourite')
   async getFavouritesByUser(
     @Body() body: GetFavouritesByUserDto,
-  ): Promise<IProperty[]> {
+  ): Promise<any> {
     return this.usersService.getFavouritesByUser(body)
   }
 

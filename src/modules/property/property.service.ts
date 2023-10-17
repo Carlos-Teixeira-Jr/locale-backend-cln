@@ -512,11 +512,11 @@ export class PropertyService {
       const limit = 10
 
       let ownerProperties: IProperty[]
+      let count: number
+      let totalPages: number
 
       // Verifica se o userId recebido é um owner;
 
-      let totalPages
-      let count
       const userIsOwner = await this.ownerModel.findOne({ userId: ownerId })
 
       if (!userIsOwner) {
