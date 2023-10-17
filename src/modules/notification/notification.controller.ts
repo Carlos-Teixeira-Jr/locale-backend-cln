@@ -31,7 +31,7 @@ export class NotificationController {
     @Param() params: GetNotificationParams,
   ): Promise<INotification[]> {
     this.logger.log({}, 'findOne')
-    return this.notificationService.findOne(params.id)
+    return this.notificationService.findOne(params)
   }
 
   @Get()

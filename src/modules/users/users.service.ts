@@ -127,11 +127,11 @@ export class UsersService {
         .findOne({ userId: id })
         .select('adCredits plan phone cellPhone _id')
 
-      if (!owner) {
-        throw new NotFoundException(
-          `Usuário com o id: ${id} não possui nenhum anúncio cadastrado.`,
-        )
-      }
+      // if (!owner) {
+      //   throw new NotFoundException(
+      //     `Usuário com o id: ${id} não possui nenhum anúncio cadastrado.`,
+      //   )
+      // }
 
       return {
         user,
