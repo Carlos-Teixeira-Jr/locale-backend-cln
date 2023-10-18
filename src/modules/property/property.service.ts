@@ -114,7 +114,7 @@ export class PropertyService {
       this.logger.log({}, 'start filter')
 
       const { page, limit, filter, sort } = queryFilter
-      const originalPage = page
+      const originalPage = page + 1
       const highlightsSkip = page * limit
 
       const allFilters = this.getFilter(filter)
