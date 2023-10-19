@@ -53,6 +53,7 @@ export interface IFilterReturn {
   docs: IProperty[]
   page: number
   totalCount: number
+  totalPages: number
 }
 
 export interface IFindByCodeReturn {
@@ -180,7 +181,7 @@ export class PropertyService {
       return {
         docs,
         page: originalPage,
-        ...(countDocs && { totalPages }),
+        totalPages,
         totalCount,
       }
     } catch (error) {
