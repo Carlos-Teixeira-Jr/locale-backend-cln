@@ -9,6 +9,7 @@ import { LoggerService } from 'modules/logger/logger.service'
 import { Model } from 'mongoose'
 import { CreateNotificationDto } from './dto/create-notification.dto'
 import { PageQueryFilter } from 'common/utils/query.filter'
+import { GetNotificationParams } from './dto/getNotification.params'
 
 export interface INotificationsWithPagination {
   docs: INotification[]
@@ -45,7 +46,7 @@ export class NotificationService {
     }
   }
 
-  async findOne(id: string): Promise<INotification[]> {
+  async findOne({ id }: GetNotificationParams): Promise<INotification[]> {
     try {
       this.logger.log({}, 'start findOne')
 

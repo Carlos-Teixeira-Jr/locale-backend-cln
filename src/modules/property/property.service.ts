@@ -53,6 +53,7 @@ export interface IFilterReturn {
   docs: IProperty[]
   page: number
   totalCount: number
+  totalPages: number
 }
 
 export interface IFindByCodeReturn {
@@ -114,7 +115,7 @@ export class PropertyService {
       this.logger.log({}, 'start filter')
 
       const { page, limit, filter, sort } = queryFilter
-      const originalPage = page
+      const originalPage = page + 1
       const highlightsSkip = page * limit
 
       const allFilters = this.getFilter(filter)
@@ -180,7 +181,7 @@ export class PropertyService {
       return {
         docs,
         page: originalPage,
-        ...(countDocs && { totalPages }),
+        totalPages,
         totalCount,
       }
     } catch (error) {
@@ -512,8 +513,8 @@ export class PropertyService {
       const limit = 10
 
       let ownerProperties: IProperty[]
-      let count: number;
-      let totalPages: number;
+      let count: number
+      let totalPages: number
 
       // Verifica se o userId recebido é um owner;
 
@@ -526,7 +527,7 @@ export class PropertyService {
           .find({ owner: userIsOwner._id })
           .skip(skip)
           .limit(limit)
-          .lean();
+          .lean()
 
         count = await this.propertyModel.countDocuments({
           owner: userIsOwner._id,

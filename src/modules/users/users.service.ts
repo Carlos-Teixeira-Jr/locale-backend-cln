@@ -133,11 +133,11 @@ export class UsersService {
         .findOne({ userId: id })
         .select('adCredits plan phone cellPhone _id')
 
-      if (!owner) {
-        throw new NotFoundException(
-          `Usuário com o id: ${id} não possui nenhum anúncio cadastrado.`,
-        )
-      }
+      // if (!owner) {
+      //   throw new NotFoundException(
+      //     `Usuário com o id: ${id} não possui nenhum anúncio cadastrado.`,
+      //   )
+      // }
 
       return {
         user,
@@ -244,17 +244,17 @@ export class UsersService {
     try {
       this.logger.log({ body }, 'favourite property')
 
-      const { id, page } = body;
-      const skip = (page - 1) * 10;
-      const limit = 10;
+      const { id, page } = body
+      const skip = (page - 1) * 10
+      const limit = 10
 
-      const user = await this.userModel.findById(id);
+      const user = await this.userModel.findById(id)
 
       if (!user) {
         throw new NotFoundException('Usuário não encontrado')
       }
 
-      const favouritedProperties = user.favourited;
+      const favouritedProperties = user.favourited
 
       const favouritePropertiesDocs = await this.propertyModel
         .find({
@@ -262,22 +262,22 @@ export class UsersService {
         })
         .skip(skip)
         .limit(limit)
-        .lean();
+        .lean()
 
-      let count;
-      let totalPages;
+      let count
+      let totalPages
 
       if (favouritePropertiesDocs.length > 0) {
         count = await this.propertyModel.countDocuments({
-          _id: { $in: favouritedProperties }
-        });
-        totalPages = Math.ceil(count / limit);
+          _id: { $in: favouritedProperties },
+        })
+        totalPages = Math.ceil(count / limit)
       }
 
       return {
         docs: favouritePropertiesDocs,
         count,
-        totalPages
+        totalPages,
       }
     } catch (error) {
       this.logger.error({
