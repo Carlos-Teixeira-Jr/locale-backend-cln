@@ -123,7 +123,7 @@ export class PropertyService {
       // Querys $and não aceitam arrays vazios, essa verificação muda o tipo de query caso o array allFilters esteja vazio;
       const filtersOrNot =
         allFilters.length > 1
-          ? { $and: [...allFilters, { highlighted: false }] }
+          ? { $and: [...allFilters] }
           : { highlighted: false }
 
       let highlightsFilters
@@ -453,6 +453,7 @@ export class PropertyService {
       // PROPERTY
 
       propertyData.owner = owner._id
+
       propertyData.ownerInfo = {
         name: owner.name,
         phones: [phone, cellPhone],
