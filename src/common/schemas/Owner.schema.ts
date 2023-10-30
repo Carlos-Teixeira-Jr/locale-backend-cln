@@ -16,6 +16,11 @@ export interface IOwner extends BaseModel, Document {
   userId: Schema.Types.ObjectId
   adCredits: number
   customerId: string
+  creditCardInfo: {
+    creditCardNumber: string
+    creditCardBrand: string
+    creditCardToken: string
+  }
 }
 
 export const OwnerSchema = new Schema(
@@ -34,6 +39,11 @@ export const OwnerSchema = new Schema(
     userId: { type: Schema.Types.ObjectId },
     adCredits: { type: Number },
     customerId: { type: String },
+    creditCardInfo: {
+      creditCardNumber: { type: String },
+      creditCardBrand: { type: String },
+      creditCardToken: { type: String },
+    },
   },
   {
     versionKey: false,

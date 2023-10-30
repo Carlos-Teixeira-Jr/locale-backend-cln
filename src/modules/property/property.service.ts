@@ -298,7 +298,6 @@ export class PropertyService {
       }
 
       // CUSTOMER
-
       if (!isPlanFree && !owner.customerId) {
         // Cadastrar customer no payment api;;
         const response = await fetch(`http://localhost:3002/customer`, {
@@ -333,6 +332,7 @@ export class PropertyService {
 
       let creditCardBrand
       let paymentValue
+      let creditCardInfo
       // Validar se tem plano e se há creditos no plano;
       if (!isPlanFree) {
         if (owner.adCredits < 1) {
@@ -345,51 +345,89 @@ export class PropertyService {
         const expiryYear = formattedExpiry[0]
         const expiryMonth = formattedExpiry[1]
 
-        // Chamada pra api de pagamento "subscription";
-        const response = await fetch(
-          `http://localhost:3002/payment/subscription`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              access_token: process.env.ASSAS_API_KEY || '',
+        const currentDate = new Date()
+        const year = currentDate.getFullYear()
+        const month = (currentDate.getMonth() + 1).toString().padStart(2, '0')
+        const day = currentDate.getDate().toString().padStart(2, '0')
+        const formattedDate = `${year}-${month}-${day}`
+
+        if (!owner.creditCardInfo.creditCardToken) {
+          // Chamada pra api de pagamento "subscription";
+          const response = await fetch(
+            `http://localhost:3002/payment/subscription`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                access_token: process.env.ASSAS_API_KEY || '',
+              },
+              body: JSON.stringify({
+                billingType: 'CREDIT_CARD',
+                cycle: 'MONTHLY',
+                customer: owner.customerId,
+                value: selectedPlan.price,
+                nextDueDate: formattedDate,
+                creditCard: {
+                  holderName: cardName,
+                  number: cardNumber,
+                  expiryMonth,
+                  expiryYear,
+                  ccv: cvc,
+                },
+                creditCardHolderInfo: {
+                  name: cardName,
+                  email: userData.email,
+                  phone,
+                  cpfCnpj: userData.cpf,
+                  postalCode: address.zipCode,
+                  addressNumber: address.streetNumber,
+                },
+              }),
             },
-            body: JSON.stringify({
-              billingType: 'CREDIT_CARD',
-              cycle: 'MONTHLY',
-              customer: owner.customerId,
-              value: selectedPlan.price,
-              nextDueDate: '2023-10-13',
-              creditCard: {
-                holderName: cardName,
-                number: cardNumber,
-                expiryMonth,
-                expiryYear,
-                ccv: cvc,
-              },
-              creditCardHolderInfo: {
-                name: cardName,
-                email: userData.email,
-                phone: cellPhone,
-                cpfCnpj: userData.cpf,
-                postalCode: address.zipCode,
-                addressNumber: address.streetNumber,
-              },
-            }),
-          },
-        )
+          )
 
-        if (!response.ok) {
-          throw new Error(`Falha ao criar o cliente: ${response.statusText}`)
+          if (!response.ok) {
+            throw new Error(`Falha ao gerar a cobrança: ${response.statusText}`)
+          }
+
+          const responseData = await response.json()
+
+          creditCardInfo = responseData.creditCard
+
+          // Decrementar o número de créditos disponíveis do usuário;
+          owner.adCredits = owner.adCredits - 1
+          // Salvar o token do cartão de crédito no banco de dados;
+          owner.creditCardInfo = creditCardInfo
+          await owner.save()
+        } else {
+          // Chamada pra api de pagamento "subscription" no caso de o usuário já ter seus dados de cartão salvos no banco;
+          const response = await fetch(
+            `http://localhost:3002/payment/subscription`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                access_token: process.env.ASSAS_API_KEY || '',
+              },
+              body: JSON.stringify({
+                billingType: 'CREDIT_CARD',
+                cycle: 'MONTHLY',
+                customer: owner.customerId,
+                value: selectedPlan.price,
+                nextDueDate: formattedDate,
+                creditCardToken: owner.creditCardInfo.creditCardToken,
+              }),
+            },
+          )
+
+          if (!response.ok) {
+            throw new Error(`Falha ao gerara cobrança: ${response.statusText}`)
+          }
+
+          // Decrementar o número de créditos disponíveis do usuário;
+          owner.adCredits = owner.adCredits - 1
+          await owner.save()
         }
-
-        const responseData = await response.json()
-        creditCardBrand = responseData.creditCard.creditCardBrand
-        paymentValue = responseData.value
-
-        // Decrementar o número de créditos disponíveis do usuário;
-        owner.adCredits = owner.adCredits - 1
-        await owner.save()
       }
 
       // LOCATION
