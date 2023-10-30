@@ -7,6 +7,7 @@ import {
   IsObject,
   Validate,
   IsBoolean,
+  IsCreditCard,
 } from 'class-validator'
 import {
   PropertyAddressDto,
@@ -130,7 +131,7 @@ export class CreditCardData {
   cardName: string
 
   @IsNotEmpty()
-  @IsString()
+  @IsCreditCard({ message: 'Número de cartão inválido' })
   cardNumber: string
 
   @IsNotEmpty()

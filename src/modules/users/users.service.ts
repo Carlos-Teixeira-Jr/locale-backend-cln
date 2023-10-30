@@ -12,6 +12,7 @@ import { EditUserDto } from './dto/edit-user.dto'
 import { IProperty, PropertyModelName } from 'common/schemas/Property.schema'
 import { EditFavouriteDto } from './dto/edit-favourite.dto'
 import { GetFavouritesByUserDto } from './dto/favourite-property.dto'
+import { EditCreditCardDto } from './dto/editCreditCard.dto'
 
 export type User = {
   userId: number
@@ -131,7 +132,7 @@ export class UsersService {
 
       const owner = await this.ownerModel
         .findOne({ userId: id })
-        .select('adCredits plan phone cellPhone _id')
+        .select('adCredits plan phone cellPhone creditCardInfo _id')
 
       return {
         user,
@@ -223,6 +224,28 @@ export class UsersService {
         success: true,
         updatedOwner,
       }
+    } catch (error) {
+      this.logger.error({
+        error: JSON.stringify(error),
+        exception: '> exception',
+      })
+      throw error
+    }
+  }
+
+  async editCreditCard(body: EditCreditCardDto) {
+    console.log(
+      '🚀 ~ file: users.service.ts:237 ~ UsersService ~ editCreditCard ~ body:',
+      body,
+    )
+    try {
+      this.logger.log({}, 'edit credit card')
+
+      // const { cardNumber, cardName, expiry, cvc } = body
+
+      // Atualizar o cartão de crédito usando a api da Asaas;
+
+      return
     } catch (error) {
       this.logger.error({
         error: JSON.stringify(error),

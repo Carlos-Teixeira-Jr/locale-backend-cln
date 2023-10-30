@@ -299,7 +299,7 @@ export class PropertyService {
 
       // CUSTOMER
       if (!isPlanFree && !owner.customerId) {
-        // Cadastrar customer no payment api;;
+        // Cadastrar customer no payment api;
         const response = await fetch(`http://localhost:3002/customer`, {
           method: 'POST',
           headers: {
@@ -330,7 +330,6 @@ export class PropertyService {
 
       // PAYMENT
 
-      let creditCardBrand
       let paymentValue
       let creditCardInfo
       // Validar se tem plano e se há creditos no plano;
@@ -502,7 +501,7 @@ export class PropertyService {
 
       return {
         createdProperty,
-        creditCardBrand,
+        creditCardBrand: owner.creditCardInfo.creditCardBrand,
         paymentValue,
         userAlreadyExists,
       }
