@@ -399,28 +399,32 @@ export class PropertyService {
           owner.creditCardInfo = creditCardInfo
           await owner.save()
         } else {
-          // Chamada pra api de pagamento "subscription" no caso de o usuário já ter seus dados de cartão salvos no banco;
-          const response = await fetch(
-            `http://localhost:3002/payment/subscription`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                access_token: process.env.ASSAS_API_KEY || '',
+          if (owner.adCredits < 1) {
+            // Chamada pra api de pagamento "subscription" no caso de o usuário já ter seus dados de cartão salvos no banco;
+            const response = await fetch(
+              `http://localhost:3002/payment/subscription`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  access_token: process.env.ASSAS_API_KEY || '',
+                },
+                body: JSON.stringify({
+                  billingType: 'CREDIT_CARD',
+                  cycle: 'MONTHLY',
+                  customer: owner.customerId,
+                  value: selectedPlan.price,
+                  nextDueDate: formattedDate,
+                  creditCardToken: owner.creditCardInfo.creditCardToken,
+                }),
               },
-              body: JSON.stringify({
-                billingType: 'CREDIT_CARD',
-                cycle: 'MONTHLY',
-                customer: owner.customerId,
-                value: selectedPlan.price,
-                nextDueDate: formattedDate,
-                creditCardToken: owner.creditCardInfo.creditCardToken,
-              }),
-            },
-          )
+            )
 
-          if (!response.ok) {
-            throw new Error(`Falha ao gerara cobrança: ${response.statusText}`)
+            if (!response.ok) {
+              throw new Error(
+                `Falha ao gerara cobrança: ${response.statusText}`,
+              )
+            }
           }
 
           // Decrementar o número de créditos disponíveis do usuário;
