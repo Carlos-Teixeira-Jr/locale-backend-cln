@@ -16,4 +16,8 @@ export class EditCreditCardDto {
   @IsNotEmpty()
   @IsString()
   cvc: string
+
+  @IsNotEmpty()
+  @IsString()
+  cpf: string
 }

@@ -12,7 +12,6 @@ import { EditUserDto } from './dto/edit-user.dto'
 import { IProperty, PropertyModelName } from 'common/schemas/Property.schema'
 import { EditFavouriteDto } from './dto/edit-favourite.dto'
 import { GetFavouritesByUserDto } from './dto/favourite-property.dto'
-import { EditCreditCardDto } from './dto/editCreditCard.dto'
 
 export type User = {
   userId: number
@@ -132,7 +131,7 @@ export class UsersService {
 
       const owner = await this.ownerModel
         .findOne({ userId: id })
-        .select('adCredits plan phone cellPhone creditCardInfo _id')
+        .select('adCredits plan phone cellPhone customerId creditCardInfo _id')
 
       return {
         user,
@@ -233,7 +232,7 @@ export class UsersService {
     }
   }
 
-  async editCreditCard(body: EditCreditCardDto) {
+  async editCreditCard(body: any) {
     console.log(
       '🚀 ~ file: users.service.ts:237 ~ UsersService ~ editCreditCard ~ body:',
       body,
@@ -241,11 +240,122 @@ export class UsersService {
     try {
       this.logger.log({}, 'edit credit card')
 
-      // const { cardNumber, cardName, expiry, cvc } = body
+      const {
+        cardNumber,
+        cardName,
+        expiry,
+        cvc,
+        cpf,
+        email,
+        phone,
+        customer,
+        plan,
+        address,
+        owner,
+      } = body
 
       // Atualizar o cartão de crédito usando a api da Asaas;
+      const response = await fetch(
+        `http://localhost:3002/payment/charges/${cpf}`,
+      )
 
-      return
+      if (!response.ok) {
+        throw new Error(`Erro na requisição à API: ${response.status}`)
+      }
+
+      const subscriptions = await response.json()
+
+      let mostRecentCharge = null
+      let mostRecentDate = new Date(0)
+
+      for (const charge of subscriptions) {
+        const chargeDate = new Date(charge.dateCreated)
+        if (chargeDate > mostRecentDate) {
+          mostRecentCharge = charge
+          mostRecentDate = chargeDate
+        }
+      }
+
+      if (!mostRecentCharge) {
+        throw new Error('Nenhuma cobrança encontrada.')
+      }
+
+      console.log('Cobrança mais recente:', mostRecentCharge)
+
+      const chargeId = mostRecentCharge.id
+
+      if (chargeId) {
+        const formattedExpiry = expiry.split('-')
+        const expiryYear = formattedExpiry[0]
+        const expiryMonth = formattedExpiry[1]
+
+        const currentDate = new Date()
+        const year = currentDate.getFullYear()
+        const month = (currentDate.getMonth() + 1).toString().padStart(2, '0')
+        const day = currentDate.getDate().toString().padStart(2, '0')
+        const formattedDate = `${year}-${month}-${day}`
+
+        const response = await fetch(
+          `http://localhost:3002/payment/subscription`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              access_token: process.env.ASSAS_API_KEY || '',
+            },
+            body: JSON.stringify({
+              billingType: 'CREDIT_CARD',
+              cycle: 'MONTHLY',
+              customer,
+              value: plan.price,
+              nextDueDate: formattedDate,
+              creditCard: {
+                holderName: cardName,
+                number: cardNumber,
+                expiryMonth,
+                expiryYear,
+                ccv: cvc,
+              },
+              creditCardHolderInfo: {
+                name: cardName,
+                email,
+                phone,
+                cpfCnpj: cpf,
+                postalCode: address.zipCode,
+                addressNumber: address.streetNumber,
+              },
+            }),
+          },
+        )
+
+        if (!response.ok) {
+          throw new Error(`Falha ao gerar a cobrança: ${response.statusText}`)
+        }
+
+        const responseData = await response.json()
+
+        const ownerData: IOwner = await this.ownerModel
+          .findById(owner._id)
+          .lean()
+
+        if (!ownerData) {
+          throw new Error(`Proprietário não encontrado: ${response.statusText}`)
+        }
+
+        ownerData.creditCardInfo = responseData.creditCardInfo
+
+        await ownerData.save()
+      }
+
+      const deleteChargeResponse = await fetch(
+        `http://localhost:3002/payment/subscription/${chargeId}`,
+      )
+
+      if (!deleteChargeResponse.ok) {
+        throw new Error('Não foi possível deletar a cobrança anterior.')
+      }
+
+      return { success: 'success' }
     } catch (error) {
       this.logger.error({
         error: JSON.stringify(error),
