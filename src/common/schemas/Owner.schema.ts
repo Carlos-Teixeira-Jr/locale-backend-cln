@@ -21,6 +21,26 @@ export interface IOwner extends BaseModel, Document {
     creditCardBrand: string
     creditCardToken: string
   }
+  isNewCreditCard: boolean
+  newCreditCardData: {
+    creditCard: {
+      holderName: string
+      number: string
+      expiryMonth: string
+      expiryYear: string
+      ccv: string
+    }
+    creditCardHolderInfo: {
+      name: string
+      email: string
+      phone: string
+      cpfCnpj: string
+      postalCode: string
+      addressNumber: string
+    }
+    isNewPlan: boolean
+    newPlan: Schema.Types.ObjectId
+  }
 }
 
 export const OwnerSchema = new Schema(
@@ -43,6 +63,26 @@ export const OwnerSchema = new Schema(
       creditCardNumber: { type: String },
       creditCardBrand: { type: String },
       creditCardToken: { type: String },
+    },
+    isNewCreditCard: { type: Boolean },
+    newCreditCardData: {
+      creditCard: {
+        holderName: { type: String },
+        number: { type: String },
+        expiryMonth: { type: String },
+        expiryYear: { type: String },
+        ccv: { type: String },
+      },
+      creditCardHolderInfo: {
+        name: { type: String },
+        email: { type: String },
+        phone: { type: String },
+        cpfCnpj: { type: String },
+        postalCode: { type: String },
+        addressNumber: { type: String },
+      },
+      isNewPlan: { type: Boolean },
+      newPlan: { type: Schema.Types.ObjectId, ref: 'plan' },
     },
   },
   {
