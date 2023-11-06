@@ -132,7 +132,9 @@ export class UsersService {
 
       const owner = await this.ownerModel
         .findOne({ userId: _id })
-        .select('adCredits plan phone cellPhone customerId creditCardInfo _id')
+        .select(
+          'adCredits plan phone cellPhone customerId creditCardInfo _id name',
+        )
 
       return {
         user,
@@ -248,6 +250,7 @@ export class UsersService {
         plan,
         address,
         owner,
+        customerId,
       } = body
 
       // Cadastrar os dados do novo cartão de crédito no owner do usuário;
@@ -263,32 +266,92 @@ export class UsersService {
       const expiryMonth = formattedExpiry[1]
 
       // Verificando se o usuário selecionou umnovo plano ao mudar os dados do cartão;
-      const isNewPlan = ownerExists.plan === plan
+      const isNewPlan = ownerExists.plan === plan._id
 
       if (isNewPlan) {
-        ownerExists.newCreditCardData.newPlan = plan
+        ownerExists.newPlan = plan._id
       }
+
+      // Gerar o customerId caso o usuário não tenha feito ainda;
+      if (!customerId) {
+        const response = await fetch(`http://localhost:3002/customer`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            access_token: process.env.ASSAS_API_KEY || '',
+          },
+          body: JSON.stringify({
+            name: owner.name,
+            email: email,
+            phone,
+            postalCode: address.zipCode,
+            description: 'Confirmação de criação de id de cliente',
+            cpfCnpj: cpf,
+            addressNumber: address.streetNumber,
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error(`Falha ao criar o cliente: ${response.statusText}`)
+        }
+
+        const customer = await response.json()
+
+        // Atualiza o 'customerId' no 'owner' e salva no banco de dados
+        ownerExists.customerId = customer.id
+        await ownerExists.save()
+      }
+
+      // Formatação da data;
+      const currentDate = new Date()
+      const year = currentDate.getFullYear()
+      const month = (currentDate.getMonth() + 1).toString().padStart(2, '0')
+      const day = currentDate.getDate().toString().padStart(2, '0')
+      const formattedDate = `${year}-${month}-${day}`
+
+      // Gerar token dos dados do cartão;
+      const response = await fetch(`http://localhost:3002/payment/tokenize`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          access_token: process.env.ASSAS_API_KEY || '',
+        },
+        body: JSON.stringify({
+          billingType: 'CREDIT_CARD',
+          cycle: 'MONTHLY',
+          customer: customerId ? customerId : ownerExists.customerId,
+          value: plan.price,
+          nextDueDate: formattedDate,
+          creditCard: {
+            holderName: cardName,
+            number: cardNumber,
+            expiryMonth,
+            expiryYear,
+            ccv: cvc,
+          },
+          creditCardHolderInfo: {
+            name: cardName,
+            email: email,
+            phone,
+            cpfCnpj: cpf,
+            postalCode: address.zipCode,
+            addressNumber: address.streetNumber,
+          },
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Não foi possível gerar um token dos dados do cartão')
+      }
+
+      const responseData = await response.json()
+
+      const creditCardInfo = responseData.creditCard
 
       // Atualiza os dados do usuário;
       ownerExists.isNewCreditCard = true
-      ownerExists.newCreditCardData.creditCard = {
-        holderName: cardName,
-        number: cardNumber,
-        expiryMonth: expiryMonth,
-        expiryYear: expiryYear,
-        ccv: cvc,
-      }
-      ownerExists.newCreditCardData.creditCardHolderInfo = {
-        name: cardName,
-        email: email,
-        phone: phone,
-        cpfCnpj: cpf,
-        postalCode: address.zipCode,
-        addressNumber: address.streetNumber,
-      }
-      ownerExists.newCreditCardData.isNewPlan = isNewPlan
-
-      //Salva os novos dados atualizados no banco de dados;
+      ownerExists.newPlan = isNewPlan
+      ownerExists.creditCardInfo = creditCardInfo
       await ownerExists.save()
 
       return { success: true }

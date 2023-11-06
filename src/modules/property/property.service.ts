@@ -269,10 +269,6 @@ export class PropertyService {
 
           // Use o método findById para buscar o usuário atualizado
           user = await this.userModel.findById(registerUser._id)
-
-          // user = await this.userModel.findById(registerUser._id);
-          // user.cpf = userData.cpf;
-          // await user.save();
         } else {
           user = userEmailExists
         }

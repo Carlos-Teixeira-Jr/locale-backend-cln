@@ -3,13 +3,13 @@ import {
   IsCreditCard,
   IsNotEmpty,
   IsObject,
+  IsOptional,
   IsString,
-  Validate,
   ValidateNested,
 } from 'class-validator'
-import { IDValidator } from 'common/validators/ID.validator'
+import { IOwner } from 'common/schemas/Owner.schema'
+import { IPlan } from 'common/schemas/Plan.schema'
 import { PropertyAddressDto } from 'modules/property/dto/property.dto'
-import { Schema } from 'mongoose'
 
 export class EditCreditCardDto {
   @IsNotEmpty()
@@ -41,8 +41,8 @@ export class EditCreditCardDto {
   phone: string
 
   @IsNotEmpty()
-  @Validate(IDValidator)
-  plan: Schema.Types.ObjectId
+  @IsObject()
+  plan: IPlan
 
   @IsNotEmpty()
   @IsObject()
@@ -51,6 +51,10 @@ export class EditCreditCardDto {
   address: PropertyAddressDto
 
   @IsNotEmpty()
-  @Validate(IDValidator)
-  owner: Schema.Types.ObjectId
+  @IsObject()
+  owner: IOwner
+
+  @IsOptional()
+  @IsString()
+  customerId: string
 }
