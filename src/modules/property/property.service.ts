@@ -260,7 +260,11 @@ export class PropertyService {
           // Use o método updateOne para adicionar a propriedade 'cpf' ao usuário
           await this.userModel.updateOne(
             { _id: registerUser._id }, // Filtro para encontrar o usuário
-            { cpf: userData.cpf }, // Dados a serem atualizados
+            {
+              cpf: userData.cpf,
+              address: userData.address,
+              username: userData.username,
+            },
           )
 
           // Use o método findById para buscar o usuário atualizado
@@ -571,7 +575,7 @@ export class PropertyService {
 
       // Verifica se o userId recebido é um owner;
 
-      const userIsOwner = await this.ownerModel.findOne({ userId: ownerId })
+      const userIsOwner = await this.ownerModel.findById(ownerId)
 
       if (!userIsOwner) {
         ownerProperties = []
