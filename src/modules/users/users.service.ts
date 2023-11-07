@@ -346,7 +346,7 @@ export class UsersService {
 
       const responseData = await response.json()
 
-      const creditCardInfo = responseData.creditCard
+      const creditCardInfo = responseData
 
       // Atualiza os dados do usuário;
       ownerExists.isNewCreditCard = true
