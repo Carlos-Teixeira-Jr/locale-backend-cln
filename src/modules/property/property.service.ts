@@ -60,6 +60,15 @@ export interface IFindByCodeReturn {
   docs: IProperty[]
 }
 
+interface IOwnerData {
+  name: string
+  phone: string
+  cellPhone: string
+  plan: any
+  userId: any
+  adCredits?: number
+}
+
 @Injectable()
 export class PropertyService {
   constructor(
@@ -283,14 +292,20 @@ export class PropertyService {
       })
 
       if (!ownerExists) {
-        const createdOwner: IOwner = await this.ownerModel.create({
+        const ownerData: IOwnerData = {
           name: userData.username,
           phone,
           cellPhone,
           plan,
           userId: user._id,
-          adCredits: selectedPlan.commonAd,
-        })
+          //adCredits: selectedPlan.commonAd,
+        }
+
+        if (!isPlanFree) {
+          ownerData.adCredits = selectedPlan.commonAd
+        }
+
+        const createdOwner: IOwner = await this.ownerModel.create(ownerData)
         owner = createdOwner
       } else {
         owner = ownerExists
