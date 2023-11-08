@@ -9,13 +9,13 @@ import { LoggerService } from 'modules/logger/logger.service'
 import { Model } from 'mongoose'
 import { CreateMessageDto } from './dto/create-message.dto'
 import { IOwner, OwnerModelName } from 'common/schemas/Owner.schema'
-import { PageQueryFilter } from 'common/utils/query.filter'
-import { ObjectId } from 'mongodb'
 import { FindByPropertyIdDto } from './dto/find-by-prperty-id.dto'
 import { IProperty, PropertyModelName } from 'common/schemas/Property.schema'
+import { GetAllByOwnerIdDto } from './dto/get-all-by-owner-id.dto'
 
 export interface IMessagesWithPagination {
   docs: IMessageOwner[]
+  properties: IProperty[]
   totalPages: number
   page: number
 }
@@ -37,13 +37,13 @@ export class MessageService {
     try {
       this.logger.log({}, 'start createOne')
 
-      const { owner_id } = createMessageDto
+      const { ownerId } = createMessageDto
 
-      const owner = await this.ownerModel.findById(owner_id).lean()
+      const owner = await this.ownerModel.findById(ownerId).lean()
 
       if (!owner) {
         throw new NotFoundException(
-          `O proprietário com o id: ${owner_id} não foi encontrado`,
+          `O proprietário com o id: ${ownerId} não foi encontrado`,
         )
       }
 
@@ -59,37 +59,43 @@ export class MessageService {
     }
   }
 
-  async findAll(
-    owner_id: string,
-    pageQueryFilter: PageQueryFilter,
+  async findAllByOwnerId(
+    getAllByOwnerIdDto: GetAllByOwnerIdDto,
   ): Promise<IMessagesWithPagination> {
     try {
       this.logger.log({}, 'start findAll')
 
-      const { page, limit } = pageQueryFilter
+      const { page, ownerId } = getAllByOwnerIdDto
+      const limit = 10
+      const skip = (page - 1) * 10
 
-      const skip = page * limit
-
-      const foundOwner = await this.ownerModel.findById({
-        owner_id: new ObjectId(owner_id),
-      })
+      const foundOwner = await this.ownerModel.findById(ownerId)
 
       if (!foundOwner) {
-        throw new NotFoundException(
-          `O proprietário com o id: ${owner_id} não foi encontrado.`,
-        )
+        throw new NotFoundException(`O proprietário não foi encontrado.`)
       }
       const docs: IMessageOwner[] = await this.messageModel
-        .find({ owner_id: new ObjectId(owner_id) })
+        .find({ ownerId: ownerId })
         .skip(skip)
         .limit(limit)
         .lean()
 
-      const count = await this.messageModel.estimatedDocumentCount({ owner_id })
+      // Coletar todos os propertyId únicos dos documentos em docs
+      const uniquePropertyIds = Array.from(
+        new Set(docs.map(doc => doc.propertyId)),
+      )
+
+      // Consultar a coleção 'properties' para encontrar os documentos correspondentes aos propertyId
+      const properties = await this.propertyModel.find({
+        _id: { $in: uniquePropertyIds },
+      })
+
+      const count = await this.messageModel.countDocuments({ ownerId })
       const totalPages = Math.ceil(count / limit)
 
       return {
         docs,
+        properties,
         page,
         ...(count && { totalPages }),
       }
@@ -104,33 +110,31 @@ export class MessageService {
 
   async findByPropertyId(
     findByPropertyIdDto: FindByPropertyIdDto,
-  ): Promise<IMessageOwner[]> {
+  ): Promise<any> {
     try {
       this.logger.log(
         { findByPropertyIdDto },
         'start find-messages-by-property-id',
       )
 
-      const { id } = findByPropertyIdDto
+      const { propertyId } = findByPropertyIdDto
 
-      const property = await this.propertyModel.findById(id)
+      const property = await this.propertyModel.findById(propertyId).lean()
 
       if (!property) {
         throw new NotFoundException(
-          `Nenhum imóvel encontrado para o id: ${id}.`,
+          `Nenhum imóvel encontrado para o id: ${propertyId}.`,
         )
       }
 
-      const messages = []
-      const messagesFound = await this.messageModel.find({ propertyId: id })
+      const messages = await this.messageModel
+        .find({ propertyId: propertyId })
+        .lean()
 
-      if (!messagesFound) {
-        return messages
+      return {
+        messages,
+        property,
       }
-
-      messages.push(messagesFound)
-
-      return messages
     } catch (error) {
       this.logger.error({
         error: JSON.stringify(error),

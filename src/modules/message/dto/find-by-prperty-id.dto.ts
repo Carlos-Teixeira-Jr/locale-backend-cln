@@ -5,5 +5,5 @@ import { Schema } from 'mongoose'
 export class FindByPropertyIdDto {
   @IsNotEmpty()
   @Validate(IDValidator)
-  id: Schema.Types.ObjectId
+  propertyId: Schema.Types.ObjectId
 }
