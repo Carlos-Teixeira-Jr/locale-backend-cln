@@ -20,6 +20,15 @@ export interface IMessagesWithPagination {
   page: number
 }
 
+export interface IMessagesByPropIdOut {
+  messages: {
+    messagesDocs: IMessageOwner[]
+    count: number
+    totalPages: number
+  }
+  property: IProperty
+}
+
 @Injectable()
 export class MessageService {
   constructor(
@@ -67,13 +76,14 @@ export class MessageService {
 
       const { page, ownerId } = getAllByOwnerIdDto
       const limit = 10
-      const skip = (page - 1) * 10
+      const skip = (page - 1) * limit
 
       const foundOwner = await this.ownerModel.findById(ownerId)
 
       if (!foundOwner) {
         throw new NotFoundException(`O proprietário não foi encontrado.`)
       }
+
       const docs: IMessageOwner[] = await this.messageModel
         .find({ ownerId: ownerId })
         .skip(skip)
@@ -110,16 +120,18 @@ export class MessageService {
 
   async findByPropertyId(
     findByPropertyIdDto: FindByPropertyIdDto,
-  ): Promise<any> {
+  ): Promise<IMessagesByPropIdOut> {
     try {
       this.logger.log(
         { findByPropertyIdDto },
         'start find-messages-by-property-id',
       )
 
-      const { propertyId } = findByPropertyIdDto
+      const { propertyId, page } = findByPropertyIdDto
+      const limit = 2
+      const skip = (page - 1) * limit
 
-      const property = await this.propertyModel.findById(propertyId).lean()
+      const property: IProperty = await this.propertyModel.findById(propertyId)
 
       if (!property) {
         throw new NotFoundException(
@@ -127,9 +139,22 @@ export class MessageService {
         )
       }
 
-      const messages = await this.messageModel
+      const messagesDocs = await this.messageModel
         .find({ propertyId: propertyId })
-        .lean()
+        .skip(skip)
+        .limit(limit)
+
+      const count = await this.messageModel.countDocuments({
+        propertyId,
+      })
+
+      const totalPages = Math.ceil(count / limit)
+
+      const messages = {
+        messagesDocs,
+        count,
+        totalPages,
+      }
 
       return {
         messages,
