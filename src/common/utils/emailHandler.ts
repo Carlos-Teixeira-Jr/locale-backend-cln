@@ -87,7 +87,7 @@ export async function sendResetPasswordEmail(
               <p class="text">Olá, uma senha provisória foi gerada para que o usuário com o email ${email} pudesse logar. Recomendamos que você altere essa senha assim que puder acessar sua área de usuário.</p>
               <div class="two-color-line">
                 <p class="title">Senha provisória: </p>
-                <p class="title">${newPassword}</p>
+                <h1 class="title">${newPassword}</h1>
               </div>
               <hr>
               <p class="small-text">Caso não tenha feito essa solicitação, por favor desconsidere esse email.</p>
