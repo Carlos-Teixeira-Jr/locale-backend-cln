@@ -274,7 +274,7 @@ export class UsersService {
 
       // Gerar o customerId caso o usuário não tenha feito ainda;
       if (!customerId) {
-        const response = await fetch(`http://localhost:3002/customer`, {
+        const response = await fetch(`${process.env.PAYMENT_URL}/customer`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -310,7 +310,7 @@ export class UsersService {
       const formattedDate = `${year}-${month}-${day}`
 
       // Gerar token dos dados do cartão;
-      const response = await fetch(`http://localhost:3002/payment/tokenize`, {
+      const response = await fetch(`${process.env.PAYMENT_URL}/payment/tokenize`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

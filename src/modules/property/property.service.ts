@@ -326,7 +326,7 @@ export class PropertyService {
       // CUSTOMER
       if (!isPlanFree && !owner.customerId) {
         // Cadastrar customer no payment api;
-        const response = await fetch(`http://localhost:3002/customer`, {
+        const response = await fetch(`${process.env.PAYMENT_URL}/customer`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -379,7 +379,7 @@ export class PropertyService {
         if (!owner.creditCardInfo.creditCardToken) {
           // Chamada pra api de pagamento "subscription";
           const response = await fetch(
-            `http://localhost:3002/payment/subscription`,
+            `${process.env.PAYMENT_URL}/payment/subscription`,
             {
               method: 'POST',
               headers: {
@@ -428,7 +428,7 @@ export class PropertyService {
           if (owner.adCredits < 1) {
             // Chamada pra api de pagamento "subscription" no caso de o usuário já ter seus dados de cartão salvos no banco;
             const response = await fetch(
-              `http://localhost:3002/payment/subscription`,
+              `${process.env.PAYMENT_URL}/payment/subscription`,
               {
                 method: 'POST',
                 headers: {
