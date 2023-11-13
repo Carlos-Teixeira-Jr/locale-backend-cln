@@ -310,35 +310,38 @@ export class UsersService {
       const formattedDate = `${year}-${month}-${day}`
 
       // Gerar token dos dados do cartão;
-      const response = await fetch(`${process.env.PAYMENT_URL}/payment/tokenize`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          access_token: process.env.ASSAS_API_KEY || '',
+      const response = await fetch(
+        `${process.env.PAYMENT_URL}/payment/tokenize`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            access_token: process.env.ASSAS_API_KEY || '',
+          },
+          body: JSON.stringify({
+            billingType: 'CREDIT_CARD',
+            cycle: 'MONTHLY',
+            customer: customerId ? customerId : ownerExists.customerId,
+            value: plan.price,
+            nextDueDate: formattedDate,
+            creditCard: {
+              holderName: cardName,
+              number: cardNumber,
+              expiryMonth,
+              expiryYear,
+              ccv: cvc,
+            },
+            creditCardHolderInfo: {
+              name: cardName,
+              email: email,
+              phone,
+              cpfCnpj: cpf,
+              postalCode: address.zipCode,
+              addressNumber: address.streetNumber,
+            },
+          }),
         },
-        body: JSON.stringify({
-          billingType: 'CREDIT_CARD',
-          cycle: 'MONTHLY',
-          customer: customerId ? customerId : ownerExists.customerId,
-          value: plan.price,
-          nextDueDate: formattedDate,
-          creditCard: {
-            holderName: cardName,
-            number: cardNumber,
-            expiryMonth,
-            expiryYear,
-            ccv: cvc,
-          },
-          creditCardHolderInfo: {
-            name: cardName,
-            email: email,
-            phone,
-            cpfCnpj: cpf,
-            postalCode: address.zipCode,
-            addressNumber: address.streetNumber,
-          },
-        }),
-      })
+      )
 
       if (!response.ok) {
         throw new Error('Não foi possível gerar um token dos dados do cartão')
