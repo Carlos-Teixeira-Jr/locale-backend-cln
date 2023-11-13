@@ -21,7 +21,7 @@ export class CreateMessageDto {
 
   @IsNotEmpty()
   @Validate(IDValidator)
-  owner_id: Schema.Types.ObjectId
+  ownerId: Schema.Types.ObjectId
 
   @IsNotEmpty()
   @Validate(IDValidator)

@@ -11,6 +11,7 @@ import { EditUserDto } from './dto/edit-user.dto'
 import { EditFavouriteDto } from './dto/edit-favourite.dto'
 import { GetFavouritesByUserDto } from './dto/favourite-property.dto'
 import { IUser } from 'common/schemas/User.schema'
+import { EditCreditCardDto } from './dto/editCreditCard.dto'
 
 @ApiTags('users')
 @Controller('user')
@@ -39,6 +40,11 @@ export class UsersController {
   @Post('edit-user')
   async editUser(@Body() body: EditUserDto): Promise<{ success: boolean }> {
     return this.usersService.editUser(body)
+  }
+
+  @Post('edit-credit-card')
+  async editCreditCard(@Body() body: EditCreditCardDto) {
+    return this.usersService.editCreditCard(body)
   }
 
   @Post('favourite')

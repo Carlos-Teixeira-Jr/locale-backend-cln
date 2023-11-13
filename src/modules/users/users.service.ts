@@ -12,6 +12,7 @@ import { EditUserDto } from './dto/edit-user.dto'
 import { IProperty, PropertyModelName } from 'common/schemas/Property.schema'
 import { EditFavouriteDto } from './dto/edit-favourite.dto'
 import { GetFavouritesByUserDto } from './dto/favourite-property.dto'
+import { EditCreditCardDto } from './dto/editCreditCard.dto'
 
 export type User = {
   userId: number
@@ -117,21 +118,23 @@ export class UsersService {
     try {
       this.logger.log({ body }, 'find owner by user id')
 
-      const { id } = body
+      const { _id } = body
 
       const user = await this.userModel
-        .findOne({ _id: id })
+        .findOne({ _id })
         .select('username email address cpf')
 
       if (!user) {
         throw new NotFoundException(
-          `Usuário com o id: ${id} não foi encontrado`,
+          `Usuário com o id: ${_id} não foi encontrado`,
         )
       }
 
       const owner = await this.ownerModel
-        .findOne({ userId: id })
-        .select('adCredits plan phone cellPhone _id')
+        .findOne({ userId: _id })
+        .select(
+          'adCredits plan phone cellPhone customerId creditCardInfo _id name',
+        )
 
       return {
         user,
@@ -223,6 +226,135 @@ export class UsersService {
         success: true,
         updatedOwner,
       }
+    } catch (error) {
+      this.logger.error({
+        error: JSON.stringify(error),
+        exception: '> exception',
+      })
+      throw error
+    }
+  }
+
+  async editCreditCard(body: EditCreditCardDto) {
+    try {
+      this.logger.log({}, 'edit credit card')
+
+      const {
+        cardNumber,
+        cardName,
+        expiry,
+        cvc,
+        cpf,
+        email,
+        phone,
+        plan,
+        address,
+        owner,
+        customerId,
+      } = body
+
+      // Cadastrar os dados do novo cartão de crédito no owner do usuário;
+      const ownerExists = await this.ownerModel.findById(owner)
+
+      if (!ownerExists) {
+        throw new NotFoundException(`Proprietário não econtrado.`)
+      }
+
+      // Formatando a data de validade do cartão;
+      const formattedExpiry = expiry.split('-')
+      const expiryYear = formattedExpiry[0]
+      const expiryMonth = formattedExpiry[1]
+
+      // Verificando se o usuário selecionou umnovo plano ao mudar os dados do cartão;
+      const isNewPlan = ownerExists.plan === plan._id
+
+      if (isNewPlan) {
+        ownerExists.newPlan = plan._id
+      }
+
+      // Gerar o customerId caso o usuário não tenha feito ainda;
+      if (!customerId) {
+        const response = await fetch(`http://localhost:3002/customer`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            access_token: process.env.ASSAS_API_KEY || '',
+          },
+          body: JSON.stringify({
+            name: owner.name,
+            email: email,
+            phone,
+            postalCode: address.zipCode,
+            description: 'Confirmação de criação de id de cliente',
+            cpfCnpj: cpf,
+            addressNumber: address.streetNumber,
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error(`Falha ao criar o cliente: ${response.statusText}`)
+        }
+
+        const customer = await response.json()
+
+        // Atualiza o 'customerId' no 'owner' e salva no banco de dados
+        ownerExists.customerId = customer.id
+        await ownerExists.save()
+      }
+
+      // Formatação da data;
+      const currentDate = new Date()
+      const year = currentDate.getFullYear()
+      const month = (currentDate.getMonth() + 1).toString().padStart(2, '0')
+      const day = currentDate.getDate().toString().padStart(2, '0')
+      const formattedDate = `${year}-${month}-${day}`
+
+      // Gerar token dos dados do cartão;
+      const response = await fetch(`http://localhost:3002/payment/tokenize`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          access_token: process.env.ASSAS_API_KEY || '',
+        },
+        body: JSON.stringify({
+          billingType: 'CREDIT_CARD',
+          cycle: 'MONTHLY',
+          customer: customerId ? customerId : ownerExists.customerId,
+          value: plan.price,
+          nextDueDate: formattedDate,
+          creditCard: {
+            holderName: cardName,
+            number: cardNumber,
+            expiryMonth,
+            expiryYear,
+            ccv: cvc,
+          },
+          creditCardHolderInfo: {
+            name: cardName,
+            email: email,
+            phone,
+            cpfCnpj: cpf,
+            postalCode: address.zipCode,
+            addressNumber: address.streetNumber,
+          },
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Não foi possível gerar um token dos dados do cartão')
+      }
+
+      const responseData = await response.json()
+
+      const creditCardInfo = responseData
+
+      // Atualiza os dados do usuário;
+      ownerExists.isNewCreditCard = true
+      ownerExists.newPlan = isNewPlan
+      ownerExists.creditCardInfo = creditCardInfo
+      await ownerExists.save()
+
+      return { success: true }
     } catch (error) {
       this.logger.error({
         error: JSON.stringify(error),

@@ -10,14 +10,14 @@ export interface IMessageOwner extends BaseModel, Document {
   phone: string
   email: string
   message: string
-  owner_id: Schema.Types.ObjectId
+  ownerId: Schema.Types.ObjectId
   propertyId: Schema.Types.ObjectId
 }
 
 export class OwnerParams {
   @IsString()
   @Validate(IDValidator)
-  owner_id: string
+  ownerId: string
 }
 
 export const MessageOwnerSchema = new Schema<IMessageOwner>(
@@ -26,7 +26,7 @@ export const MessageOwnerSchema = new Schema<IMessageOwner>(
     phone: { type: String },
     email: { type: String },
     message: { type: String },
-    owner_id: { type: Schema.Types.ObjectId },
+    ownerId: { type: Schema.Types.ObjectId },
     propertyId: { type: Schema.Types.ObjectId },
   },
   {
