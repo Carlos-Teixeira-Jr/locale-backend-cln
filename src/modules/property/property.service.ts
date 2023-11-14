@@ -298,7 +298,6 @@ export class PropertyService {
           cellPhone,
           plan,
           userId: user._id,
-          //adCredits: selectedPlan.commonAd,
         }
 
         if (!isPlanFree) {
@@ -358,6 +357,8 @@ export class PropertyService {
 
       let paymentValue
       let creditCardInfo
+      let subscriptionId
+
       // Validar se tem plano e se há creditos no plano;
       if (!isPlanFree) {
         if (owner.adCredits < 1) {
@@ -418,14 +419,71 @@ export class PropertyService {
           const responseData = await response.json()
 
           creditCardInfo = responseData.creditCard
+          subscriptionId = responseData.id
 
           // Decrementar o número de créditos disponíveis do usuário;
           owner.adCredits = owner.adCredits - 1
           // Salvar o token do cartão de crédito no banco de dados;
           owner.creditCardInfo = creditCardInfo
+          owner.subscriptionId = subscriptionId
           await owner.save()
         } else {
+          // if (owner.adCredits < 1) {
+          //   // Chamada pra api de pagamento "subscription" no caso de o usuário já ter seus dados de cartão salvos no banco;
+          //   const response = await fetch(
+          //     `${process.env.PAYMENT_URL}/payment/subscription`,
+          //     {
+          //       method: 'POST',
+          //       headers: {
+          //         'Content-Type': 'application/json',
+          //         access_token: process.env.ASSAS_API_KEY || '',
+          //       },
+          //       body: JSON.stringify({
+          //         billingType: 'CREDIT_CARD',
+          //         cycle: 'MONTHLY',
+          //         customer: owner.customerId,
+          //         value: selectedPlan.price,
+          //         nextDueDate: formattedDate,
+          //         creditCardToken: owner.creditCardInfo.creditCardToken,
+          //       }),
+          //     },
+          //   )
+
+          //   if (!response.ok) {
+          //     throw new Error(
+          //       `Falha ao gerara cobrança: ${response.statusText}`,
+          //     )
+          //   }
+          // }
           if (owner.adCredits < 1) {
+            // Caso em que o usuário não tem mais créditos e selecionou outro plano
+            if (selectedPlan._id !== owner.plan) {
+              const subscriptionId = owner.subscriptionId
+              const response = await fetch(
+                `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    access_token: process.env.ASSAS_API_KEY || '',
+                  },
+                  body: JSON.stringify({
+                    billingType: 'CREDIT_CARD',
+                    cycle: 'MONTHLY',
+                    customer: owner.customerId,
+                    value: selectedPlan.price,
+                    nextDueDate: formattedDate,
+                    creditCardToken: owner.creditCardInfo.creditCardToken,
+                  }),
+                },
+              )
+
+              if (!response.ok) {
+                throw new Error(
+                  `Falha ao atualizar a assinatura: ${response.statusText}`,
+                )
+              }
+            }
             // Chamada pra api de pagamento "subscription" no caso de o usuário já ter seus dados de cartão salvos no banco;
             const response = await fetch(
               `${process.env.PAYMENT_URL}/payment/subscription`,
@@ -448,7 +506,7 @@ export class PropertyService {
 
             if (!response.ok) {
               throw new Error(
-                `Falha ao gerara cobrança: ${response.statusText}`,
+                `Falha ao gerar a cobrança: ${response.statusText}`,
               )
             }
           }
