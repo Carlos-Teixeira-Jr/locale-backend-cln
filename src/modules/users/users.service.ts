@@ -1,7 +1,10 @@
 import { Model } from 'mongoose'
-import { Injectable, NotFoundException } from '@nestjs/common'
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
-
 import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import { LoggerService } from 'modules/logger/logger.service'
 import { IUser, UserModelName } from 'common/schemas/User.schema'
@@ -13,6 +16,7 @@ import { IProperty, PropertyModelName } from 'common/schemas/Property.schema'
 import { EditFavouriteDto } from './dto/edit-favourite.dto'
 import { GetFavouritesByUserDto } from './dto/favourite-property.dto'
 import { EditCreditCardDto } from './dto/editCreditCard.dto'
+import * as bcrypt from 'bcrypt'
 
 export type User = {
   userId: number
@@ -161,6 +165,8 @@ export class UsersService {
         address: userAddress,
       } = body.user
 
+      const { password, passwordConfirmattion } = body.password
+
       let ownerId
       let ownerName: string
       let user
@@ -185,17 +191,43 @@ export class UsersService {
         )
       }
 
-      await this.userModel.updateOne(
-        { _id: userId },
-        {
-          $set: {
-            username: userName,
-            email,
-            cpf,
-            address: userAddress,
+      // Lida com a edição da senha caso o usuário tenha trocado;
+      if (password) {
+        if (password !== passwordConfirmattion) {
+          throw new BadRequestException(
+            'A confirmação de senha não é igual a senha informada',
+          )
+        } else {
+          const encryptedPassword = await bcrypt.hash(password, 10)
+          await this.userModel.updateOne(
+            { _id: userId },
+            {
+              $set: {
+                username: userName,
+                email,
+                cpf,
+                address: userAddress,
+                password: encryptedPassword,
+              },
+            },
+          )
+        }
+      } else {
+        await this.userModel.updateOne(
+          { _id: userId },
+          {
+            $set: {
+              username: userName,
+              email,
+              cpf,
+              address: userAddress,
+            },
           },
-        },
-      )
+        )
+      }
+
+      let updatedOwner
+      let response
 
       if (ownerId) {
         const owner = await this.ownerModel.findById(ownerId)
@@ -218,14 +250,18 @@ export class UsersService {
             },
           },
         )
+
+        updatedOwner = await this.ownerModel.findById(ownerId).lean()
+
+        response = {
+          success: true,
+          updatedOwner,
+        }
       }
 
-      const updatedOwner = await this.ownerModel.findById(ownerId).lean()
+      response = { success: true }
 
-      return {
-        success: true,
-        updatedOwner,
-      }
+      return response
     } catch (error) {
       this.logger.error({
         error: JSON.stringify(error),
