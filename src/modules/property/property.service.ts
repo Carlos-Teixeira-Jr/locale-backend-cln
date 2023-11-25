@@ -7,7 +7,7 @@ import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import { LoggerService } from 'modules/logger/logger.service'
 import { InjectModel } from '@nestjs/mongoose'
 import { IProperty, PropertyModelName } from 'common/schemas/Property.schema'
-import { Model } from 'mongoose'
+import mongoose, { Model } from 'mongoose'
 import { CommonQueryFilter } from 'common/utils/query.filter'
 import { CreatePropertyDto } from './dto/create-property.dto'
 import { IOwner, OwnerModelName } from 'common/schemas/Owner.schema'
@@ -92,6 +92,8 @@ export class PropertyService {
   ) {}
 
   async findOne(id: string, isEdit: boolean): Promise<IProperty> {
+    const session = await mongoose.startSession()
+    session.startTransaction()
     try {
       this.logger.log({}, 'start findOne')
 
@@ -101,7 +103,7 @@ export class PropertyService {
         throw new NotFoundException(`O id: ${id} não foi encontrado`)
       }
 
-      // Incrementa o número de visualizações do imóvel quando for página de edição de imóvel;
+      // Incrementa o número de visualizações do imóvel quando não for página de edição de imóvel;
       if (!isEdit) {
         await this.propertyModel.updateOne(
           { _id: property._id },
@@ -109,13 +111,18 @@ export class PropertyService {
         )
       }
 
+      await session.commitTransaction()
+
       return property
     } catch (error) {
+      await session.abortTransaction()
       this.logger.error({
         error: JSON.stringify(error),
         exception: '> exception',
       })
       throw error
+    } finally {
+      session.endSession()
     }
   }
 
@@ -203,7 +210,12 @@ export class PropertyService {
   }
 
   async createOne(createPropertyDto: CreatePropertyDto): Promise<any> {
+    const mongodbUri = `${process.env.DB_HOST}`
+    const db = await mongoose.createConnection(mongodbUri).asPromise()
+    const session = await db.startSession()
+    const opt = { session, new: true }
     try {
+      await session.startTransaction()
       this.logger.log({}, 'start createOne')
 
       const { propertyType, address } = createPropertyDto.propertyData
@@ -213,13 +225,13 @@ export class PropertyService {
 
       let cardName
       let cardNumber
-      let cvc
+      let ccv
       let expiry
 
       if (!isPlanFree) {
         cardName = createPropertyDto.creditCardData.cardName
         cardNumber = createPropertyDto.creditCardData.cardNumber
-        cvc = createPropertyDto.creditCardData.cvc
+        ccv = createPropertyDto.creditCardData.ccv
         expiry = createPropertyDto.creditCardData.expiry
       }
 
@@ -274,6 +286,7 @@ export class PropertyService {
               address: userData.address,
               username: userData.username,
             },
+            opt,
           )
 
           // Use o método findById para buscar o usuário atualizado
@@ -298,14 +311,13 @@ export class PropertyService {
           cellPhone,
           plan,
           userId: user._id,
-          //adCredits: selectedPlan.commonAd,
         }
 
         if (!isPlanFree) {
           ownerData.adCredits = selectedPlan.commonAd
         }
 
-        const createdOwner: IOwner = await this.ownerModel.create(ownerData)
+        const createdOwner: any = await this.ownerModel.create([ownerData], opt)
         owner = createdOwner
       } else {
         owner = ownerExists
@@ -318,6 +330,9 @@ export class PropertyService {
           owner.adCredits = selectedPlan.commonAd
           if (selectedPlan.name === 'Locale Plus') {
             // Modificar o schema de owner para salvar o highlightCredit;
+            owner.plan = selectedPlan._id
+            owner.adCredits = selectedPlan.commonAd
+            owner.highlightAd = selectedPlan.highlightAd
           }
           await owner.save()
         }
@@ -358,6 +373,8 @@ export class PropertyService {
 
       let paymentValue
       let creditCardInfo
+      let subscriptionId
+
       // Validar se tem plano e se há creditos no plano;
       if (!isPlanFree) {
         if (owner.adCredits < 1) {
@@ -397,7 +414,7 @@ export class PropertyService {
                   number: cardNumber,
                   expiryMonth,
                   expiryYear,
-                  ccv: cvc,
+                  ccv: ccv,
                 },
                 creditCardHolderInfo: {
                   name: cardName,
@@ -418,14 +435,71 @@ export class PropertyService {
           const responseData = await response.json()
 
           creditCardInfo = responseData.creditCard
+          subscriptionId = responseData.id
 
           // Decrementar o número de créditos disponíveis do usuário;
           owner.adCredits = owner.adCredits - 1
           // Salvar o token do cartão de crédito no banco de dados;
           owner.creditCardInfo = creditCardInfo
+          owner.subscriptionId = subscriptionId
           await owner.save()
         } else {
+          // if (owner.adCredits < 1) {
+          //   // Chamada pra api de pagamento "subscription" no caso de o usuário já ter seus dados de cartão salvos no banco;
+          //   const response = await fetch(
+          //     `${process.env.PAYMENT_URL}/payment/subscription`,
+          //     {
+          //       method: 'POST',
+          //       headers: {
+          //         'Content-Type': 'application/json',
+          //         access_token: process.env.ASSAS_API_KEY || '',
+          //       },
+          //       body: JSON.stringify({
+          //         billingType: 'CREDIT_CARD',
+          //         cycle: 'MONTHLY',
+          //         customer: owner.customerId,
+          //         value: selectedPlan.price,
+          //         nextDueDate: formattedDate,
+          //         creditCardToken: owner.creditCardInfo.creditCardToken,
+          //       }),
+          //     },
+          //   )
+
+          //   if (!response.ok) {
+          //     throw new Error(
+          //       `Falha ao gerara cobrança: ${response.statusText}`,
+          //     )
+          //   }
+          // }
           if (owner.adCredits < 1) {
+            // Caso em que o usuário não tem mais créditos e selecionou outro plano
+            if (selectedPlan._id !== owner.plan) {
+              const subscriptionId = owner.subscriptionId
+              const response = await fetch(
+                `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    access_token: process.env.ASSAS_API_KEY || '',
+                  },
+                  body: JSON.stringify({
+                    billingType: 'CREDIT_CARD',
+                    cycle: 'MONTHLY',
+                    customer: owner.customerId,
+                    value: selectedPlan.price,
+                    nextDueDate: formattedDate,
+                    creditCardToken: owner.creditCardInfo.creditCardToken,
+                  }),
+                },
+              )
+
+              if (!response.ok) {
+                throw new Error(
+                  `Falha ao atualizar a assinatura: ${response.statusText}`,
+                )
+              }
+            }
             // Chamada pra api de pagamento "subscription" no caso de o usuário já ter seus dados de cartão salvos no banco;
             const response = await fetch(
               `${process.env.PAYMENT_URL}/payment/subscription`,
@@ -448,7 +522,7 @@ export class PropertyService {
 
             if (!response.ok) {
               throw new Error(
-                `Falha ao gerara cobrança: ${response.statusText}`,
+                `Falha ao gerar a cobrança: ${response.statusText}`,
               )
             }
           }
@@ -467,10 +541,15 @@ export class PropertyService {
         .lean()
 
       if (!foundCity) {
-        await this.locationModel.create({
-          name: address.city,
-          category: 'city',
-        })
+        await this.locationModel.create(
+          [
+            {
+              name: address.city,
+              category: 'city',
+            },
+          ],
+          opt,
+        )
       }
 
       // lida com o cadastro do estado
@@ -479,7 +558,10 @@ export class PropertyService {
         .lean()
 
       if (!foundUf) {
-        await this.locationModel.create({ name: address.uf, category: 'uf' })
+        await this.locationModel.create(
+          [{ name: address.uf, category: 'uf' }],
+          opt,
+        )
       }
 
       // lida com o cadastro da rua
@@ -488,10 +570,15 @@ export class PropertyService {
         .lean()
 
       if (!foundStreetName) {
-        await this.locationModel.create({
-          name: address.streetName,
-          category: 'streetName',
-        })
+        await this.locationModel.create(
+          [
+            {
+              name: address.streetName,
+              category: 'streetName',
+            },
+          ],
+          opt,
+        )
       }
 
       // Lida com o cadastro do bairro
@@ -500,10 +587,15 @@ export class PropertyService {
         .lean()
 
       if (!foundNeighborhood) {
-        await this.locationModel.create({
-          name: address.neighborhood,
-          category: 'neighborhood',
-        })
+        await this.locationModel.create(
+          [
+            {
+              name: address.neighborhood,
+              category: 'neighborhood',
+            },
+          ],
+          opt,
+        )
       }
 
       // PROPERTY TYPE
@@ -514,7 +606,7 @@ export class PropertyService {
         .lean()
 
       if (!foundPropertyType) {
-        await this.propertyTypeModel.create({ name: propertyType })
+        await this.propertyTypeModel.create([{ name: propertyType }], opt)
       }
 
       // PROPERTY
@@ -527,7 +619,12 @@ export class PropertyService {
       }
 
       // lida com a criação da property no DB
-      const createdProperty = await this.propertyModel.create(propertyData)
+      const createdProperty = await this.propertyModel.create(
+        [propertyData],
+        opt,
+      )
+
+      await session.commitTransaction()
 
       return {
         createdProperty,
@@ -536,11 +633,14 @@ export class PropertyService {
         userAlreadyExists,
       }
     } catch (error) {
+      await session.abortTransaction()
       this.logger.error({
         error: JSON.stringify(error),
         exception: '> exception',
       })
       throw error
+    } finally {
+      session.endSession()
     }
   }
 
@@ -623,7 +723,13 @@ export class PropertyService {
   }
 
   async propertyActivation(propertyActivationDto: PropertyActivationDto) {
+    const mongodbUri = `${process.env.DB_HOST}`
+    const db = await mongoose.createConnection(mongodbUri).asPromise()
+    const session = await db.startSession()
+    const opt = { session, new: true }
+
     try {
+      await session.startTransaction()
       this.logger.log({ propertyActivationDto }, 'start property activation')
 
       const { isActive, propertyId, userId } = propertyActivationDto
@@ -648,6 +754,7 @@ export class PropertyService {
         await this.propertyModel.updateOne(
           { _id: propertyId },
           { $set: { isActive: isActive } },
+          opt,
         )
       } else {
         if (propertyOwner.adCredits <= 0) {
@@ -658,72 +765,96 @@ export class PropertyService {
           await this.propertyModel.updateOne(
             { _id: propertyId },
             { $set: { isActive: isActive } },
+            opt,
           )
 
           await this.ownerModel.updateOne(
             { userId: userId },
             { $set: { adCredits: propertyOwner.adCredits - 1 } },
+            opt,
           )
         }
       }
+
+      await session.commitTransaction()
 
       return {
         success: true,
         message: 'Propriedade atualizada com sucesso.',
       }
     } catch (error) {
+      await session.abortTransaction()
+      session.endSession()
       this.logger.error({
         error: JSON.stringify(error),
         exception: '> exception',
       })
       throw error
+    } finally {
+      session.endSession()
     }
   }
 
   async highlightProperty(highlightPropertyDto: HighlightPropertyDto) {
+    const mongodbUri = `${process.env.DB_HOST}`
+    const db = await mongoose.createConnection(mongodbUri).asPromise()
+    const session = await db.startSession()
+    const opt = { session, new: true }
     try {
+      await session.startTransaction()
       this.logger.log({ highlightPropertyDto }, 'start highlight property')
 
-      const { id, owner } = highlightPropertyDto
+      const { propertyId, userId } = highlightPropertyDto
 
-      const property = await this.propertyModel.find({ _id: id })
+      const property = await this.propertyModel.findById(propertyId).lean()
 
       if (!property) {
-        throw new NotFoundException(`Imóvel com o id ${id} não encontrado.`)
-      }
-
-      const propertyOwner = await this.ownerModel.findOne({ userId: owner })
-
-      if (!propertyOwner) {
         throw new NotFoundException(
-          `O anunciante com o id ${owner} não foi encontrado.`,
+          `Imóvel com o id ${propertyId} não encontrado.`,
         )
       }
 
-      if (propertyOwner.adCredits <= 0) {
-        throw new BadRequestException(`O proprietário ${propertyOwner}`)
+      const propertyOwner = await this.ownerModel.findOne({ userId }).lean()
+
+      if (!propertyOwner) {
+        throw new NotFoundException(
+          `O anunciante com o id ${userId} não foi encontrado.`,
+        )
+      }
+
+      if (!propertyOwner.highlightAd || propertyOwner.highlightAd <= 0) {
+        throw new BadRequestException(
+          `O proprietário ${propertyOwner.name} não possúi mais créditos de destaque para destacar este anúncio!`,
+        )
       }
 
       await this.propertyModel.updateOne(
-        { _id: id },
+        { _id: propertyId },
         { $set: { highlighted: true } },
+        opt,
       )
 
       await this.ownerModel.updateOne(
         { _id: id },
         { $set: { adCredits: propertyOwner.adCredits - 1 } },
+        opt,
       )
+
+      await session.commitTransaction()
 
       return {
         success: true,
         message: 'Anúncio destacado com sucesso.',
       }
     } catch (error) {
+      await session.abortTransaction()
       this.logger.error({
         error: JSON.stringify(error),
         exception: '> exception',
       })
       throw error
+    } finally {
+      session.endSession()
     }
   }
 

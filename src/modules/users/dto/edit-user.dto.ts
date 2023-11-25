@@ -65,6 +65,16 @@ export class UserDto {
   address: PropertyAddressDto
 }
 
+export class EditPasswordDto {
+  @IsNotEmpty()
+  @IsString()
+  password: string
+
+  @IsNotEmpty()
+  @IsString()
+  passwordConfirmattion: string
+}
+
 export class EditUserDto {
   @IsNotEmpty()
   @Type(() => UserDto)
@@ -72,4 +82,8 @@ export class EditUserDto {
 
   @IsOptional()
   owner: OwnerDto
+
+  @IsOptional()
+  @Type(() => EditPasswordDto)
+  password: EditPasswordDto
 }

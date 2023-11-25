@@ -140,7 +140,7 @@ export class CreditCardData {
 
   @IsNotEmpty()
   @IsString()
-  cvc: string
+  ccv: string
 }
 
 export class CreatePropertyDto {

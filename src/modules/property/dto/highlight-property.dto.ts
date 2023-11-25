@@ -5,9 +5,9 @@ import { Schema } from 'mongoose'
 export class HighlightPropertyDto {
   @IsNotEmpty()
   @Validate(IDValidator)
-  id: { type: Schema.Types.ObjectId }
+  propertyId: { type: Schema.Types.ObjectId }
 
   @IsNotEmpty()
   @Validate(IDValidator)
-  owner: { type: Schema.Types.ObjectId }
+  userId: { type: Schema.Types.ObjectId }
 }
