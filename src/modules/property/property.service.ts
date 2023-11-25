@@ -204,7 +204,7 @@ export class PropertyService {
 
   async createOne(createPropertyDto: CreatePropertyDto): Promise<any> {
     try {
-      this.logger.log({}, 'start createOne')
+      this.logger.log({}, 'start create one')
 
       const { propertyType, address } = createPropertyDto.propertyData
 
@@ -213,13 +213,13 @@ export class PropertyService {
 
       let cardName
       let cardNumber
-      let cvc
+      let ccv
       let expiry
 
       if (!isPlanFree) {
         cardName = createPropertyDto.creditCardData.cardName
         cardNumber = createPropertyDto.creditCardData.cardNumber
-        cvc = createPropertyDto.creditCardData.cvc
+        ccv = createPropertyDto.creditCardData.ccv
         expiry = createPropertyDto.creditCardData.expiry
       }
 
@@ -398,7 +398,7 @@ export class PropertyService {
                   number: cardNumber,
                   expiryMonth,
                   expiryYear,
-                  ccv: cvc,
+                  ccv: ccv,
                 },
                 creditCardHolderInfo: {
                   name: cardName,
