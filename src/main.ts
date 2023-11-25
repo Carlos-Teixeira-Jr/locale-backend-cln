@@ -31,6 +31,11 @@ async function bootstrap() {
     }),
   )
 
+  // Configurar o limite do corpo da requisição
+  app.use((req, res, next) => {
+    json({ limit: '50mb' })(req, res, next)
+  })
+
   setupSwagger(app)
 
   app.useGlobalPipes(new ValidationPipe({ transform: true }))
