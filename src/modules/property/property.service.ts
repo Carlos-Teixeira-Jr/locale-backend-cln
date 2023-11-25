@@ -7,7 +7,7 @@ import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import { LoggerService } from 'modules/logger/logger.service'
 import { InjectModel } from '@nestjs/mongoose'
 import { IProperty, PropertyModelName } from 'common/schemas/Property.schema'
-import { Model } from 'mongoose'
+import mongoose, { Model } from 'mongoose'
 import { CommonQueryFilter } from 'common/utils/query.filter'
 import { CreatePropertyDto } from './dto/create-property.dto'
 import { IOwner, OwnerModelName } from 'common/schemas/Owner.schema'
@@ -92,6 +92,8 @@ export class PropertyService {
   ) {}
 
   async findOne(id: string, isEdit: boolean): Promise<IProperty> {
+    const session = await mongoose.startSession()
+    session.startTransaction()
     try {
       this.logger.log({}, 'start findOne')
 
@@ -101,7 +103,7 @@ export class PropertyService {
         throw new NotFoundException(`O id: ${id} não foi encontrado`)
       }
 
-      // Incrementa o número de visualizações do imóvel quando for página de edição de imóvel;
+      // Incrementa o número de visualizações do imóvel quando não for página de edição de imóvel;
       if (!isEdit) {
         await this.propertyModel.updateOne(
           { _id: property._id },
@@ -109,13 +111,18 @@ export class PropertyService {
         )
       }
 
+      await session.commitTransaction()
+
       return property
     } catch (error) {
+      await session.abortTransaction()
       this.logger.error({
         error: JSON.stringify(error),
         exception: '> exception',
       })
       throw error
+    } finally {
+      session.endSession()
     }
   }
 
@@ -203,8 +210,13 @@ export class PropertyService {
   }
 
   async createOne(createPropertyDto: CreatePropertyDto): Promise<any> {
+    const mongodbUri = `${process.env.DB_HOST}`
+    const db = await mongoose.createConnection(mongodbUri).asPromise()
+    const session = await db.startSession()
+    const opt = { session, new: true }
     try {
-      this.logger.log({}, 'start create one')
+      await session.startTransaction()
+      this.logger.log({}, 'start createOne')
 
       const { propertyType, address } = createPropertyDto.propertyData
 
@@ -274,6 +286,7 @@ export class PropertyService {
               address: userData.address,
               username: userData.username,
             },
+            opt,
           )
 
           // Use o método findById para buscar o usuário atualizado
@@ -304,7 +317,7 @@ export class PropertyService {
           ownerData.adCredits = selectedPlan.commonAd
         }
 
-        const createdOwner: IOwner = await this.ownerModel.create(ownerData)
+        const createdOwner: any = await this.ownerModel.create([ownerData], opt)
         owner = createdOwner
       } else {
         owner = ownerExists
@@ -528,10 +541,15 @@ export class PropertyService {
         .lean()
 
       if (!foundCity) {
-        await this.locationModel.create({
-          name: address.city,
-          category: 'city',
-        })
+        await this.locationModel.create(
+          [
+            {
+              name: address.city,
+              category: 'city',
+            },
+          ],
+          opt,
+        )
       }
 
       // lida com o cadastro do estado
@@ -540,7 +558,10 @@ export class PropertyService {
         .lean()
 
       if (!foundUf) {
-        await this.locationModel.create({ name: address.uf, category: 'uf' })
+        await this.locationModel.create(
+          [{ name: address.uf, category: 'uf' }],
+          opt,
+        )
       }
 
       // lida com o cadastro da rua
@@ -549,10 +570,15 @@ export class PropertyService {
         .lean()
 
       if (!foundStreetName) {
-        await this.locationModel.create({
-          name: address.streetName,
-          category: 'streetName',
-        })
+        await this.locationModel.create(
+          [
+            {
+              name: address.streetName,
+              category: 'streetName',
+            },
+          ],
+          opt,
+        )
       }
 
       // Lida com o cadastro do bairro
@@ -561,10 +587,15 @@ export class PropertyService {
         .lean()
 
       if (!foundNeighborhood) {
-        await this.locationModel.create({
-          name: address.neighborhood,
-          category: 'neighborhood',
-        })
+        await this.locationModel.create(
+          [
+            {
+              name: address.neighborhood,
+              category: 'neighborhood',
+            },
+          ],
+          opt,
+        )
       }
 
       // PROPERTY TYPE
@@ -575,7 +606,7 @@ export class PropertyService {
         .lean()
 
       if (!foundPropertyType) {
-        await this.propertyTypeModel.create({ name: propertyType })
+        await this.propertyTypeModel.create([{ name: propertyType }], opt)
       }
 
       // PROPERTY
@@ -588,7 +619,12 @@ export class PropertyService {
       }
 
       // lida com a criação da property no DB
-      const createdProperty = await this.propertyModel.create(propertyData)
+      const createdProperty = await this.propertyModel.create(
+        [propertyData],
+        opt,
+      )
+
+      await session.commitTransaction()
 
       return {
         createdProperty,
@@ -597,11 +633,14 @@ export class PropertyService {
         userAlreadyExists,
       }
     } catch (error) {
+      await session.abortTransaction()
       this.logger.error({
         error: JSON.stringify(error),
         exception: '> exception',
       })
       throw error
+    } finally {
+      session.endSession()
     }
   }
 
@@ -684,7 +723,13 @@ export class PropertyService {
   }
 
   async propertyActivation(propertyActivationDto: PropertyActivationDto) {
+    const mongodbUri = `${process.env.DB_HOST}`
+    const db = await mongoose.createConnection(mongodbUri).asPromise()
+    const session = await db.startSession()
+    const opt = { session, new: true }
+
     try {
+      await session.startTransaction()
       this.logger.log({ propertyActivationDto }, 'start property activation')
 
       const { isActive, propertyId, userId } = propertyActivationDto
@@ -709,6 +754,7 @@ export class PropertyService {
         await this.propertyModel.updateOne(
           { _id: propertyId },
           { $set: { isActive: isActive } },
+          opt,
         )
       } else {
         if (propertyOwner.adCredits <= 0) {
@@ -719,30 +765,43 @@ export class PropertyService {
           await this.propertyModel.updateOne(
             { _id: propertyId },
             { $set: { isActive: isActive } },
+            opt,
           )
 
           await this.ownerModel.updateOne(
             { userId: userId },
             { $set: { adCredits: propertyOwner.adCredits - 1 } },
+            opt,
           )
         }
       }
+
+      await session.commitTransaction()
 
       return {
         success: true,
         message: 'Propriedade atualizada com sucesso.',
       }
     } catch (error) {
+      await session.abortTransaction()
+      session.endSession()
       this.logger.error({
         error: JSON.stringify(error),
         exception: '> exception',
       })
       throw error
+    } finally {
+      session.endSession()
     }
   }
 
   async highlightProperty(highlightPropertyDto: HighlightPropertyDto) {
+    const mongodbUri = `${process.env.DB_HOST}`
+    const db = await mongoose.createConnection(mongodbUri).asPromise()
+    const session = await db.startSession()
+    const opt = { session, new: true }
     try {
+      await session.startTransaction()
       this.logger.log({ highlightPropertyDto }, 'start highlight property')
 
       const { propertyId, userId } = highlightPropertyDto
@@ -772,23 +831,30 @@ export class PropertyService {
       await this.propertyModel.updateOne(
         { _id: propertyId },
         { $set: { highlighted: true } },
+        opt,
       )
 
       await this.ownerModel.updateOne(
-        { _id: propertyOwner._id },
-        { $set: { highlightAd: propertyOwner.highlightAd - 1 } },
+        { _id: id },
+        { $set: { adCredits: propertyOwner.adCredits - 1 } },
+        opt,
       )
+
+      await session.commitTransaction()
 
       return {
         success: true,
         message: 'Anúncio destacado com sucesso.',
       }
     } catch (error) {
+      await session.abortTransaction()
       this.logger.error({
         error: JSON.stringify(error),
         exception: '> exception',
       })
       throw error
+    } finally {
+      session.endSession()
     }
   }
 
