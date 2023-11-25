@@ -14,6 +14,7 @@ export interface IOwner extends BaseModel, Document {
   }[]
   plan: Schema.Types.ObjectId
   userId: Schema.Types.ObjectId
+  highlightAd: number
   adCredits: number
   customerId: string
   subscriptionId: string
@@ -41,6 +42,7 @@ export const OwnerSchema = new Schema(
     plan: { type: Schema.Types.ObjectId, ref: 'plan' },
     userId: { type: Schema.Types.ObjectId },
     adCredits: { type: Number },
+    highLightAd: { type: Number },
     customerId: { type: String },
     subscriptionId: { type: String },
     creditCardInfo: {

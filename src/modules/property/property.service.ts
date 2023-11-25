@@ -317,6 +317,9 @@ export class PropertyService {
           owner.adCredits = selectedPlan.commonAd
           if (selectedPlan.name === 'Locale Plus') {
             // Modificar o schema de owner para salvar o highlightCredit;
+            owner.plan = selectedPlan._id
+            owner.adCredits = selectedPlan.commonAd
+            owner.highlightAd = selectedPlan.highlightAd
           }
           await owner.save()
         }
@@ -742,34 +745,38 @@ export class PropertyService {
     try {
       this.logger.log({ highlightPropertyDto }, 'start highlight property')
 
-      const { id, owner } = highlightPropertyDto
+      const { propertyId, userId } = highlightPropertyDto
 
-      const property = await this.propertyModel.find({ _id: id })
+      const property = await this.propertyModel.findById(propertyId).lean()
 
       if (!property) {
-        throw new NotFoundException(`Imóvel com o id ${id} não encontrado.`)
-      }
-
-      const propertyOwner = await this.ownerModel.findOne({ userId: owner })
-
-      if (!propertyOwner) {
         throw new NotFoundException(
-          `O anunciante com o id ${owner} não foi encontrado.`,
+          `Imóvel com o id ${propertyId} não encontrado.`,
         )
       }
 
-      if (propertyOwner.adCredits <= 0) {
-        throw new BadRequestException(`O proprietário ${propertyOwner}`)
+      const propertyOwner = await this.ownerModel.findOne({ userId }).lean()
+
+      if (!propertyOwner) {
+        throw new NotFoundException(
+          `O anunciante com o id ${userId} não foi encontrado.`,
+        )
+      }
+
+      if (!propertyOwner.highlightAd || propertyOwner.highlightAd <= 0) {
+        throw new BadRequestException(
+          `O proprietário ${propertyOwner.name} não possúi mais créditos de destaque para destacar este anúncio!`,
+        )
       }
 
       await this.propertyModel.updateOne(
-        { _id: id },
+        { _id: propertyId },
         { $set: { highlighted: true } },
       )
 
       await this.ownerModel.updateOne(
-        { _id: id },
-        { $set: { adCredits: propertyOwner.adCredits - 1 } },
+        { _id: propertyOwner._id },
+        { $set: { highlightAd: propertyOwner.highlightAd - 1 } },
       )
 
       return {
