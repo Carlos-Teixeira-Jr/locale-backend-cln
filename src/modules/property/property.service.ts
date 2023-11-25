@@ -835,7 +835,7 @@ export class PropertyService {
       )
 
       await this.ownerModel.updateOne(
-        { _id: id },
+        { _id: userId },
         { $set: { adCredits: propertyOwner.adCredits - 1 } },
         opt,
       )
