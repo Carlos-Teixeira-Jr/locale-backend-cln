@@ -365,7 +365,7 @@ export class PropertyService {
 
       // PAYMENT
 
-      let paymentValue
+      const paymentValue = null
       let creditCardInfo
       let subscriptionId
 
@@ -613,16 +613,15 @@ export class PropertyService {
       }
 
       // lida com a criação da property no DB
-      const createdProperty = await this.propertyModel.create(
-        [propertyData],
-        opt,
-      )
+      const createdProperty = await this.propertyModel.create(propertyData)
 
       await session.commitTransaction()
 
       return {
         createdProperty,
-        creditCardBrand: owner.creditCardInfo.creditCardBrand,
+        creditCardBrand: owner.creditCardInfo
+          ? owner.creditCardInfo.creditCardBrand
+          : null,
         paymentValue,
         userAlreadyExists,
       }
