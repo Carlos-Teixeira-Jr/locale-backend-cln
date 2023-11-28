@@ -92,8 +92,6 @@ export class PropertyService {
   ) {}
 
   async findOne(id: string, isEdit: boolean): Promise<IProperty> {
-    const session = await mongoose.startSession()
-    session.startTransaction()
     try {
       this.logger.log({}, 'start findOne')
 
@@ -111,18 +109,13 @@ export class PropertyService {
         )
       }
 
-      await session.commitTransaction()
-
       return property
     } catch (error) {
-      await session.abortTransaction()
       this.logger.error({
         error: JSON.stringify(error),
         exception: '> exception',
       })
       throw error
-    } finally {
-      session.endSession()
     }
   }
 
@@ -272,6 +265,7 @@ export class PropertyService {
             password: randomPassword,
           }
 
+          // Cria o usuário no banco de dados;
           const registerUser = await this.authService.register(
             registerUserParams,
           )
@@ -371,7 +365,7 @@ export class PropertyService {
 
       // PAYMENT
 
-      let paymentValue
+      const paymentValue = null
       let creditCardInfo
       let subscriptionId
 
@@ -619,16 +613,15 @@ export class PropertyService {
       }
 
       // lida com a criação da property no DB
-      const createdProperty = await this.propertyModel.create(
-        [propertyData],
-        opt,
-      )
+      const createdProperty = await this.propertyModel.create(propertyData)
 
       await session.commitTransaction()
 
       return {
         createdProperty,
-        creditCardBrand: owner.creditCardInfo.creditCardBrand,
+        creditCardBrand: owner.creditCardInfo
+          ? owner.creditCardInfo.creditCardBrand
+          : null,
         paymentValue,
         userAlreadyExists,
       }
@@ -835,7 +828,7 @@ export class PropertyService {
       )
 
       await this.ownerModel.updateOne(
-        { _id: id },
+        { _id: userId },
         { $set: { adCredits: propertyOwner.adCredits - 1 } },
         opt,
       )

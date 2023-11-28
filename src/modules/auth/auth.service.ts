@@ -358,6 +358,7 @@ export class AuthService {
           refresh_token,
         }
       } else {
+        // Caso o usuário tenha criado uma conta passando email e senha mas não verificou o email, ao clicr no login social ele apenas confirma o email.
         if (!user.isEmailVerified) {
           user.isEmailVerified = true
           await user.save()

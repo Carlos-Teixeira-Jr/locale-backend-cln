@@ -31,19 +31,14 @@ async function bootstrap() {
     }),
   )
 
-  // Configurar o limite do corpo da requisição
-  app.use((req, res, next) => {
-    json({ limit: '50mb' })(req, res, next)
-  })
-
   setupSwagger(app)
 
   app.useGlobalPipes(new ValidationPipe({ transform: true }))
 
   app.use(passport.initialize())
 
-  app.use(json({ limit: '50mb' }))
-  app.use(urlencoded({ extended: true, limit: '50mb' }))
+  app.use(json({ limit: '500mb' }))
+  app.use(urlencoded({ extended: true, limit: '500mb' }))
 
   await app.listen(process.env.PORT || 3001)
 }
