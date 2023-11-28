@@ -272,6 +272,7 @@ export class PropertyService {
             password: randomPassword,
           }
 
+          // Cria o usuário no banco de dados;
           const registerUser = await this.authService.register(
             registerUserParams,
           )
