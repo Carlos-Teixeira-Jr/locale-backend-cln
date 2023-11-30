@@ -25,6 +25,7 @@ import { PlanModelName, PlanSchema } from 'common/schemas/Plan.schema'
 import { AuthService } from 'modules/auth/auth.service'
 import { JwtService } from '@nestjs/jwt'
 import { UsersService } from 'modules/users/users.service'
+import { TagModelName, TagSchema } from 'common/schemas/Tag.schema'
 
 @Module({
   imports: [
@@ -56,6 +57,10 @@ import { UsersService } from 'modules/users/users.service'
       {
         name: PlanModelName,
         schema: PlanSchema,
+      },
+      {
+        name: TagModelName,
+        schema: TagSchema,
       },
     ]),
   ],
