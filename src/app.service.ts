@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
+import { SendEmailToLocaleDto } from 'app-dto/sendEmailToLocale.dto'
 import { IProperty, PropertyModelName } from 'common/schemas/Property.schema'
 import { ITag, TagModelName } from 'common/schemas/Tag.schema'
 import { CommonQueryFilter } from 'common/utils/query.filter'
@@ -105,6 +106,28 @@ export class AppService {
       await this.tagModel.bulkWrite(tagObjects)
 
       return tags
+    } catch (error) {
+      this.logger.error({
+        error: JSON.stringify(error),
+        exception: '> exception',
+      })
+      throw error
+    }
+  }
+
+  async sendEmailToLocale(sendEmailToLocaleDto: SendEmailToLocaleDto) {
+    try {
+      this.logger.log({}, 'start send email to locale');
+
+      const {
+        name,
+        email,
+        telephone,
+        message
+      } = sendEmailToLocaleDto;
+
+
+
     } catch (error) {
       this.logger.error({
         error: JSON.stringify(error),
