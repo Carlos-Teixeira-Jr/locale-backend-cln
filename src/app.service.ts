@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose'
 import { SendEmailToLocaleDto } from 'app-dto/sendEmailToLocale.dto'
 import { IProperty, PropertyModelName } from 'common/schemas/Property.schema'
 import { ITag, TagModelName } from 'common/schemas/Tag.schema'
+import { senEmailToLocale } from 'common/utils/emailHandler'
 import { CommonQueryFilter } from 'common/utils/query.filter'
 import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import { LoggerService } from 'modules/logger/logger.service'
@@ -117,17 +118,11 @@ export class AppService {
 
   async sendEmailToLocale(sendEmailToLocaleDto: SendEmailToLocaleDto) {
     try {
-      this.logger.log({}, 'start send email to locale');
+      this.logger.log({}, 'start send email to locale')
 
-      const {
-        name,
-        email,
-        telephone,
-        message
-      } = sendEmailToLocaleDto;
+      await senEmailToLocale(sendEmailToLocaleDto)
 
-
-
+      return { success: true }
     } catch (error) {
       this.logger.error({
         error: JSON.stringify(error),

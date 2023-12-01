@@ -47,7 +47,7 @@ export class AppController {
 
   @Post('/send-email-to-locale')
   async sendEmailToLocale(@Body() sendEmailToLocaleDto: SendEmailToLocaleDto) {
-    this.logger.log({sendEmailToLocaleDto}, 'email to locale')
+    this.logger.log({ sendEmailToLocaleDto }, 'email to locale')
     return await this.appService.sendEmailToLocale(sendEmailToLocaleDto)
   }
 }
