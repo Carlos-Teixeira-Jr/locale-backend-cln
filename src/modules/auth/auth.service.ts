@@ -192,6 +192,10 @@ export class AuthService {
         )
       }
 
+      if (!existingUser.isActive) {
+        throw new BadRequestException(`O usuário foi excluído.`)
+      }
+
       const passwordMatched = await bcrypt.compare(
         password,
         existingUser.password,
@@ -199,7 +203,7 @@ export class AuthService {
 
       if (!passwordMatched || existingUser.email !== email) {
         throw new BadRequestException(
-          `O usuário ou a seha informados estão incorretos`,
+          `O usuário ou a senha informados estão incorretos`,
         )
       }
 

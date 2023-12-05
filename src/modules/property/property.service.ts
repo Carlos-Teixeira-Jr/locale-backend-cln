@@ -100,7 +100,7 @@ export class PropertyService {
 
       const property: IProperty = await this.propertyModel.findById(id).lean()
 
-      if (!property) {
+      if (!property || !property.isActive) {
         throw new NotFoundException(`O id: ${id} não foi encontrado`)
       }
 
@@ -627,7 +627,7 @@ export class PropertyService {
           },
         }))
 
-        await this.tagModel.bulkWrite(tagObjects);
+        await this.tagModel.bulkWrite(tagObjects)
       }
 
       // lida com a criação da property no DB
@@ -914,7 +914,7 @@ export class PropertyService {
           },
         }))
 
-        await this.tagModel.bulkWrite(tagObjects);
+        await this.tagModel.bulkWrite(tagObjects)
       }
 
       const updatedProperty = await this.propertyModel.updateOne(
@@ -935,7 +935,8 @@ export class PropertyService {
             prices,
             youtubeLink,
           },
-        }, opt
+        },
+        opt,
       )
 
       await session.commitTransaction()
@@ -1119,6 +1120,10 @@ export class PropertyService {
 
     allFilters.push({
       highlighted: false,
+    })
+
+    allFilters.push({
+      isActive: true,
     })
 
     return allFilters

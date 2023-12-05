@@ -1,4 +1,4 @@
-import { Model } from 'mongoose'
+import mongoose, { Model } from 'mongoose'
 import {
   BadRequestException,
   Injectable,
@@ -17,6 +17,9 @@ import { EditFavouriteDto } from './dto/edit-favourite.dto'
 import { GetFavouritesByUserDto } from './dto/favourite-property.dto'
 import { EditCreditCardDto } from './dto/editCreditCard.dto'
 import * as bcrypt from 'bcrypt'
+import { DeleteUserDto } from './dto/delete-user.dto'
+import { ITag, TagModelName } from 'common/schemas/Tag.schema'
+import { ILocation, LocationModelName } from 'common/schemas/Location.schema'
 
 export type User = {
   userId: number
@@ -46,6 +49,10 @@ export class UsersService {
     private readonly ownerModel: Model<IOwner>,
     @InjectModel(PropertyModelName)
     private readonly propertyModel: Model<IProperty>,
+    @InjectModel(TagModelName)
+    private readonly tagModel: Model<ITag>,
+    @InjectModel(LocationModelName)
+    private readonly locationModel: Model<ILocation>,
   ) {}
 
   async findOne(_id: string) {
@@ -487,6 +494,127 @@ export class UsersService {
         exception: '> exception',
       })
       throw error
+    }
+  }
+
+  async deleteUser(deleteUserDto: DeleteUserDto) {
+    const mongodbUri = `${process.env.DB_HOST}`
+    const db = await mongoose.createConnection(mongodbUri).asPromise()
+    const session = await db.startSession()
+    const opt = { session, new: true }
+    try {
+      await session.startTransaction()
+      this.logger.log({}, 'delete user')
+
+      const { userId } = deleteUserDto
+
+      // user
+      const foundUser: IUser = await this.userModel.findById(userId).lean()
+
+      if (!foundUser) {
+        throw new NotFoundException(
+          `O usuário com i id: ${userId} não foi encontrado!`,
+        )
+      }
+
+      await this.userModel.updateOne({ _id: userId }, { isActive: false }, opt)
+
+      // owner
+      const foundOwner: IOwner = await this.ownerModel
+        .findOne({ userId })
+        .lean()
+
+      if (foundOwner) {
+        // Inativa o owner
+        await this.ownerModel.updateOne(
+          { _id: foundOwner._id },
+          { isActive: false },
+          opt,
+        )
+
+        // Inativa os imóveis do owner
+        await this.propertyModel.updateMany(
+          { owner: foundOwner._id },
+          { isActive: false },
+          opt,
+        )
+
+        // Obtém as tags associadas às propriedades do owner
+        const properties: IProperty[] = await this.propertyModel
+          .find({ owner: foundOwner._id })
+          .lean()
+        const propertyTags: string[] = properties.flatMap(
+          property => property.tags,
+        )
+
+        // Atualiza as tags decrementando a quantidade
+        for (const tag of propertyTags) {
+          const updatedTag = await this.tagModel.findOneAndUpdate(
+            { name: tag },
+            { $inc: { amount: -1 } },
+            opt,
+          )
+
+          // Verifica se o amount é menor ou igual a 0 após a atualização
+          if (updatedTag && updatedTag.amount <= 0) {
+            // Exclui a tag se o amount for menor ou igual a 0
+            await this.tagModel.deleteOne({ name: tag }, opt)
+          }
+        }
+
+        // Location
+
+        const propertyAddresses: Array<{ category: string; name: string }> =
+          properties.flatMap(property =>
+            Object.entries(property.address).map(([category, name]) => ({
+              category,
+              name,
+            })),
+          )
+
+        for (const { category, name } of propertyAddresses) {
+          const locationInUse = await this.propertyModel.exists({
+            [`address.${category}`]: name,
+            isActive: true,
+          })
+
+          // Se não houver mais propriedades usando esta localização, exclua-a
+          if (!locationInUse) {
+            await this.locationModel.deleteOne({ category, name })
+          }
+        }
+
+        // Charges
+        // if (foundOwner.subscriptionId) {
+        //   const subscriptionId = foundOwner.subscriptionId
+        //   const response = await fetch(`${process.env.PAYMENT_URL}/subscription/${subscriptionId}`, {
+        //     method: 'DELETE',
+        //     headers: {
+        //       'Content-Type': 'application/json',
+        //       access_token: process.env.ASSAS_API_KEY || '',
+        //     },
+        //   })
+
+        //   if (response.ok) {
+        //     delete foundOwner.subscriptionId;
+        //   } else {
+        //     throw new BadRequestException(`Não foi possível cancelar a assinatura deste usuário`)
+        //   }
+        // }
+      }
+
+      await session.commitTransaction()
+
+      return { success: true }
+    } catch (error) {
+      await session.abortTransaction()
+      this.logger.error({
+        error: JSON.stringify(error),
+        exception: '> exception',
+      })
+      throw error
+    } finally {
+      session.endSession()
     }
   }
 }

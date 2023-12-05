@@ -1,5 +1,5 @@
 import { ApiTags } from '@nestjs/swagger'
-import { Body, Controller, Get, Param, Post } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common'
 
 import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import { LoggerService } from 'modules/logger/logger.service'
@@ -12,6 +12,7 @@ import { EditFavouriteDto } from './dto/edit-favourite.dto'
 import { GetFavouritesByUserDto } from './dto/favourite-property.dto'
 import { IUser } from 'common/schemas/User.schema'
 import { EditCreditCardDto } from './dto/editCreditCard.dto'
+import { DeleteUserDto } from './dto/delete-user.dto'
 
 @ApiTags('users')
 @Controller('user')
@@ -57,5 +58,10 @@ export class UsersController {
   @Post('edit-favourite')
   async editFavourite(@Body() body: EditFavouriteDto): Promise<string[]> {
     return this.usersService.editFavourite(body)
+  }
+
+  @Delete()
+  async DeleteUserDto(@Body() deleteUserDto: DeleteUserDto) {
+    return this.usersService.deleteUser(deleteUserDto)
   }
 }
