@@ -323,7 +323,7 @@ export class PropertyService {
         }
 
         const createdOwner: any = await this.ownerModel.create([ownerData], opt)
-        owner = createdOwner
+        owner = createdOwner[0]._doc
       } else {
         owner = ownerExists
 
@@ -684,7 +684,7 @@ export class PropertyService {
         ownerProperties = []
       } else {
         ownerProperties = await this.propertyModel
-          .find({ owner: userIsOwner._id, isActive: true })
+          .find({ owner: userIsOwner._id })
           .skip(skip)
           .limit(limit)
           .lean()
@@ -737,10 +737,12 @@ export class PropertyService {
         )
       }
 
-      const propertyOwner = await this.ownerModel.findOne({
-        userId: userId,
-        isActive: true,
-      })
+      const propertyOwner = await this.ownerModel
+        .findOne({
+          userId: userId,
+          isActive: true,
+        })
+        .lean()
 
       if (!propertyOwner) {
         throw new NotFoundException(
@@ -755,7 +757,7 @@ export class PropertyService {
           opt,
         )
       } else {
-        if (propertyOwner.adCredits <= 0) {
+        if (!propertyOwner.adCredits || propertyOwner.adCredits <= 0) {
           throw new BadRequestException(
             `O usuário com o id ${userId} não tem mais créditos para ativar esse anúncio.`,
           )

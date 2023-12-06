@@ -132,10 +132,10 @@ export class UsersService {
       const { _id } = body
 
       const user = await this.userModel
-        .findOne({ _id })
+        .findOne({ _id, isActive: true })
         .select('username email address cpf')
 
-      if (!user || !user.isActive) {
+      if (!user) {
         throw new NotFoundException(
           `Usuário com o id: ${_id} não foi encontrado`,
         )
@@ -518,7 +518,16 @@ export class UsersService {
         )
       }
 
-      await this.userModel.updateOne({ _id: userId }, { isActive: false }, opt)
+      const deactivatedEmail = `${new Date().getTime()} - ${foundUser.email}`
+
+      await this.userModel.updateOne(
+        { _id: userId },
+        {
+          isActive: false,
+          email: deactivatedEmail,
+        },
+        opt,
+      )
 
       // owner
       const foundOwner: IOwner = await this.ownerModel
@@ -574,13 +583,14 @@ export class UsersService {
           )
 
         for (const { category, name } of propertyAddresses) {
-          const locationInUse = await this.propertyModel.exists({
-            [`address.${category}`]: name,
-            isActive: true,
-          })
+          const propertyCountWithLocation =
+            await this.propertyModel.countDocuments({
+              [`address.${category}`]: name,
+              isActive: true,
+            })
 
           // Se não houver mais propriedades usando esta localização, exclua-a
-          if (!locationInUse) {
+          if (propertyCountWithLocation === 1) {
             await this.locationModel.deleteOne({ category, name })
           }
         }
