@@ -61,7 +61,7 @@ export class UsersService {
 
       const user = await this.userModel.findById(_id)
 
-      if (!user) {
+      if (!user || !user.isActive) {
         throw new NotFoundException(`Usuário com o id: ${_id} não encontrado.`)
       }
 
@@ -87,7 +87,7 @@ export class UsersService {
 
       const user = await this.userModel.findOne({ username: username })
 
-      if (!user) {
+      if (!user || !user.isActive) {
         throw new NotFoundException(`Usuário não foi encontrado`)
       }
 
@@ -109,7 +109,7 @@ export class UsersService {
 
       const user = await this.userModel.findOne({ email: email })
 
-      if (!user) {
+      if (!user || !user.isActive) {
         throw new NotFoundException(
           `Usuário com o email: ${email} não foi encontrado`,
         )
@@ -135,14 +135,14 @@ export class UsersService {
         .findOne({ _id })
         .select('username email address cpf')
 
-      if (!user) {
+      if (!user || !user.isActive) {
         throw new NotFoundException(
           `Usuário com o id: ${_id} não foi encontrado`,
         )
       }
 
       const owner = await this.ownerModel
-        .findOne({ userId: _id })
+        .findOne({ userId: _id, isActive: true })
         .select(
           'adCredits plan phone cellPhone customerId creditCardInfo _id name',
         )
@@ -192,7 +192,7 @@ export class UsersService {
 
       const userExists = await this.userModel.findOne({ _id: userId })
 
-      if (!userExists) {
+      if (!userExists || !userExists.isActive) {
         throw new NotFoundException(
           `Usuário com o id: ${userId} não foi encontrado`,
         )
@@ -239,7 +239,7 @@ export class UsersService {
       if (ownerId) {
         const owner = await this.ownerModel.findById(ownerId)
 
-        if (!owner) {
+        if (!owner || !owner.isActive) {
           throw new NotFoundException(
             `O usuário com o id: ${userId} não possui nenhum anúncio cadastrado.`,
           )
@@ -299,7 +299,7 @@ export class UsersService {
       // Cadastrar os dados do novo cartão de crédito no owner do usuário;
       const ownerExists = await this.ownerModel.findById(owner)
 
-      if (!ownerExists) {
+      if (!ownerExists || !ownerExists.isActive) {
         throw new NotFoundException(`Proprietário não econtrado.`)
       }
 
@@ -422,7 +422,7 @@ export class UsersService {
 
       const user = await this.userModel.findById(id)
 
-      if (!user) {
+      if (!user || !user.isActive) {
         throw new NotFoundException('Usuário não encontrado')
       }
 
@@ -431,6 +431,7 @@ export class UsersService {
       const favouritePropertiesDocs = await this.propertyModel
         .find({
           _id: { $in: favouritedProperties },
+          isActive: true,
         })
         .skip(skip)
         .limit(limit)
@@ -468,7 +469,7 @@ export class UsersService {
 
       const user = await this.userModel.findById(userId)
 
-      if (!user) {
+      if (!user || !user.isActive) {
         throw new NotFoundException('Usuário não encontrado')
       }
 
@@ -511,9 +512,9 @@ export class UsersService {
       // user
       const foundUser: IUser = await this.userModel.findById(userId).lean()
 
-      if (!foundUser) {
+      if (!foundUser || !foundUser.isActive) {
         throw new NotFoundException(
-          `O usuário com i id: ${userId} não foi encontrado!`,
+          `O usuário com o id: ${userId} não foi encontrado!`,
         )
       }
 
@@ -521,7 +522,7 @@ export class UsersService {
 
       // owner
       const foundOwner: IOwner = await this.ownerModel
-        .findOne({ userId })
+        .findOne({ userId, isActive: true })
         .lean()
 
       if (foundOwner) {
@@ -541,7 +542,7 @@ export class UsersService {
 
         // Obtém as tags associadas às propriedades do owner
         const properties: IProperty[] = await this.propertyModel
-          .find({ owner: foundOwner._id })
+          .find({ owner: foundOwner._id, isActive: true })
           .lean()
         const propertyTags: string[] = properties.flatMap(
           property => property.tags,
