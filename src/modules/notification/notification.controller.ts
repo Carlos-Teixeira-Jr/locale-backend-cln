@@ -7,7 +7,6 @@ import {
 import { CreateNotificationDto } from './dto/create-notification.dto'
 import { INotification } from 'common/schemas/Notification.schema'
 import { LoggerService } from 'modules/logger/logger.service'
-import { GetNotificationParams } from './dto/getNotification.params'
 import { PageQueryFilter } from 'common/utils/query.filter'
 
 @Controller('notification')
@@ -26,10 +25,8 @@ export class NotificationController {
     return this.notificationService.createOne(createNotificationDto)
   }
 
-  @Get(':id')
-  async findOne(
-    @Param() params: GetNotificationParams,
-  ): Promise<INotification[]> {
+  @Get('/user/:id')
+  async findOne(@Param('id') params: any): Promise<INotification[]> {
     this.logger.log({}, 'findOne')
     return this.notificationService.findOne(params)
   }

@@ -627,7 +627,7 @@ export class PropertyService {
           },
         }))
 
-        await this.tagModel.bulkWrite(tagObjects);
+        await this.tagModel.bulkWrite(tagObjects)
       }
 
       // lida com a criação da property no DB
@@ -914,7 +914,7 @@ export class PropertyService {
           },
         }))
 
-        await this.tagModel.bulkWrite(tagObjects);
+        await this.tagModel.bulkWrite(tagObjects)
       }
 
       const updatedProperty = await this.propertyModel.updateOne(
@@ -935,7 +935,8 @@ export class PropertyService {
             prices,
             youtubeLink,
           },
-        }, opt
+        },
+        opt,
       )
 
       await session.commitTransaction()
