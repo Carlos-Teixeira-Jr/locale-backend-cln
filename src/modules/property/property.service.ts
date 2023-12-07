@@ -388,9 +388,9 @@ export class PropertyService {
           )
         }
 
-        const formattedExpiry = expiry.split('-')
-        const expiryYear = formattedExpiry[0]
-        const expiryMonth = formattedExpiry[1]
+        //const formattedExpiry = expiry.split('-')
+        const expiryYear = `20${expiry[2] + expiry[3]}`
+        const expiryMonth = `${expiry[0] + expiry[1]}`
 
         const currentDate = new Date()
         const year = currentDate.getFullYear()

@@ -587,31 +587,44 @@ export class UsersService {
             await this.propertyModel.countDocuments({
               [`address.${category}`]: name,
               isActive: true,
+              owner: { $ne: foundOwner._id },
             })
 
           // Se não houver mais propriedades usando esta localização, exclua-a
-          if (propertyCountWithLocation === 1) {
+          if (propertyCountWithLocation === 0) {
             await this.locationModel.deleteOne({ category, name })
           }
         }
 
         // Charges
-        // if (foundOwner.subscriptionId) {
-        //   const subscriptionId = foundOwner.subscriptionId
-        //   const response = await fetch(`${process.env.PAYMENT_URL}/subscription/${subscriptionId}`, {
-        //     method: 'DELETE',
-        //     headers: {
-        //       'Content-Type': 'application/json',
-        //       access_token: process.env.ASSAS_API_KEY || '',
-        //     },
-        //   })
+        if (foundOwner.subscriptionId) {
+          const subscriptionId = foundOwner.subscriptionId
+          const response = await fetch(
+            `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
+            {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+                access_token: process.env.ASSAS_API_KEY || '',
+              },
+            },
+          )
 
-        //   if (response.ok) {
-        //     delete foundOwner.subscriptionId;
-        //   } else {
-        //     throw new BadRequestException(`Não foi possível cancelar a assinatura deste usuário`)
-        //   }
-        // }
+          if (response.ok) {
+            // Remover a propriedade na memória
+            delete foundOwner.subscriptionId
+
+            // Persistir a alteração no banco de dados
+            await this.ownerModel.updateOne(
+              { _id: foundOwner._id },
+              { $unset: { subscriptionId: 1 } },
+            )
+          } else {
+            throw new BadRequestException(
+              `Não foi possível cancelar a assinatura deste usuário`,
+            )
+          }
+        }
       }
 
       await session.commitTransaction()
