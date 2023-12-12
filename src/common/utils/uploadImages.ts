@@ -1,21 +1,19 @@
 import { env } from 'node:process'
 import { v4 as uuid } from 'uuid'
-import mime from 'mime-types'
 import { BadRequestException } from '@nestjs/common'
 import { S3 } from 'aws-sdk'
 import { removeNonAlphanumericCharacters as cleanString } from './removeNumAlphaNumeric';
 import { Multer } from 'multer';
 
 const {
-  R2_ACCESS_KEY = '8f38e4a42a7d46a64f0d6d6dd3e6a8e1',
-  R2_SECRET_KEY = 'b6a2e73138209a72be50e3f4a95595aa8e86f96053ba9758e9ffca5adb911c3e',
-  R2_ACCOUNT_ID = '2b6225885c45d2c36cff9c814b9370e8',
-  R2_BUCKET_NAME = 'imoveis',
-} = env
+  R2_ACCESS_KEY = process.env.R2_ACCESS_KEY,
+  R2_SECRET_KEY = process.env.R2_SECRET_KEY,
+  R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID,
+  R2_BUCKET_NAME = process.env.R2_BUCKET_NAME,
+  IMAGE_UPLOAD_PREFIX = process.env.IMAGE_UPLOAD_PREFIX
+} = env;
 
-const VALID_EXT = ['PNG', 'jpg', 'JPEG', 'GIF', 'image/jpeg']
-
-const VALID_FIELD_NAMES = ['images']
+const VALID_EXT = ['PNG', 'JPG', 'JPEG', 'GIF']
 
 const MAXIMUM_FILE_SIZE = 41943040
 
@@ -34,21 +32,18 @@ export const uploadFile = async (
   file: Multer.File | Multer.File[],
   directory: string,
 ) => {
-  // if (!VALID_FIELD_NAMES.includes(file.fieldname)) {
-  //   throw new BadRequestException(
-  //     `You must upload a file with fieldname ${VALID_FIELD_NAMES.join(', ')}`,
-  //   )
-  // }
 
   const singleFile = Array.isArray(file) ? file[0] : file;
+  console.log("🚀 ~ file: uploadImages.ts:44 ~ singleFile:", singleFile)
 
   if (!singleFile) {
     throw new BadRequestException(`No file provided`);
   }
 
-  const ext = mime.extension(singleFile.mimetype);
-
-  //const ext = mime.extension(file.mimetype)
+  const name = singleFile.originalname;
+  console.log("🚀 ~ file: uploadImages.ts:54 ~ name:", name)
+  const ext = name.split('.').pop();
+  console.log("🚀 ~ file: uploadImages.ts:56 ~ ext:", ext)
 
   if (!ext) {
     throw new BadRequestException(`File doesn't have an extension`)
@@ -72,14 +67,15 @@ export const uploadFile = async (
   const params = {
     Bucket: 'imoveis',
     Key: fileName,
-    ContentType: file.mimetype,
-    Body: file.buffer,
+    ContentType: singleFile.mimetype,
+    Body: singleFile.buffer,
     ACL: 'public-read',
   }
 
   try {
     await s3.upload(params as any).promise()
-    return { fileName: `https://images.localeimoveis.com/${fileName}` }
+    console.log(`link da imagem: ${IMAGE_UPLOAD_PREFIX}/${fileName}`)
+    return { fileName: `${IMAGE_UPLOAD_PREFIX}/${fileName}` }
   } catch (error) {
     throw new BadRequestException(`${error.message}`);
   }
