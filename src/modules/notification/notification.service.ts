@@ -59,10 +59,10 @@ export class NotificationService {
         )
       }
 
-      // await this.notificationModel.updateMany(
-      //   { userId: id, isRead: false },
-      //   { $set: { isRead: true } },
-      // )
+      await this.notificationModel.updateMany(
+        { userId: id, isRead: false },
+        { $set: { isRead: true } },
+      )
 
       return notification
     } catch (error) {
