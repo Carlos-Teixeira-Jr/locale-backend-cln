@@ -91,7 +91,7 @@ export class PropertyController {
   async uploadDropImageWithRarity(
     //@Body() imagesFormData: ImagesFormDataDto,
     //@Req() request: any,
-    @UploadedFiles() files: Record<string, Multer.File[]>, // nome de id tem que ser 'images'
+    @UploadedFiles() files: Multer.File[], // nome de id tem que ser 'images'
   ) {
     this.logger.info(
       {  },

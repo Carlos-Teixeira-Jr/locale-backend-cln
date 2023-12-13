@@ -957,13 +957,11 @@ export class PropertyService {
     }
   }
 
-  async uploadDropImageWithRarity(files: Record<string, Multer.File[]>) {
+  async uploadDropImageWithRarity(files: Multer.File[]) {
     try {
       this.logger.log({}, 'start edit-property');
 
-      //const { propertyId} = imagesFormData;
-
-      await uploadFile(files, 'images');
+      await uploadFile(files, 'images')
 
     } catch (error) {
       this.logger.error({
