@@ -411,7 +411,7 @@ export class UsersService {
 
       const { id, page } = body
       const skip = (page - 1) * 10
-      const limit = 10
+      const limit = 6
 
       const user = await this.userModel.findById(id)
 
