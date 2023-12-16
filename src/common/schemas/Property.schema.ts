@@ -34,7 +34,7 @@ export interface IProperty extends BaseModel, Document {
   images: string[]
   isActive: {
     type: boolean
-    default: boolean
+    default: true
   }
   owner: Schema.Types.ObjectId
   ownerInfo: {
