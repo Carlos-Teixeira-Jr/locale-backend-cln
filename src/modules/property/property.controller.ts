@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UploadedFiles,
+  UseInterceptors,
+} from '@nestjs/common'
 import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import { LoggerService } from 'modules/logger/logger.service'
 import { GetPropertyParams } from './dto/getProperty.params'
@@ -15,7 +24,9 @@ import { PropertyActivationDto } from './dto/property-activation.dto'
 import { EditPropertyDto } from './dto/edit-property.dto'
 import { IProperty } from 'common/schemas/Property.schema'
 import { IOwnerPropertiesReturn } from './property.service'
-
+import { FilesInterceptor } from '@nestjs/platform-express'
+import { Multer } from 'multer'
+import { PropertyIdDto } from './dto/propertyId.dto'
 @Controller('property')
 export class PropertyController {
   constructor(
@@ -79,5 +90,19 @@ export class PropertyController {
   @Post('edit-property')
   async editProperty(@Body() editPropertyDto: EditPropertyDto) {
     return this.propertyService.editProperty(editPropertyDto)
+  }
+
+  @Post('uploadDropImageWithRarity')
+  @UseInterceptors(FilesInterceptor('images'))
+  async uploadDropImageWithRarity(
+    @UploadedFiles() files: Multer.File[],
+    @Body('propertyId') propertyId: PropertyIdDto,
+  ) {
+    this.logger.info({}, 'uploadDropImageWithRarity > params')
+
+    return await this.propertyService.uploadDropImageWithRarity(
+      files,
+      propertyId,
+    )
   }
 }
