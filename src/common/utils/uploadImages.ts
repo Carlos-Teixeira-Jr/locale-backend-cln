@@ -12,6 +12,14 @@ const {
   R2_BUCKET_NAME = process.env.R2_BUCKET_NAME,
   IMAGE_UPLOAD_PREFIX = process.env.IMAGE_UPLOAD_PREFIX,
 } = env
+console.log('🚀 ~ file: uploadImages.ts:10 ~ R2_ACCESS_KEY:', R2_ACCESS_KEY)
+console.log('🚀 ~ file: uploadImages.ts:11 ~ R2_SECRET_KEY:', R2_SECRET_KEY)
+console.log('🚀 ~ file: uploadImages.ts:12 ~ R2_ACCOUNT_ID:', R2_ACCOUNT_ID)
+console.log('🚀 ~ file: uploadImages.ts:13 ~ R2_BUCKET_NAME:', R2_BUCKET_NAME)
+console.log(
+  '🚀 ~ file: uploadImages.ts:14 ~ IMAGE_UPLOAD_PREFIX:',
+  IMAGE_UPLOAD_PREFIX,
+)
 
 const VALID_EXT = ['PNG', 'JPG', 'JPEG', 'GIF']
 
