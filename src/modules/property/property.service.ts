@@ -960,7 +960,6 @@ export class PropertyService {
       this.logger.log({}, 'start upload images')
 
       const uploadedImages = await uploadFile(files, 'images')
-      this.logger.info({ uploadedImages }, 'upload images')
 
       const propertyFound = await this.propertyModel.findById(propertyId)
       this.logger.info(propertyFound)

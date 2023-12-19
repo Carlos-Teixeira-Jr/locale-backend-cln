@@ -4,9 +4,6 @@ import { BadRequestException } from '@nestjs/common'
 import { S3 } from 'aws-sdk'
 import { removeNonAlphanumericCharacters as cleanString } from './removeNumAlphaNumeric'
 import { Multer } from 'multer'
-import { Logger } from 'modules/logger/Logger'
-
-const logger = new Logger()
 
 const {
   R2_ACCESS_KEY = process.env.R2_ACCESS_KEY,
@@ -30,17 +27,15 @@ const s3 = new S3({
     secretAccessKey: cleanString(R2_SECRET_KEY as string),
   },
 }) as any
-logger.info(s3)
+console.log('🚀 ~ file: uploadImages.ts:30 ~ s3:', s3)
 
 export const uploadFile = async (
   file: Multer.File | Multer.File[],
   directory: string,
 ) => {
   const images = file
-  logger.info(images)
 
   const uploadedFiles = []
-  logger.info(uploadedFiles)
 
   if (!images) {
     throw new BadRequestException(`No file provided`)
@@ -48,14 +43,11 @@ export const uploadFile = async (
 
   for (let i = 0; i < images.length; i++) {
     const name = images[i].originalname
-    logger.info(name)
     const ext = name.split('.').pop()
-    logger.info(ext)
     const id = uuid()
-    logger.info(id)
     const fileName = `${directory}/${id}.${ext}`
-    logger.info(fileName)
 
+    console.log('🚀 ~ file: uploadImages.ts:50 ~ fileName:', fileName)
     if (!ext) {
       throw new BadRequestException(`File ${name} doesn't have an extension`)
     }
@@ -81,14 +73,14 @@ export const uploadFile = async (
       Body: images[i].buffer,
       ACL: 'public-read',
     }
-    logger.info(params)
+    console.log('🚀 ~ file: uploadImages.ts:76 ~ params:', params)
 
     try {
       await s3.upload(params as any).promise()
       console.log(`link da imagem: ${IMAGE_UPLOAD_PREFIX}/${fileName}`)
       uploadedFiles.push(`${IMAGE_UPLOAD_PREFIX}/${fileName}`)
     } catch (error) {
-      logger.info(error)
+      console.log('🚀 ~ file: uploadImages.ts:83 ~ error:', error)
       throw new BadRequestException(`${error.message}`)
     }
   }
