@@ -50,7 +50,7 @@ export class MessageService {
 
       const owner = await this.ownerModel.findById(ownerId).lean()
 
-      if (!owner) {
+      if (!owner || !owner.isActive) {
         throw new NotFoundException(
           `O proprietário com o id: ${ownerId} não foi encontrado`,
         )
@@ -80,7 +80,7 @@ export class MessageService {
 
       const foundOwner = await this.ownerModel.findById(ownerId)
 
-      if (!foundOwner) {
+      if (!foundOwner || !foundOwner.isActive) {
         throw new NotFoundException(`O proprietário não foi encontrado.`)
       }
 
@@ -98,6 +98,7 @@ export class MessageService {
       // Consultar a coleção 'properties' para encontrar os documentos correspondentes aos propertyId
       const properties = await this.propertyModel.find({
         _id: { $in: uniquePropertyIds },
+        isActive: true,
       })
 
       const count = await this.messageModel.countDocuments({ ownerId })
@@ -133,7 +134,7 @@ export class MessageService {
 
       const property: IProperty = await this.propertyModel.findById(propertyId)
 
-      if (!property) {
+      if (!property || !property.isActive) {
         throw new NotFoundException(
           `Nenhum imóvel encontrado para o id: ${propertyId}.`,
         )

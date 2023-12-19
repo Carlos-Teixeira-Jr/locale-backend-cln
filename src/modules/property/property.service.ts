@@ -104,7 +104,7 @@ export class PropertyService {
 
       const property: IProperty = await this.propertyModel.findById(id).lean()
 
-      if (!property) {
+      if (!property || !property.isActive) {
         throw new NotFoundException(`O id: ${id} não foi encontrado`)
       }
 
@@ -248,12 +248,19 @@ export class PropertyService {
       if (userId) {
         user = await this.userModel.findById(userId).lean()
 
+        if (!user || !user.isActive) {
+          throw new NotFoundException(
+            `O usuário com o id : ${userId} não foi encontrado.`,
+          )
+        }
+
         //Indica que este usuário já tem cadastro prévio como 'user' no banco de dados;
         userAlreadyExists = true
       } else {
         //Verifica se apesar do usuário não estar logado ao criar o anúncio o email dele já havia sido usado para cadastrar algum 'user' no banco de dados;
         const userEmailExists = await this.userModel.findOne({
           email: userData.email,
+          isActive: true,
         })
 
         if (!userEmailExists) {
@@ -281,7 +288,7 @@ export class PropertyService {
 
           // Use o método updateOne para adicionar a propriedade 'cpf' ao usuário
           await this.userModel.updateOne(
-            { _id: registerUser._id }, // Filtro para encontrar o usuário
+            { _id: registerUser._id },
             {
               cpf: userData.cpf,
               address: userData.address,
@@ -290,7 +297,7 @@ export class PropertyService {
             opt,
           )
 
-          // Use o método findById para buscar o usuário atualizado
+          // Busca o usuário atualizado
           user = await this.userModel.findById(registerUser._id)
         } else {
           user = userEmailExists
@@ -303,6 +310,7 @@ export class PropertyService {
       // Verifica se o 'user' já é um 'owner';
       const ownerExists: IOwner = await this.ownerModel.findOne({
         userId: user._id,
+        isActive: true,
       })
 
       if (!ownerExists) {
@@ -319,7 +327,7 @@ export class PropertyService {
         }
 
         const createdOwner: any = await this.ownerModel.create([ownerData], opt)
-        owner = createdOwner
+        owner = createdOwner[0]._doc
       } else {
         owner = ownerExists
 
@@ -384,9 +392,9 @@ export class PropertyService {
           )
         }
 
-        const formattedExpiry = expiry.split('-')
-        const expiryYear = formattedExpiry[0]
-        const expiryMonth = formattedExpiry[1]
+        //const formattedExpiry = expiry.split('-')
+        const expiryYear = `20${expiry[2] + expiry[3]}`
+        const expiryMonth = `${expiry[0] + expiry[1]}`
 
         const currentDate = new Date()
         const year = currentDate.getFullYear()
@@ -445,33 +453,6 @@ export class PropertyService {
           owner.subscriptionId = subscriptionId
           await owner.save()
         } else {
-          // if (owner.adCredits < 1) {
-          //   // Chamada pra api de pagamento "subscription" no caso de o usuário já ter seus dados de cartão salvos no banco;
-          //   const response = await fetch(
-          //     `${process.env.PAYMENT_URL}/payment/subscription`,
-          //     {
-          //       method: 'POST',
-          //       headers: {
-          //         'Content-Type': 'application/json',
-          //         access_token: process.env.ASSAS_API_KEY || '',
-          //       },
-          //       body: JSON.stringify({
-          //         billingType: 'CREDIT_CARD',
-          //         cycle: 'MONTHLY',
-          //         customer: owner.customerId,
-          //         value: selectedPlan.price,
-          //         nextDueDate: formattedDate,
-          //         creditCardToken: owner.creditCardInfo.creditCardToken,
-          //       }),
-          //     },
-          //   )
-
-          //   if (!response.ok) {
-          //     throw new Error(
-          //       `Falha ao gerara cobrança: ${response.statusText}`,
-          //     )
-          //   }
-          // }
           if (owner.adCredits < 1) {
             // Caso em que o usuário não tem mais créditos e selecionou outro plano
             if (selectedPlan._id !== owner.plan) {
@@ -666,10 +647,10 @@ export class PropertyService {
       this.logger.log({}, 'start findByAnnouncementCode')
 
       const foundAnnouncementCode: IProperty[] = await this.propertyModel
-        .find({ announcementCode: announcementCode })
+        .find({ announcementCode: announcementCode, isActive: true })
         .exec()
 
-      if (foundAnnouncementCode.length == 0) {
+      if (foundAnnouncementCode.length === 0) {
         throw new NotFoundException(
           `O imóvel com o código de anúncio ${announcementCode} não foi encontrado`,
         )
@@ -703,7 +684,7 @@ export class PropertyService {
 
       const userIsOwner = await this.ownerModel.findById(ownerId)
 
-      if (!userIsOwner) {
+      if (!userIsOwner || !userIsOwner.isActive) {
         ownerProperties = []
       } else {
         ownerProperties = await this.propertyModel
@@ -714,6 +695,7 @@ export class PropertyService {
 
         count = await this.propertyModel.countDocuments({
           owner: userIsOwner._id,
+          isActive: true,
         })
         totalPages = Math.ceil(count / limit)
       }
@@ -749,7 +731,9 @@ export class PropertyService {
 
       const { isActive, propertyId, userId } = propertyActivationDto
 
-      const property = await this.propertyModel.find({ _id: propertyId }).lean()
+      const property = await this.propertyModel
+        .find({ _id: propertyId, isActive: false })
+        .lean()
 
       if (!property) {
         throw new NotFoundException(
@@ -757,7 +741,12 @@ export class PropertyService {
         )
       }
 
-      const propertyOwner = await this.ownerModel.findOne({ userId: userId })
+      const propertyOwner = await this.ownerModel
+        .findOne({
+          userId: userId,
+          isActive: true,
+        })
+        .lean()
 
       if (!propertyOwner) {
         throw new NotFoundException(
@@ -772,7 +761,7 @@ export class PropertyService {
           opt,
         )
       } else {
-        if (propertyOwner.adCredits <= 0) {
+        if (!propertyOwner.adCredits || propertyOwner.adCredits <= 0) {
           throw new BadRequestException(
             `O usuário com o id ${userId} não tem mais créditos para ativar esse anúncio.`,
           )
@@ -823,13 +812,15 @@ export class PropertyService {
 
       const property = await this.propertyModel.findById(propertyId).lean()
 
-      if (!property) {
+      if (!property || !property.isActive) {
         throw new NotFoundException(
           `Imóvel com o id ${propertyId} não encontrado.`,
         )
       }
 
-      const propertyOwner = await this.ownerModel.findOne({ userId }).lean()
+      const propertyOwner = await this.ownerModel
+        .findOne({ userId, isActive: true })
+        .lean()
 
       if (!propertyOwner) {
         throw new NotFoundException(
@@ -899,7 +890,10 @@ export class PropertyService {
         youtubeLink,
       } = editPropertyDto
 
-      const property = await this.propertyModel.findOne({ _id: id })
+      const property = await this.propertyModel.findOne({
+        _id: id,
+        isActive: true,
+      })
 
       if (!property) {
         throw new NotFoundException(
@@ -966,12 +960,10 @@ export class PropertyService {
       this.logger.log({}, 'start upload images')
 
       const uploadedImages = await uploadFile(files, 'images')
-      console.log(
-        '🚀 ~ file: property.service.ts:966 ~ PropertyService ~ uploadDropImageWithRarity ~ uploadedImages:',
-        uploadedImages,
-      )
+      this.logger.info({ uploadedImages }, 'upload images')
 
       const propertyFound = await this.propertyModel.findById(propertyId)
+      this.logger.info(propertyFound)
 
       if (!propertyFound) {
         throw new NotFoundException(
@@ -1160,6 +1152,10 @@ export class PropertyService {
 
     allFilters.push({
       highlighted: false,
+    })
+
+    allFilters.push({
+      isActive: true,
     })
 
     return allFilters
