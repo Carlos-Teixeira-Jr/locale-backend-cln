@@ -13,6 +13,11 @@ import {
   PropertyModelName,
   PropertySchema,
 } from 'common/schemas/Property.schema'
+import { TagModelName, TagSchema } from 'common/schemas/Tag.schema'
+import {
+  LocationModelName,
+  LocationSchema,
+} from 'common/schemas/Location.schema'
 
 @Module({
   imports: [
@@ -32,6 +37,14 @@ import {
       {
         name: PropertyModelName,
         schema: PropertySchema,
+      },
+      {
+        name: TagModelName,
+        schema: TagSchema,
+      },
+      {
+        name: LocationModelName,
+        schema: LocationSchema,
       },
     ]),
   ],
