@@ -93,7 +93,13 @@ export class PropertyController {
   }
 
   @Post('uploadDropImageWithRarity')
-  @UseInterceptors(FilesInterceptor('images'))
+  @UseInterceptors(
+    FilesInterceptor('images', 20, {
+      limits: {
+        fileSize: 10 * 1024 * 1024,
+      },
+    }),
+  )
   async uploadDropImageWithRarity(
     @UploadedFiles() files: Multer.File[],
     @Body('propertyId') propertyId: PropertyIdDto,
