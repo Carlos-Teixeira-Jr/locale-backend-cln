@@ -962,7 +962,6 @@ export class PropertyService {
       const uploadedImages = await uploadFile(files, 'images')
 
       const propertyFound = await this.propertyModel.findById(propertyId)
-      this.logger.info(propertyFound)
 
       if (!propertyFound) {
         throw new NotFoundException(
