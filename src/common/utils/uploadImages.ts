@@ -12,14 +12,6 @@ const {
   R2_BUCKET_NAME = process.env.R2_BUCKET_NAME,
   IMAGE_UPLOAD_PREFIX = process.env.IMAGE_UPLOAD_PREFIX,
 } = env
-console.log('🚀 ~ file: uploadImages.ts:10 ~ R2_ACCESS_KEY:', R2_ACCESS_KEY)
-console.log('🚀 ~ file: uploadImages.ts:11 ~ R2_SECRET_KEY:', R2_SECRET_KEY)
-console.log('🚀 ~ file: uploadImages.ts:12 ~ R2_ACCOUNT_ID:', R2_ACCOUNT_ID)
-console.log('🚀 ~ file: uploadImages.ts:13 ~ R2_BUCKET_NAME:', R2_BUCKET_NAME)
-console.log(
-  '🚀 ~ file: uploadImages.ts:14 ~ IMAGE_UPLOAD_PREFIX:',
-  IMAGE_UPLOAD_PREFIX,
-)
 
 const VALID_EXT = ['PNG', 'JPG', 'JPEG', 'GIF']
 
@@ -35,7 +27,6 @@ const s3 = new S3({
     secretAccessKey: cleanString(R2_SECRET_KEY as string),
   },
 }) as any
-console.log('🚀 ~ file: uploadImages.ts:30 ~ s3:', s3)
 
 export const uploadFile = async (
   file: Multer.File | Multer.File[],
@@ -55,7 +46,6 @@ export const uploadFile = async (
     const id = uuid()
     const fileName = `${directory}/${id}.${ext}`
 
-    console.log('🚀 ~ file: uploadImages.ts:50 ~ fileName:', fileName)
     if (!ext) {
       throw new BadRequestException(`File ${name} doesn't have an extension`)
     }
@@ -81,14 +71,12 @@ export const uploadFile = async (
       Body: images[i].buffer,
       ACL: 'public-read',
     }
-    console.log('🚀 ~ file: uploadImages.ts:76 ~ params:', params)
 
     try {
       await s3.upload(params as any).promise()
       console.log(`link da imagem: ${IMAGE_UPLOAD_PREFIX}/${fileName}`)
       uploadedFiles.push(`${IMAGE_UPLOAD_PREFIX}/${fileName}`)
     } catch (error) {
-      console.log('🚀 ~ file: uploadImages.ts:83 ~ error:', error)
       throw new BadRequestException(`${error.message}`)
     }
   }
