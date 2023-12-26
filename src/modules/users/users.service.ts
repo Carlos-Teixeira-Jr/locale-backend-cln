@@ -1,4 +1,4 @@
-import { Model } from 'mongoose'
+import mongoose, { Model } from 'mongoose'
 import {
   BadRequestException,
   Injectable,
@@ -17,6 +17,9 @@ import { EditFavouriteDto } from './dto/edit-favourite.dto'
 import { GetFavouritesByUserDto } from './dto/favourite-property.dto'
 import { EditCreditCardDto } from './dto/editCreditCard.dto'
 import * as bcrypt from 'bcrypt'
+import { DeleteUserDto } from './dto/delete-user.dto'
+import { ITag, TagModelName } from 'common/schemas/Tag.schema'
+import { ILocation, LocationModelName } from 'common/schemas/Location.schema'
 
 export type User = {
   userId: number
@@ -46,6 +49,10 @@ export class UsersService {
     private readonly ownerModel: Model<IOwner>,
     @InjectModel(PropertyModelName)
     private readonly propertyModel: Model<IProperty>,
+    @InjectModel(TagModelName)
+    private readonly tagModel: Model<ITag>,
+    @InjectModel(LocationModelName)
+    private readonly locationModel: Model<ILocation>,
   ) {}
 
   async findOne(_id: string) {
@@ -54,7 +61,7 @@ export class UsersService {
 
       const user = await this.userModel.findById(_id)
 
-      if (!user) {
+      if (!user || !user.isActive) {
         throw new NotFoundException(`Usuário com o id: ${_id} não encontrado.`)
       }
 
@@ -80,7 +87,7 @@ export class UsersService {
 
       const user = await this.userModel.findOne({ username: username })
 
-      if (!user) {
+      if (!user || !user.isActive) {
         throw new NotFoundException(`Usuário não foi encontrado`)
       }
 
@@ -102,7 +109,7 @@ export class UsersService {
 
       const user = await this.userModel.findOne({ email: email })
 
-      if (!user) {
+      if (!user || !user.isActive) {
         throw new NotFoundException(
           `Usuário com o email: ${email} não foi encontrado`,
         )
@@ -125,7 +132,7 @@ export class UsersService {
       const { _id } = body
 
       const user = await this.userModel
-        .findOne({ _id })
+        .findOne({ _id, isActive: true })
         .select('username email address cpf')
 
       if (!user) {
@@ -135,7 +142,7 @@ export class UsersService {
       }
 
       const owner = await this.ownerModel
-        .findOne({ userId: _id })
+        .findOne({ userId: _id, isActive: true })
         .select(
           'adCredits plan phone cellPhone customerId creditCardInfo _id name',
         )
@@ -185,7 +192,7 @@ export class UsersService {
 
       const userExists = await this.userModel.findOne({ _id: userId })
 
-      if (!userExists) {
+      if (!userExists || !userExists.isActive) {
         throw new NotFoundException(
           `Usuário com o id: ${userId} não foi encontrado`,
         )
@@ -232,7 +239,7 @@ export class UsersService {
       if (ownerId) {
         const owner = await this.ownerModel.findById(ownerId)
 
-        if (!owner) {
+        if (!owner || !owner.isActive) {
           throw new NotFoundException(
             `O usuário com o id: ${userId} não possui nenhum anúncio cadastrado.`,
           )
@@ -292,7 +299,7 @@ export class UsersService {
       // Cadastrar os dados do novo cartão de crédito no owner do usuário;
       const ownerExists = await this.ownerModel.findById(owner)
 
-      if (!ownerExists) {
+      if (!ownerExists || !ownerExists.isActive) {
         throw new NotFoundException(`Proprietário não econtrado.`)
       }
 
@@ -415,7 +422,7 @@ export class UsersService {
 
       const user = await this.userModel.findById(id)
 
-      if (!user) {
+      if (!user || !user.isActive) {
         throw new NotFoundException('Usuário não encontrado')
       }
 
@@ -424,6 +431,7 @@ export class UsersService {
       const favouritePropertiesDocs = await this.propertyModel
         .find({
           _id: { $in: favouritedProperties },
+          isActive: true,
         })
         .skip(skip)
         .limit(limit)
@@ -461,7 +469,7 @@ export class UsersService {
 
       const user = await this.userModel.findById(userId)
 
-      if (!user) {
+      if (!user || !user.isActive) {
         throw new NotFoundException('Usuário não encontrado')
       }
 
@@ -487,6 +495,150 @@ export class UsersService {
         exception: '> exception',
       })
       throw error
+    }
+  }
+
+  async deleteUser(deleteUserDto: DeleteUserDto) {
+    const mongodbUri = `${process.env.DB_HOST}`
+    const db = await mongoose.createConnection(mongodbUri).asPromise()
+    const session = await db.startSession()
+    const opt = { session, new: true }
+    try {
+      await session.startTransaction()
+      this.logger.log({}, 'delete user')
+
+      const { userId } = deleteUserDto
+
+      // user
+      const foundUser: IUser = await this.userModel.findById(userId).lean()
+
+      if (!foundUser || !foundUser.isActive) {
+        throw new NotFoundException(
+          `O usuário com o id: ${userId} não foi encontrado!`,
+        )
+      }
+
+      const deactivatedEmail = `${new Date().getTime()} - ${foundUser.email}`
+
+      await this.userModel.updateOne(
+        { _id: userId },
+        {
+          isActive: false,
+          email: deactivatedEmail,
+        },
+        opt,
+      )
+
+      // owner
+      const foundOwner: IOwner = await this.ownerModel
+        .findOne({ userId, isActive: true })
+        .lean()
+
+      if (foundOwner) {
+        // Inativa o owner
+        await this.ownerModel.updateOne(
+          { _id: foundOwner._id },
+          { isActive: false },
+          opt,
+        )
+
+        // Inativa os imóveis do owner
+        await this.propertyModel.updateMany(
+          { owner: foundOwner._id },
+          { isActive: false },
+          opt,
+        )
+
+        // Obtém as tags associadas às propriedades do owner
+        const properties: IProperty[] = await this.propertyModel
+          .find({ owner: foundOwner._id, isActive: true })
+          .lean()
+        const propertyTags: string[] = properties.flatMap(
+          property => property.tags,
+        )
+
+        // Atualiza as tags decrementando a quantidade
+        for (const tag of propertyTags) {
+          const updatedTag = await this.tagModel.findOneAndUpdate(
+            { name: tag },
+            { $inc: { amount: -1 } },
+            opt,
+          )
+
+          // Verifica se o amount é menor ou igual a 0 após a atualização
+          if (updatedTag && updatedTag.amount <= 0) {
+            // Exclui a tag se o amount for menor ou igual a 0
+            await this.tagModel.deleteOne({ name: tag }, opt)
+          }
+        }
+
+        // Location
+
+        const propertyAddresses: Array<{ category: string; name: string }> =
+          properties.flatMap(property =>
+            Object.entries(property.address).map(([category, name]) => ({
+              category,
+              name,
+            })),
+          )
+
+        for (const { category, name } of propertyAddresses) {
+          const propertyCountWithLocation =
+            await this.propertyModel.countDocuments({
+              [`address.${category}`]: name,
+              isActive: true,
+              owner: { $ne: foundOwner._id },
+            })
+
+          // Se não houver mais propriedades usando esta localização, exclua-a
+          if (propertyCountWithLocation === 0) {
+            await this.locationModel.deleteOne({ category, name })
+          }
+        }
+
+        // Charges
+        if (foundOwner.subscriptionId) {
+          const subscriptionId = foundOwner.subscriptionId
+          const response = await fetch(
+            `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
+            {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+                access_token: process.env.ASSAS_API_KEY || '',
+              },
+            },
+          )
+
+          if (response.ok) {
+            // Remover a propriedade na memória
+            delete foundOwner.subscriptionId
+
+            // Persistir a alteração no banco de dados
+            await this.ownerModel.updateOne(
+              { _id: foundOwner._id },
+              { $unset: { subscriptionId: 1 } },
+            )
+          } else {
+            throw new BadRequestException(
+              `Não foi possível cancelar a assinatura deste usuário`,
+            )
+          }
+        }
+      }
+
+      await session.commitTransaction()
+
+      return { success: true }
+    } catch (error) {
+      await session.abortTransaction()
+      this.logger.error({
+        error: JSON.stringify(error),
+        exception: '> exception',
+      })
+      throw error
+    } finally {
+      session.endSession()
     }
   }
 }

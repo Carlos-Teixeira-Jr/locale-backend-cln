@@ -22,6 +22,7 @@ export const UserSchema = new Schema(
     isEmailVerified: { type: Boolean, default: false },
     emailVerificationExpiry: { type: Date },
     plan: { type: Schema.Types.ObjectId },
+    isActive: { type: Boolean, default: true },
     favourited: {
       type: [
         {
@@ -61,4 +62,5 @@ export interface IUser extends Document {
   isEmailVerified?: boolean
   emailVerificationExpiry?: Date
   favourited: string[]
+  isActive: boolean
 }

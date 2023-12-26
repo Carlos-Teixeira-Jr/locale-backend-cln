@@ -6,6 +6,7 @@ import { CommonQueryFilter } from 'common/utils/query.filter'
 import { AppService } from 'app.service'
 import { TagDto } from 'modules/property/dto/tag.dto'
 import { AuthService } from 'modules/auth/auth.service'
+import { SendEmailToLocaleDto } from 'app-dto/sendEmailToLocale.dto'
 
 @Controller()
 export class AppController {
@@ -42,5 +43,11 @@ export class AppController {
   async createTag(@Body() tagDto: TagDto): Promise<any> {
     this.logger.log({}, 'createTag')
     return await this.appService.createTag(tagDto)
+  }
+
+  @Post('/send-email-to-locale')
+  async sendEmailToLocale(@Body() sendEmailToLocaleDto: SendEmailToLocaleDto) {
+    this.logger.log({ sendEmailToLocaleDto }, 'email to locale')
+    return await this.appService.sendEmailToLocale(sendEmailToLocaleDto)
   }
 }
