@@ -75,7 +75,7 @@ export class MessageService {
       this.logger.log({}, 'start findAll')
 
       const { page, ownerId } = getAllByOwnerIdDto
-      const limit = 10
+      const limit = 6
       const skip = (page - 1) * limit
 
       const foundOwner = await this.ownerModel.findById(ownerId)
