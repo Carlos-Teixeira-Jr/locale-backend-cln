@@ -88,26 +88,27 @@ export class MessageService {
         .find({ ownerId: ownerId })
         .lean()
 
-      const uniquePropertyIds: string[] = [];
+      const uniquePropertyIds: string[] = []
 
       docs.forEach(doc => {
-        const stringId = String(doc.propertyId);
+        const stringId = String(doc.propertyId)
 
         if (!uniquePropertyIds.includes(stringId)) {
-          uniquePropertyIds.push(stringId);
+          uniquePropertyIds.push(stringId)
         }
-      });
+      })
 
       // Consultar a coleção 'properties' para encontrar os documentos correspondentes aos propertyId
-      const properties = await this.propertyModel.find({
-        _id: { $in: uniquePropertyIds },
-        isActive: true,
-      })
-      .skip(skip)
-      .limit(limit)
-      .exec();
+      const properties = await this.propertyModel
+        .find({
+          _id: { $in: uniquePropertyIds },
+          isActive: true,
+        })
+        .skip(skip)
+        .limit(limit)
+        .exec()
 
-      const count = uniquePropertyIds.length;
+      const count = uniquePropertyIds.length
       const totalPages = Math.ceil(count / limit)
 
       return {

@@ -44,10 +44,10 @@ export interface IDocsWithPagination {
 }
 
 export interface ICreatePropertyReturn {
-  createdProperty: IProperty,
-  creditCardBrand: string,
-  paymentValue: string,
-  userAlreadyExists: boolean,
+  createdProperty: IProperty
+  creditCardBrand: string
+  paymentValue: string
+  userAlreadyExists: boolean
 }
 
 export interface IPropertyByAnnouncementCode {
