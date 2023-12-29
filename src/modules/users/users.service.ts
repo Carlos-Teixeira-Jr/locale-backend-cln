@@ -33,7 +33,7 @@ export type User_Owner = {
 }
 
 export interface IFavPropertiesReturn {
-  docs: any[]
+  docs: IProperty[]
   totalPages: number
   count: number
 }
@@ -435,7 +435,7 @@ export class UsersService {
         })
         .skip(skip)
         .limit(limit)
-        .lean()
+        .exec()
 
       let count
       let totalPages

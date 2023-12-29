@@ -43,6 +43,13 @@ export interface IDocsWithPagination {
   count?: number
 }
 
+export interface ICreatePropertyReturn {
+  createdProperty: IProperty,
+  creditCardBrand: string,
+  paymentValue: string,
+  userAlreadyExists: boolean,
+}
+
 export interface IPropertyByAnnouncementCode {
   announcementCode: string
 }
