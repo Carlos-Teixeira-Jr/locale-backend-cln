@@ -43,6 +43,13 @@ export interface IDocsWithPagination {
   count?: number
 }
 
+export interface ICreatePropertyReturn {
+  createdProperty: IProperty
+  creditCardBrand: string
+  paymentValue: string
+  userAlreadyExists: boolean
+}
+
 export interface IPropertyByAnnouncementCode {
   announcementCode: string
 }
@@ -673,8 +680,8 @@ export class PropertyService {
       this.logger.log({}, 'start find by owner')
 
       const { ownerId, page } = getPropertiesByOwnerDto
-      const skip = (page - 1) * 10
       const limit = 10
+      const skip = (page - 1) * limit
 
       let ownerProperties: IProperty[]
       let count: number

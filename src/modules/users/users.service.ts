@@ -33,7 +33,7 @@ export type User_Owner = {
 }
 
 export interface IFavPropertiesReturn {
-  docs: any[]
+  docs: IProperty[]
   totalPages: number
   count: number
 }
@@ -417,8 +417,8 @@ export class UsersService {
       this.logger.log({ body }, 'favourite property')
 
       const { id, page } = body
-      const skip = (page - 1) * 10
       const limit = 6
+      const skip = (page - 1) * limit
 
       const user = await this.userModel.findById(id)
 
@@ -435,7 +435,7 @@ export class UsersService {
         })
         .skip(skip)
         .limit(limit)
-        .lean()
+        .exec()
 
       let count
       let totalPages
