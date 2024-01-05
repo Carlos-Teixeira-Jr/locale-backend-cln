@@ -26,9 +26,12 @@ export class NotificationController {
   }
 
   @Get('/user/:id')
-  async findOne(@Param('id') params: any): Promise<INotification[]> {
+  async findOne(
+    @Param('id') params: any,
+    @Query('isRead') isRead: any,
+  ): Promise<INotification[]> {
     this.logger.log({}, 'findOne')
-    return this.notificationService.findOne(params)
+    return this.notificationService.findOne(params, isRead)
   }
 
   @Get()

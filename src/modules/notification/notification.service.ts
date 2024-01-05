@@ -45,7 +45,7 @@ export class NotificationService {
     }
   }
 
-  async findOne(id: string): Promise<INotification[]> {
+  async findOne(id: string, isRead: any): Promise<INotification[]> {
     try {
       this.logger.log({ id }, 'start findOne')
 
@@ -59,10 +59,12 @@ export class NotificationService {
         )
       }
 
-      await this.notificationModel.updateMany(
-        { userId: id, isRead: false },
-        { $set: { isRead: true } },
-      )
+      if (isRead) {
+        await this.notificationModel.updateMany(
+          { userId: id, isRead: false },
+          { $set: { isRead: true } },
+        )
+      }
 
       return notification
     } catch (error) {
