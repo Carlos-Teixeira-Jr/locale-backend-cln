@@ -27,6 +27,10 @@ export class UserData {
   @Validate(IDValidator)
   _id: Schema.Types.ObjectId
 
+  @IsOptional()
+  @IsString()
+  profilePicture?: string
+
   @IsNotEmpty()
   @IsString()
   username: string

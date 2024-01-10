@@ -76,6 +76,7 @@ interface IOwnerData {
   name: string
   phone: string
   cellPhone: string
+  profilePicture?: string
   plan: any
   userId: any
   adCredits?: number
@@ -326,6 +327,7 @@ export class PropertyService {
           phone,
           cellPhone,
           plan,
+          profilePicture: userData.profilePicture,
           userId: user._id,
         }
 
