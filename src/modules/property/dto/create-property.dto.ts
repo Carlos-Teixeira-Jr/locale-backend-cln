@@ -27,9 +27,8 @@ export class UserData {
   @Validate(IDValidator)
   _id: Schema.Types.ObjectId
 
-  @IsOptional()
   @IsString()
-  profilePicture?: string
+  profilePicture: string
 
   @IsNotEmpty()
   @IsString()

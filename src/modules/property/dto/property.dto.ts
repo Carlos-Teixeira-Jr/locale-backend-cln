@@ -41,9 +41,8 @@ export class PropertyOwnerInfoDto {
   @IsString()
   name: string
 
-  @IsOptional()
   @IsString()
-  profilePicture?: string
+  profilePicture: string
 
   @IsOptional()
   @IsArray()
