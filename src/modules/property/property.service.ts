@@ -76,7 +76,7 @@ interface IOwnerData {
   name: string
   phone: string
   cellPhone: string
-  profilePicture?: string
+  profilePicture: string
   plan: any
   userId: any
   adCredits?: number
@@ -607,7 +607,7 @@ export class PropertyService {
       propertyData.ownerInfo = {
         name: owner.name,
         phones: [phone, cellPhone],
-        profilePicture: owner.profilePicture,
+        profilePicture: userData.profilePicture,
       }
 
       // TAGS
