@@ -39,6 +39,9 @@ export class OwnerDto {
   @IsOptional()
   @Validate(IDValidator)
   plan: Schema.Types.ObjectId
+
+  @IsString()
+  profilePicture: string
 }
 
 export class UserDto {
@@ -63,6 +66,10 @@ export class UserDto {
   @ValidateNested({ each: true })
   @Type(() => PropertyAddressDto)
   address: PropertyAddressDto
+
+  @IsString()
+  @IsOptional()
+  profilePicture?: string
 }
 
 export class EditPasswordDto {
