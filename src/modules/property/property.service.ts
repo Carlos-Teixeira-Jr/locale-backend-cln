@@ -1153,7 +1153,7 @@ export class PropertyService {
       }
       if (obj.minSize) {
         allFilters.push({
-          'size.area': { $gte: obj.minSize },
+          'size.totalArea': { $gte: obj.minSize },
         })
       }
     })

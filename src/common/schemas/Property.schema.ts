@@ -46,7 +46,8 @@ export interface IProperty extends BaseModel, Document {
   size: {
     width: number
     height: number
-    area: number
+    totalArea: number
+    useableArea: number
   }
   tags: string[]
   condominiumTags: string[]
@@ -110,7 +111,8 @@ export const PropertySchema = new Schema<IProperty>(
       _id: false,
       width: { type: Number },
       height: { type: Number },
-      area: { type: Number },
+      totalArea: { type: Number },
+      useableAre: { type: Number },
     },
     tags: [{ type: String, amount: Number }],
     condominiumTags: [String],
