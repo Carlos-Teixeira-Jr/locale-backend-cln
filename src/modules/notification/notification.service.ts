@@ -9,6 +9,7 @@ import { LoggerService } from 'modules/logger/logger.service'
 import { Model } from 'mongoose'
 import { CreateNotificationDto } from './dto/create-notification.dto'
 import { PageQueryFilter } from 'common/utils/query.filter'
+import { DeleteNotificationDto } from 'modules/property/dto/deleteNotification.dto'
 
 export interface INotificationsWithPagination {
   docs: INotification[]
@@ -73,6 +74,14 @@ export class NotificationService {
         exception: '> exception',
       })
       throw error
+    }
+  }
+
+  async deleteNotification(_id: DeleteNotificationDto) {
+    try {
+      await this.notificationModel.deleteOne({ _id })
+    } catch (error) {
+      console.log(error)
     }
   }
 

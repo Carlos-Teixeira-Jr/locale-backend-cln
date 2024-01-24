@@ -1,4 +1,12 @@
-import { Body, Query, Controller, Get, Param, Post } from '@nestjs/common'
+import {
+  Body,
+  Query,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Delete,
+} from '@nestjs/common'
 import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import {
   INotificationsWithPagination,
@@ -8,6 +16,7 @@ import { CreateNotificationDto } from './dto/create-notification.dto'
 import { INotification } from 'common/schemas/Notification.schema'
 import { LoggerService } from 'modules/logger/logger.service'
 import { PageQueryFilter } from 'common/utils/query.filter'
+import { DeleteNotificationDto } from 'modules/property/dto/deleteNotification.dto'
 
 @Controller('notification')
 export class NotificationController {
@@ -40,5 +49,12 @@ export class NotificationController {
   ): Promise<INotificationsWithPagination> {
     this.logger.log({}, 'findAll')
     return await this.notificationService.findAll(pageQueryFilter)
+  }
+
+  @Delete()
+  async DeleteNotificationDto(
+    @Body() deleteNotificationDto: DeleteNotificationDto,
+  ) {
+    return this.notificationService.deleteNotification(deleteNotificationDto)
   }
 }
