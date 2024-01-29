@@ -9,7 +9,7 @@ import { LoggerService } from 'modules/logger/logger.service'
 import { Model } from 'mongoose'
 import { CreateNotificationDto } from './dto/create-notification.dto'
 import { PageQueryFilter } from 'common/utils/query.filter'
-import { GetNotificationParams } from './dto/getNotification.params'
+import { DeleteNotificationDto } from 'modules/property/dto/deleteNotification.dto'
 
 export interface INotificationsWithPagination {
   docs: INotification[]
@@ -46,9 +46,9 @@ export class NotificationService {
     }
   }
 
-  async findOne({ id }: GetNotificationParams): Promise<INotification[]> {
+  async findOne(id: string, isRead: any): Promise<INotification[]> {
     try {
-      this.logger.log({}, 'start findOne')
+      this.logger.log({ id }, 'start findOne')
 
       const notification: INotification[] = await this.notificationModel
         .find({ userId: id })
@@ -60,6 +60,13 @@ export class NotificationService {
         )
       }
 
+      if (isRead) {
+        await this.notificationModel.updateMany(
+          { userId: id, isRead: false },
+          { $set: { isRead: true } },
+        )
+      }
+
       return notification
     } catch (error) {
       this.logger.error({
@@ -67,6 +74,14 @@ export class NotificationService {
         exception: '> exception',
       })
       throw error
+    }
+  }
+
+  async deleteNotification(_id: DeleteNotificationDto) {
+    try {
+      await this.notificationModel.deleteOne({ _id })
+    } catch (error) {
+      console.log(error)
     }
   }
 
