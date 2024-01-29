@@ -75,7 +75,7 @@ export class MessageService {
       this.logger.log({}, 'start findAll')
 
       const { page, ownerId } = getAllByOwnerIdDto
-      const limit = 10
+      const limit = 6
       const skip = (page - 1) * limit
 
       const foundOwner = await this.ownerModel.findById(ownerId)
@@ -86,22 +86,29 @@ export class MessageService {
 
       const docs: IMessageOwner[] = await this.messageModel
         .find({ ownerId: ownerId })
-        .skip(skip)
-        .limit(limit)
         .lean()
 
-      // Coletar todos os propertyId únicos dos documentos em docs
-      const uniquePropertyIds = Array.from(
-        new Set(docs.map(doc => doc.propertyId)),
-      )
+      const uniquePropertyIds: string[] = []
 
-      // Consultar a coleção 'properties' para encontrar os documentos correspondentes aos propertyId
-      const properties = await this.propertyModel.find({
-        _id: { $in: uniquePropertyIds },
-        isActive: true,
+      docs.forEach(doc => {
+        const stringId = String(doc.propertyId)
+
+        if (!uniquePropertyIds.includes(stringId)) {
+          uniquePropertyIds.push(stringId)
+        }
       })
 
-      const count = await this.messageModel.countDocuments({ ownerId })
+      // Consultar a coleção 'properties' para encontrar os documentos correspondentes aos propertyId
+      const properties = await this.propertyModel
+        .find({
+          _id: { $in: uniquePropertyIds },
+          isActive: true,
+        })
+        .skip(skip)
+        .limit(limit)
+        .exec()
+
+      const count = uniquePropertyIds.length
       const totalPages = Math.ceil(count / limit)
 
       return {

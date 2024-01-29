@@ -33,7 +33,7 @@ export type User_Owner = {
 }
 
 export interface IFavPropertiesReturn {
-  docs: any[]
+  docs: IProperty[]
   totalPages: number
   count: number
 }
@@ -172,7 +172,7 @@ export class UsersService {
         address: userAddress,
       } = body.user
 
-      const { password, passwordConfirmattion } = body.password
+      //const { password, passwordConfirmattion } = body.password
 
       let ownerId
       let ownerName: string
@@ -180,6 +180,7 @@ export class UsersService {
       let phone: string
       let cellPhone
       let adCredits: number
+      let profilePicture: string
 
       if (body.owner) {
         ownerId = body.owner.id
@@ -188,6 +189,7 @@ export class UsersService {
         phone = body.owner.phone
         cellPhone = body.owner.cellPhone
         adCredits = body.owner.adCredits
+        profilePicture = body.owner.profilePicture
       }
 
       const userExists = await this.userModel.findOne({ _id: userId })
@@ -196,11 +198,27 @@ export class UsersService {
         throw new NotFoundException(
           `Usuário com o id: ${userId} não foi encontrado`,
         )
+        // esse else não existia antes, só coloquei pra confirmar que o problema era no password
+      } else {
+        await this.userModel.updateOne(
+          { _id: userId },
+          {
+            $set: {
+              username: userName,
+              email,
+              cpf,
+              address: userAddress,
+              profilePicture,
+            },
+          },
+        )
       }
 
-      // Lida com a edição da senha caso o usuário tenha trocado;
-      if (password) {
-        if (password !== passwordConfirmattion) {
+      //  Lida com a edição da senha caso o usuário tenha trocado;
+      const { password, passwordConfirmattion } = body.password
+
+      if (body.password !== undefined) {
+        if (password !== undefined && password !== passwordConfirmattion) {
           throw new BadRequestException(
             'A confirmação de senha não é igual a senha informada',
           )
@@ -215,6 +233,7 @@ export class UsersService {
                 cpf,
                 address: userAddress,
                 password: encryptedPassword,
+                profilePicture,
               },
             },
           )
@@ -228,6 +247,7 @@ export class UsersService {
               email,
               cpf,
               address: userAddress,
+              profilePicture,
             },
           },
         )
@@ -254,6 +274,7 @@ export class UsersService {
               cellPhone,
               userId: user,
               adCredits,
+              profilePicture,
             },
           },
         )
@@ -417,8 +438,8 @@ export class UsersService {
       this.logger.log({ body }, 'favourite property')
 
       const { id, page } = body
-      const skip = (page - 1) * 10
-      const limit = 10
+      const limit = 6
+      const skip = (page - 1) * limit
 
       const user = await this.userModel.findById(id)
 
@@ -435,7 +456,7 @@ export class UsersService {
         })
         .skip(skip)
         .limit(limit)
-        .lean()
+        .exec()
 
       let count
       let totalPages

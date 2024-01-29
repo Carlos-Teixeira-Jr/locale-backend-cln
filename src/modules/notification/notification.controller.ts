@@ -1,4 +1,12 @@
-import { Body, Query, Controller, Get, Param, Post } from '@nestjs/common'
+import {
+  Body,
+  Query,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Delete,
+} from '@nestjs/common'
 import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import {
   INotificationsWithPagination,
@@ -7,8 +15,8 @@ import {
 import { CreateNotificationDto } from './dto/create-notification.dto'
 import { INotification } from 'common/schemas/Notification.schema'
 import { LoggerService } from 'modules/logger/logger.service'
-import { GetNotificationParams } from './dto/getNotification.params'
 import { PageQueryFilter } from 'common/utils/query.filter'
+import { DeleteNotificationDto } from 'modules/property/dto/deleteNotification.dto'
 
 @Controller('notification')
 export class NotificationController {
@@ -26,12 +34,13 @@ export class NotificationController {
     return this.notificationService.createOne(createNotificationDto)
   }
 
-  @Get(':id')
+  @Get('/user/:id')
   async findOne(
-    @Param() params: GetNotificationParams,
+    @Param('id') params: any,
+    @Query('isRead') isRead: any,
   ): Promise<INotification[]> {
     this.logger.log({}, 'findOne')
-    return this.notificationService.findOne(params)
+    return this.notificationService.findOne(params, isRead)
   }
 
   @Get()
@@ -40,5 +49,12 @@ export class NotificationController {
   ): Promise<INotificationsWithPagination> {
     this.logger.log({}, 'findAll')
     return await this.notificationService.findAll(pageQueryFilter)
+  }
+
+  @Delete()
+  async DeleteNotificationDto(
+    @Body() deleteNotificationDto: DeleteNotificationDto,
+  ) {
+    return this.notificationService.deleteNotification(deleteNotificationDto)
   }
 }
