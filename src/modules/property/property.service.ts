@@ -611,6 +611,7 @@ export class PropertyService {
         name: owner.name,
         phones: [phone, cellPhone],
         profilePicture: userData.profilePicture,
+        email: userData.email,
       }
 
       // TAGS
