@@ -42,11 +42,13 @@ export interface IProperty extends BaseModel, Document {
     phones?: string[]
     creci: string
     profilePicture: string
+    email: string
   }
   size: {
     width: number
     height: number
-    area: number
+    totalArea: number
+    useableArea: number
   }
   tags: string[]
   condominiumTags: string[]
@@ -105,12 +107,16 @@ export const PropertySchema = new Schema<IProperty>(
       profilePicture: {
         type: String,
       },
+      email: {
+        type: String,
+      },
     },
     size: {
       _id: false,
       width: { type: Number },
       height: { type: Number },
-      area: { type: Number },
+      totalArea: { type: Number },
+      useableAre: { type: Number },
     },
     tags: [{ type: String, amount: Number }],
     condominiumTags: [String],
