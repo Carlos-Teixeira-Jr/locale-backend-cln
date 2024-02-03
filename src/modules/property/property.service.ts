@@ -80,6 +80,7 @@ interface IOwnerData {
   plan: any
   userId: any
   adCredits?: number
+  email: string
 }
 
 @Injectable()
@@ -301,6 +302,7 @@ export class PropertyService {
               cpf: userData.cpf,
               address: userData.address,
               username: userData.username,
+              email: userData.email,
             },
             opt,
           )
@@ -329,6 +331,7 @@ export class PropertyService {
           plan,
           profilePicture: userData.profilePicture,
           userId: user._id,
+          email: userData.email,
         }
 
         if (!isPlanFree) {
@@ -608,6 +611,7 @@ export class PropertyService {
         name: owner.name,
         phones: [phone, cellPhone],
         profilePicture: userData.profilePicture,
+        email: userData.email,
       }
 
       // TAGS
@@ -1153,7 +1157,7 @@ export class PropertyService {
       }
       if (obj.minSize) {
         allFilters.push({
-          'size.area': { $gte: obj.minSize },
+          'size.totalArea': { $gte: obj.minSize },
         })
       }
     })

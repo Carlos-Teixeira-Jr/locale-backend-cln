@@ -52,6 +52,9 @@ export class PropertyOwnerInfoDto {
   @IsOptional()
   @IsArray()
   creci?: string
+
+  @IsString()
+  email: string
 }
 
 export class PropertySizeDto {
