@@ -34,6 +34,7 @@ import { TagModelName, ITag } from 'common/schemas/Tag.schema'
 import { Multer } from 'multer'
 import { uploadFile } from 'common/utils/uploadImages'
 import { PropertyIdDto } from './dto/propertyId.dto'
+import { cloneDeep } from 'lodash'
 //import { uploadFile } from 'common/utils/uploadImages'
 
 export interface IDocsWithPagination {
@@ -154,8 +155,7 @@ export class PropertyService {
       let highlightsFilters
       const index = allFilters.findIndex(obj => obj.highlighted === false)
       if (index !== -1) {
-        //Deep cloning foi necessário pois o spread fazia com que o allFilters original também fosse alterado;
-        const clonedAllFilters = JSON.parse(JSON.stringify(allFilters))
+        const clonedAllFilters = cloneDeep(allFilters)
         clonedAllFilters[index].highlighted = true
         highlightsFilters = clonedAllFilters
       }
@@ -1130,10 +1130,17 @@ export class PropertyService {
           },
         })
       }
+      // if (obj.tags) {
+      //   allFilters.push({
+      //     tags: {
+      //       $in: obj.tags,
+      //     },
+      //   })
+      // }
       if (obj.tags) {
         allFilters.push({
           tags: {
-            $in: obj.tags,
+            $in: [new RegExp(obj.tags, 'i')],
           },
         })
       }
