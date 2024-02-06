@@ -966,10 +966,7 @@ export class PropertyService {
     }
   }
 
-  async uploadDropImageWithRarity(
-    files: Multer.File[],
-    propertyId: PropertyIdDto,
-  ) {
+  async uploadImages(files: Multer.File[], propertyId: PropertyIdDto) {
     try {
       this.logger.log({}, 'start upload images')
 
