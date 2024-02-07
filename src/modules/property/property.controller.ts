@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Query,
@@ -25,8 +27,8 @@ import { EditPropertyDto } from './dto/edit-property.dto'
 import { IProperty } from 'common/schemas/Property.schema'
 import { IOwnerPropertiesReturn } from './property.service'
 import { FilesInterceptor } from '@nestjs/platform-express'
-import { Multer } from 'multer'
 import { PropertyIdDto } from './dto/propertyId.dto'
+import { uploadFiles } from 'common/decorators'
 @Controller('property')
 export class PropertyController {
   constructor(
@@ -92,23 +94,28 @@ export class PropertyController {
     return this.propertyService.editProperty(editPropertyDto)
   }
 
-  @Post('uploadDropImageWithRarity')
+  @Post('uploadImages')
   @UseInterceptors(
     FilesInterceptor('images', 20, {
       limits: {
-        fileSize: 10 * 1024 * 1024,
+        fileSize: 1000 * 1024 * 1024,
       },
     }),
   )
   async uploadDropImageWithRarity(
-    @UploadedFiles() files: Multer.File[],
+    @UploadedFiles() files: Array<Express.Multer.File>,
     @Body('propertyId') propertyId: PropertyIdDto,
   ) {
-    this.logger.info({}, 'uploadDropImageWithRarity > params')
+    this.logger.info({}, 'uploadImages > params')
 
-    return await this.propertyService.uploadDropImageWithRarity(
-      files,
-      propertyId,
-    )
+    return await this.propertyService.uploadImages(files, propertyId)
+  }
+
+  @HttpCode(HttpStatus.CREATED)
+  @uploadFiles('filename')
+  @UseInterceptors(FilesInterceptor('filename'))
+  @Post('upload-file')
+  uploadMyFiles(@UploadedFiles() files: Array<Express.Multer.File>) {
+    console.log(files)
   }
 }
