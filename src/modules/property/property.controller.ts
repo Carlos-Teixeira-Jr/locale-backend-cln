@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Query,
@@ -25,8 +27,8 @@ import { EditPropertyDto } from './dto/edit-property.dto'
 import { IProperty } from 'common/schemas/Property.schema'
 import { IOwnerPropertiesReturn } from './property.service'
 import { FilesInterceptor } from '@nestjs/platform-express'
-import { Multer } from 'multer'
 import { PropertyIdDto } from './dto/propertyId.dto'
+import { uploadFiles } from 'common/decorators'
 @Controller('property')
 export class PropertyController {
   constructor(
@@ -101,7 +103,7 @@ export class PropertyController {
     }),
   )
   async uploadDropImageWithRarity(
-    @UploadedFiles() files: Multer.File[],
+    @UploadedFiles() files: Array<Express.Multer.File>,
     @Body('propertyId') propertyId: PropertyIdDto,
   ) {
     this.logger.info({}, 'uploadDropImageWithRarity > params')
@@ -110,5 +112,13 @@ export class PropertyController {
       files,
       propertyId,
     )
+  }
+
+  @HttpCode(HttpStatus.CREATED)
+  @uploadFiles('filename')
+  @UseInterceptors(FilesInterceptor('filename'))
+  @Post('upload-file')
+  uploadMyFiles(@UploadedFiles() files: Array<Express.Multer.File>) {
+    console.log(files)
   }
 }
