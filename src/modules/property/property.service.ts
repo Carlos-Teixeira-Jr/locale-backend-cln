@@ -965,7 +965,7 @@ export class PropertyService {
     }
   }
 
-  async uploadDropImageWithRarity(
+  async uploadImages(
     files: Array<Express.Multer.File>,
     propertyId: PropertyIdDto,
   ) {
