@@ -96,7 +96,7 @@ export class PropertyController {
   @UseInterceptors(
     FilesInterceptor('images', 20, {
       limits: {
-        fileSize: 10 * 1024 * 1024,
+        fileSize: 1000 * 1024 * 1024,
       },
     }),
   )

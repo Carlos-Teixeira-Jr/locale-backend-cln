@@ -37,8 +37,8 @@ async function bootstrap() {
 
   app.use(passport.initialize())
 
-  app.use(json({ limit: 500 * 1024 * 1024 }))
-  app.use(urlencoded({ extended: true, limit: 500 * 1024 * 1024 }))
+  app.use(json({ limit: 5000 * 1024 * 1024 }))
+  app.use(urlencoded({ extended: true, limit: 5000 * 1024 * 1024 }))
 
   await app.listen(process.env.PORT || 3001)
 }
