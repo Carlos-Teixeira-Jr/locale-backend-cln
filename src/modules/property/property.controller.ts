@@ -92,7 +92,7 @@ export class PropertyController {
     return this.propertyService.editProperty(editPropertyDto)
   }
 
-  @Post('uploadDropImageWithRarity')
+  @Post('uploadImages')
   @UseInterceptors(
     FilesInterceptor('images', 20, {
       limits: {
@@ -100,15 +100,12 @@ export class PropertyController {
       },
     }),
   )
-  async uploadDropImageWithRarity(
+  async uploadImages(
     @UploadedFiles() files: Multer.File[],
     @Body('propertyId') propertyId: PropertyIdDto,
   ) {
-    this.logger.info({}, 'uploadDropImageWithRarity > params')
+    this.logger.info({}, 'uploadImages > params')
 
-    return await this.propertyService.uploadDropImageWithRarity(
-      files,
-      propertyId,
-    )
+    return await this.propertyService.uploadImages(files, propertyId)
   }
 }
