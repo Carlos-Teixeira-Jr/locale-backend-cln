@@ -3,7 +3,6 @@ import { v4 as uuid } from 'uuid'
 import { BadRequestException } from '@nestjs/common'
 import { S3 } from 'aws-sdk'
 import { removeNonAlphanumericCharacters as cleanString } from './removeNumAlphaNumeric'
-import { Multer } from 'multer'
 
 const {
   R2_ACCESS_KEY = process.env.R2_ACCESS_KEY,
@@ -29,7 +28,7 @@ const s3 = new S3({
 }) as any
 
 export const uploadFile = async (
-  file: Multer.File | Multer.File[],
+  file: Array<Express.Multer.File>,
   directory: string,
 ) => {
   const images = file
