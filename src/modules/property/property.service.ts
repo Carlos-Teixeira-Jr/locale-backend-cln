@@ -76,6 +76,7 @@ interface IOwnerData {
   name: string
   phone: string
   cellPhone: string
+  wppNumber: string
   profilePicture: string
   plan: any
   userId: any
@@ -228,8 +229,15 @@ export class PropertyService {
 
       const { propertyType, address } = createPropertyDto.propertyData
 
-      const { plan, isPlanFree, phone, cellPhone, userData, propertyData } =
-        createPropertyDto
+      const {
+        plan,
+        isPlanFree,
+        phone,
+        cellPhone,
+        wppNumber,
+        userData,
+        propertyData,
+      } = createPropertyDto
 
       let cardName
       let cardNumber
@@ -327,6 +335,7 @@ export class PropertyService {
           name: userData.username,
           phone,
           cellPhone,
+          wppNumber,
           plan,
           profilePicture: userData.profilePicture,
           userId: user._id,
