@@ -175,10 +175,6 @@ export class CreatePropertyDto {
   @IsOptional()
   @IsString()
   cellPhone: string
-
-  @IsOptional()
-  @IsString()
-  wppNumber: string
 }
 
 const generateCode = (): string => {

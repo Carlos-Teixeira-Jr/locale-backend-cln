@@ -229,15 +229,10 @@ export class PropertyService {
 
       const { propertyType, address } = createPropertyDto.propertyData
 
-      const {
-        plan,
-        isPlanFree,
-        phone,
-        cellPhone,
-        wppNumber,
-        userData,
-        propertyData,
-      } = createPropertyDto
+      const { plan, isPlanFree, phone, cellPhone, userData, propertyData } =
+        createPropertyDto
+
+      const { wppNumber } = createPropertyDto.propertyData.ownerInfo
 
       let cardName
       let cardNumber
@@ -620,6 +615,7 @@ export class PropertyService {
         phones: [phone, cellPhone],
         profilePicture: userData.profilePicture,
         email: userData.email,
+        wppNumber: wppNumber,
       }
 
       // TAGS

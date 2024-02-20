@@ -7,6 +7,7 @@ export interface IOwner extends BaseModel, Document {
   name: string
   phone: string
   cellPhone: string
+  wwpNumber: string
   profilePicture?: string
   creci: string
   notifications: {
@@ -34,6 +35,7 @@ export const OwnerSchema = new Schema(
     name: { type: String },
     phone: { type: String },
     cellPhone: { type: String },
+    wppNumber: { type: String },
     profilePicture: { type: String },
     creci: { type: String },
     notifications: [

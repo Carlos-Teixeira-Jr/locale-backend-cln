@@ -55,6 +55,10 @@ export class PropertyOwnerInfoDto {
 
   @IsString()
   email: string
+
+  @IsOptional()
+  @IsString()
+  wppNumber: string
 }
 
 export class PropertySizeDto {

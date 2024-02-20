@@ -102,7 +102,7 @@ export const PropertySchema = new Schema<IProperty>(
         type: String,
       },
       phones: [{ type: String }],
-      wppNumber: { String },
+      wppNumber: { type: String },
       creci: {
         type: String,
       },
