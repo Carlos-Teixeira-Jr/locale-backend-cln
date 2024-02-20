@@ -12,6 +12,14 @@ const {
   IMAGE_UPLOAD_PREFIX = process.env.IMAGE_UPLOAD_PREFIX,
 } = env
 
+type ParamsType = {
+  Bucket: string
+  Key: string
+  ContentType?: string
+  Body?: Buffer
+  ACL?: string
+}
+
 const VALID_EXT = ['PNG', 'JPG', 'JPEG', 'GIF']
 
 const MAXIMUM_FILE_SIZE = 41943040
@@ -63,7 +71,7 @@ export const uploadFile = async (
       )
     }
 
-    const params = {
+    const params: ParamsType = {
       Bucket: 'imoveis',
       Key: fileName,
       ContentType: images[i].mimetype,
@@ -72,7 +80,7 @@ export const uploadFile = async (
     }
 
     try {
-      await s3.upload(params as any).promise()
+      await s3.upload(params).promise()
       console.log(`link da imagem: ${IMAGE_UPLOAD_PREFIX}/${fileName}`)
       uploadedFiles.push(`${IMAGE_UPLOAD_PREFIX}/${fileName}`)
     } catch (error) {
@@ -90,12 +98,12 @@ export const deleteFile = async (fileName: string) => {
 
   const key = fileName.split('https://images.localeimoveis.com/')[1]
 
-  const params = {
+  const params: ParamsType = {
     Bucket: R2_BUCKET_NAME,
     Key: key,
   }
   try {
-    await s3.deleteObject(params as any).promise()
+    await s3.deleteObject(params).promise()
   } catch (error) {
     return
   }
