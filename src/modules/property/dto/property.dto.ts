@@ -2,6 +2,7 @@ import {
   IsArray,
   IsBoolean,
   IsDefined,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
@@ -68,10 +69,12 @@ export class PropertySizeDto {
   @IsNumber()
   height: number
 
+  @IsNotEmpty()
   @IsDefined()
   @IsNumber()
   totalArea: number
 
+  @IsOptional()
   @IsNumber()
   useableArea: number
 

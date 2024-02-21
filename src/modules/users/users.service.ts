@@ -129,20 +129,20 @@ export class UsersService {
     try {
       this.logger.log({ body }, 'find owner by user id')
 
-      const { _id } = body
+      const { userId } = body
 
       const user = await this.userModel
-        .findOne({ _id, isActive: true })
+        .findOne({ userId, isActive: true })
         .select('username email address cpf')
 
       if (!user) {
         throw new NotFoundException(
-          `Usuário com o id: ${_id} não foi encontrado`,
+          `Usuário com o id: ${userId} não foi encontrado`,
         )
       }
 
       const owner = await this.ownerModel
-        .findOne({ userId: _id, isActive: true })
+        .findOne({ userId, isActive: true })
         .select(
           'adCredits plan phone cellPhone customerId creditCardInfo _id name',
         )

@@ -12,7 +12,7 @@ export interface IProperty extends BaseModel, Document {
   address: {
     zipCode: string
     city: string
-    state: string
+    uf: string
     streetName: string
     streetNumber: string
     complement: string
@@ -75,7 +75,7 @@ export const PropertySchema = new Schema<IProperty>(
       _id: false,
       zipCode: String,
       city: String,
-      state: String,
+      uf: String,
       streetName: String,
       streetNumber: String,
       complement: String,
@@ -118,7 +118,7 @@ export const PropertySchema = new Schema<IProperty>(
       width: { type: Number },
       height: { type: Number },
       totalArea: { type: Number },
-      useableAre: { type: Number },
+      useableArea: { type: Number },
     },
     tags: [{ type: String, amount: Number }],
     condominiumTags: [String],
