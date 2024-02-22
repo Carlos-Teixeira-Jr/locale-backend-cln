@@ -18,12 +18,15 @@ export interface IOwner extends BaseModel, Document {
   userId: Schema.Types.ObjectId
   highlightAd: number
   adCredits: number
-  customerId: string
-  subscriptionId: string
-  creditCardInfo: {
-    creditCardNumber: string
-    creditCardBrand: string
-    creditCardToken: string
+  paymentData: {
+    customerId: string
+    subscriptionId: string
+    cpfCnpj: string
+    creditCardInfo: {
+      creditCardNumber: string
+      creditCardBrand: string
+      creditCardToken: string
+    }
   }
   isNewCreditCard: boolean
   newPlan: boolean
@@ -48,12 +51,15 @@ export const OwnerSchema = new Schema(
     userId: { type: Schema.Types.ObjectId },
     adCredits: { type: Number },
     highLightAd: { type: Number },
-    customerId: { type: String },
-    subscriptionId: { type: String },
-    creditCardInfo: {
-      creditCardNumber: { type: String },
-      creditCardBrand: { type: String },
-      creditCardToken: { type: String },
+    paymentData: {
+      customerId: { type: String },
+      subscriptionId: { type: String },
+      cpfCnpj: { type: String },
+      creditCardInfo: {
+        creditCardNumber: { type: String },
+        creditCardBrand: { type: String },
+        creditCardToken: { type: String },
+      },
     },
     isNewCreditCard: { type: Boolean },
     newPlan: { type: Boolean },

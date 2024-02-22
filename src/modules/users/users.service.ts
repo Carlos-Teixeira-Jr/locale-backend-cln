@@ -362,7 +362,7 @@ export class UsersService {
         const customer = await response.json()
 
         // Atualiza o 'customerId' no 'owner' e salva no banco de dados
-        ownerExists.customerId = customer.id
+        ownerExists.paymentData.customerId = customer.id
         await ownerExists.save()
       }
 
@@ -385,7 +385,9 @@ export class UsersService {
           body: JSON.stringify({
             billingType: 'CREDIT_CARD',
             cycle: 'MONTHLY',
-            customer: customerId ? customerId : ownerExists.customerId,
+            customer: customerId
+              ? customerId
+              : ownerExists.paymentData.customerId,
             value: plan.price,
             nextDueDate: formattedDate,
             creditCard: {
@@ -418,7 +420,7 @@ export class UsersService {
       // Atualiza os dados do usuário;
       ownerExists.isNewCreditCard = true
       ownerExists.newPlan = isNewPlan
-      ownerExists.creditCardInfo = creditCardInfo
+      ownerExists.paymentData.creditCardInfo = creditCardInfo
       await ownerExists.save()
 
       return { success: true }
@@ -618,8 +620,8 @@ export class UsersService {
         }
 
         // Charges
-        if (foundOwner.subscriptionId) {
-          const subscriptionId = foundOwner.subscriptionId
+        if (foundOwner.paymentData.subscriptionId) {
+          const subscriptionId = foundOwner.paymentData.subscriptionId
           const response = await fetch(
             `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
             {
@@ -633,7 +635,7 @@ export class UsersService {
 
           if (response.ok) {
             // Remover a propriedade na memória
-            delete foundOwner.subscriptionId
+            delete foundOwner.paymentData.subscriptionId
 
             // Persistir a alteração no banco de dados
             await this.ownerModel.updateOne(
