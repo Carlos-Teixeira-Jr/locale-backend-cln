@@ -253,6 +253,7 @@ export class PropertyService {
       let userAlreadyExists: boolean
       let user: IUser | null = null
       let owner: IOwner | null = null
+      let ownerPreviousPlan
       // Busca os dados do plano selecionado;
       const selectedPlan: IPlan = await this.planModel.findById(plan).lean()
 
@@ -347,6 +348,7 @@ export class PropertyService {
         owner = createdOwner[0]
       } else {
         owner = ownerExists
+        ownerPreviousPlan = ownerExists.plan
 
         // Atualiza o plano caso tenha sido alterado ao cadastrar o imóvel;
         const ownerPlan = owner.plan
@@ -471,11 +473,32 @@ export class PropertyService {
           owner.paymentData.subscriptionId = subscriptionId
           await owner.save()
         } else {
+          //Buscr a assinatura do usuário para verificar a data de cobrança;
+          const subscriptionId = owner.paymentData.subscriptionId
+          const response = await fetch(
+            `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
+            {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                access_token: process.env.ASSAS_API_KEY || '',
+              },
+            },
+          )
+
+          if (!response.ok) {
+            throw new NotFoundException('Assinatura não encontrada.')
+          }
+
+          const subscription = await response.json()
+          const nextDueDate = subscription.nextDueDate
+
           if (owner.adCredits < 1) {
             // Caso em que o usuário não tem mais créditos e selecionou outro plano
             if (selectedPlan._id !== owner.plan) {
               const subscriptionId = owner.paymentData.subscriptionId
               const response = await fetch(
+                //Atualiza o valor do plano;
                 `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
                 {
                   method: 'POST',
@@ -488,7 +511,8 @@ export class PropertyService {
                     cycle: 'MONTHLY',
                     customer: owner.paymentData.customerId,
                     value: selectedPlan.price,
-                    nextDueDate: formattedDate,
+                    nextDueDate,
+                    updatePendingPayments: true,
                     creditCardToken:
                       owner.paymentData.creditCardInfo.creditCardToken,
                   }),
@@ -525,6 +549,47 @@ export class PropertyService {
             if (!response.ok) {
               throw new Error(
                 `Falha ao gerar a cobrança: ${response.statusText}`,
+              )
+            }
+          } else if (selectedPlan._id !== ownerPreviousPlan) {
+            //Atualiza o valor do plano
+            const response = await fetch(
+              `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  access_token: process.env.ASSAS_API_KEY || '',
+                },
+                body: JSON.stringify({
+                  billingType: 'CREDIT_CARD',
+                  cycle: 'MONTHLY',
+                  customer: owner.paymentData.customerId,
+                  value: selectedPlan.price,
+                  nextDueDate: formattedDate,
+                  updatePendingPayments: true,
+                  creditCard: {
+                    holderName: cardName,
+                    number: cardNumber,
+                    expiryMonth,
+                    expiryYear,
+                    ccv,
+                  },
+                  creditCardHolderInfo: {
+                    name: cardName,
+                    email: userData.email,
+                    phone,
+                    cpfCnpj,
+                    postalCode: address.zipCode,
+                    addressNumber: address.streetNumber,
+                  },
+                }),
+              },
+            )
+
+            if (!response.ok) {
+              throw new BadRequestException(
+                'Não foi possível atualizar a assinatura.',
               )
             }
           }

@@ -144,7 +144,7 @@ export class UsersService {
       const owner = await this.ownerModel
         .findOne({ userId, isActive: true })
         .select(
-          'adCredits plan phone cellPhone customerId creditCardInfo _id name',
+          'adCredits plan phone cellPhone customerId paymentData _id name',
         )
 
       return {
@@ -307,12 +307,13 @@ export class UsersService {
         cardNumber,
         cardName,
         expiry,
-        cvc,
-        cpf,
+        ccv,
+        cpfCnpj,
         email,
         phone,
         plan,
-        address,
+        zipCode,
+        streetNumber,
         owner,
         customerId,
       } = body
@@ -325,11 +326,10 @@ export class UsersService {
       }
 
       // Formatando a data de validade do cartão;
-      const formattedExpiry = expiry.split('-')
-      const expiryYear = formattedExpiry[0]
-      const expiryMonth = formattedExpiry[1]
+      const expiryMonth = expiry.slice(0, 2)
+      const expiryYear = expiry.slice(2)
 
-      // Verificando se o usuário selecionou umnovo plano ao mudar os dados do cartão;
+      // Verificando se o usuário selecionou um novo plano ao mudar os dados do cartão;
       const isNewPlan = ownerExists.plan === plan._id
 
       if (isNewPlan) {
@@ -348,10 +348,10 @@ export class UsersService {
             name: owner.name,
             email: email,
             phone,
-            postalCode: address.zipCode,
+            postalCode: zipCode,
             description: 'Confirmação de criação de id de cliente',
-            cpfCnpj: cpf,
-            addressNumber: address.streetNumber,
+            cpfCnpj,
+            addressNumber: streetNumber,
           }),
         })
 
@@ -373,55 +373,147 @@ export class UsersService {
       const day = currentDate.getDate().toString().padStart(2, '0')
       const formattedDate = `${year}-${month}-${day}`
 
-      // Gerar token dos dados do cartão;
-      const response = await fetch(
-        `${process.env.PAYMENT_URL}/payment/tokenize`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            access_token: process.env.ASSAS_API_KEY || '',
+      //Se o owner já tiver um cartão registrado;
+      if (!ownerExists.paymentData.creditCardInfo.creditCardToken) {
+        // Gerar token dos dados do cartão;
+        const response = await fetch(
+          `${process.env.PAYMENT_URL}/payment/tokenize`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              access_token: process.env.ASSAS_API_KEY || '',
+            },
+            body: JSON.stringify({
+              billingType: 'CREDIT_CARD',
+              cycle: 'MONTHLY',
+              customer: customerId
+                ? customerId
+                : ownerExists.paymentData.customerId,
+              value: plan.price,
+              nextDueDate: formattedDate,
+              creditCard: {
+                holderName: cardName,
+                number: cardNumber,
+                expiryMonth,
+                expiryYear,
+                ccv,
+              },
+              creditCardHolderInfo: {
+                name: cardName,
+                email: email,
+                phone,
+                cpfCnpj,
+                postalCode: zipCode,
+                addressNumber: streetNumber,
+              },
+            }),
           },
-          body: JSON.stringify({
-            billingType: 'CREDIT_CARD',
-            cycle: 'MONTHLY',
-            customer: customerId
-              ? customerId
-              : ownerExists.paymentData.customerId,
-            value: plan.price,
-            nextDueDate: formattedDate,
-            creditCard: {
-              holderName: cardName,
-              number: cardNumber,
-              expiryMonth,
-              expiryYear,
-              ccv: cvc,
-            },
-            creditCardHolderInfo: {
-              name: cardName,
-              email: email,
-              phone,
-              cpfCnpj: cpf,
-              postalCode: address.zipCode,
-              addressNumber: address.streetNumber,
-            },
-          }),
-        },
-      )
+        )
 
-      if (!response.ok) {
-        throw new Error('Não foi possível gerar um token dos dados do cartão')
+        if (!response.ok) {
+          throw new Error('Não foi possível gerar um token dos dados do cartão')
+        }
+
+        const responseData = await response.json()
+
+        const creditCardInfo = responseData
+
+        // Atualiza os dados do usuário;
+        ownerExists.isNewCreditCard = true
+        ownerExists.newPlan = isNewPlan
+        ownerExists.paymentData.creditCardInfo = creditCardInfo
+        await ownerExists.save()
+      } else {
+        //Deleta antiga assinatura;
+        const subscriptionId = owner.paymentData.subscriptionId
+        const response = await fetch(
+          `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
+          {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              access_token: process.env.ASSAS_API_KEY || '',
+            },
+          },
+        )
+
+        if (!response.ok) {
+          throw new Error(
+            'Não foi possível atualizar o token dos dados do cartão',
+          )
+        }
+
+        const responseData = await response.json()
+
+        const success = responseData.deleted
+
+        if (!success) {
+          throw new Error('Não foi possível remover a assinatura')
+        }
+
+        //Cria nova assinatura
+        const newSubscription = await fetch(
+          `${process.env.PAYMENT_URL}/payment/subscription`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              access_token: process.env.ASSAS_API_KEY || '',
+            },
+            body: JSON.stringify({
+              customer: customerId
+                ? customerId
+                : ownerExists.paymentData.customerId,
+              value: plan.price,
+              nextDueDate: formattedDate,
+              billingType: 'CREDIT_CARD',
+              cycle: 'MONTHLY',
+              creditCard: {
+                holderName: cardName,
+                number: cardNumber,
+                expiryMonth,
+                expiryYear,
+                ccv,
+              },
+              creditCardHolderInfo: {
+                name: cardName,
+                email,
+                phone: phone ? phone : ownerExists.cellPhone,
+                cpfCnpj,
+                postalCode: zipCode,
+                addressNumber: streetNumber,
+              },
+            }),
+          },
+        )
+
+        if (!response.ok)
+          throw new Error('Não foi possível criar a nova assinatura')
+
+        const newSubscriptionData = await newSubscription.json()
+
+        if (newSubscriptionData.statusCode === 400)
+          throw new Error('Não foi possível criar a nova assinatura')
+
+        const creditCardInfo = newSubscriptionData.creditCard
+
+        await this.ownerModel.updateOne(
+          { _id: ownerExists._id },
+          {
+            $set: {
+              isNewCreditCard: true,
+              newPlan: isNewPlan,
+              paymentData: {
+                creditCardInfo,
+                subscriptionId: newSubscriptionData.id,
+                customerId: ownerExists.paymentData.customerId,
+                cpfCnpj,
+              },
+            },
+          },
+        )
       }
-
-      const responseData = await response.json()
-
-      const creditCardInfo = responseData
-
-      // Atualiza os dados do usuário;
-      ownerExists.isNewCreditCard = true
-      ownerExists.newPlan = isNewPlan
-      ownerExists.paymentData.creditCardInfo = creditCardInfo
-      await ownerExists.save()
 
       return { success: true }
     } catch (error) {
