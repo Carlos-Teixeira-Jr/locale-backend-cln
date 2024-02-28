@@ -97,7 +97,7 @@ export class PropertyController {
     return this.propertyService.editProperty(editPropertyDto)
   }
 
-  @Post('uploadImages')
+  @Post('upload-images')
   @UseInterceptors(
     FilesInterceptor('images', 20, {
       limits: {

@@ -1129,13 +1129,6 @@ export class PropertyService {
           },
         })
       }
-      // if (obj.tags) {
-      //   allFilters.push({
-      //     tags: {
-      //       $in: obj.tags,
-      //     },
-      //   })
-      // }
       if (obj.tags) {
         allFilters.push({
           tags: {
