@@ -2,6 +2,7 @@ import {
   IsArray,
   IsBoolean,
   IsDefined,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
@@ -55,6 +56,10 @@ export class PropertyOwnerInfoDto {
 
   @IsString()
   email: string
+
+  @IsOptional()
+  @IsString()
+  wppNumber: string
 }
 
 export class PropertySizeDto {
@@ -64,10 +69,12 @@ export class PropertySizeDto {
   @IsNumber()
   height: number
 
+  @IsNotEmpty()
   @IsDefined()
   @IsNumber()
   totalArea: number
 
+  @IsOptional()
   @IsNumber()
   useableArea: number
 
