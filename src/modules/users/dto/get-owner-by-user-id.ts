@@ -4,5 +4,5 @@ import { Schema } from 'mongoose'
 export class GetOwnerByUserId {
   @IsString()
   @IsNotEmpty()
-  userId: Schema.Types.ObjectId
+  _id: Schema.Types.ObjectId
 }
