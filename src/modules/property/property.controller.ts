@@ -114,14 +114,6 @@ export class PropertyController {
     return await this.propertyService.uploadImages(files, propertyId)
   }
 
-  // @HttpCode(HttpStatus.CREATED)
-  // @uploadFiles('filename')
-  // @UseInterceptors(FilesInterceptor('filename'))
-  // @Post('upload-file')
-  // uploadMyFiles(@UploadedFiles() files: Array<Express.Multer.File>) {
-  //   console.log(files)
-  // }
-
   @Post('upload-images')
   async uploadImages(@UploadedFile() file) {
     // const { headers } = req;
