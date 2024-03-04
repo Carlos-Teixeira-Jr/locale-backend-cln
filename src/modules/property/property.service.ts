@@ -159,18 +159,25 @@ export class PropertyService {
         highlightsFilters = clonedAllFilters
       }
 
+      const highlighFiltersWithoutGeolocation = highlightsFilters.filter(obj => !obj.hasOwnProperty('geolocation'));
+      console.log("🚀 ~ PropertyService ~ filter ~ highlighFiltersWithoutGeolocation:", highlighFiltersWithoutGeolocation)
+
       const countHighlights = await this.propertyModel.countDocuments({
-        $and: highlightsFilters,
+        $and: highlighFiltersWithoutGeolocation,
         highlighted: true,
       })
 
       // Busca os destaques considerando a ordenação
       const highlights: IProperty[] = await this.propertyModel
-        .find({ $and: highlightsFilters })
+        .find({ $and: highlighFiltersWithoutGeolocation })
         .skip(highlightsSkip)
         .sort(sort[0])
         .limit(limit)
         .lean()
+
+
+      const filtersWithoutGeolocation = filtersOrNot.$and.filter(obj => !obj.hasOwnProperty('geolocation'));
+      console.log("🚀 ~ PropertyService ~ filter ~ filtersWithoutGeolocation:", filtersWithoutGeolocation)
 
       const countDocs = await this.propertyModel.countDocuments(filtersOrNot)
 
@@ -1117,15 +1124,30 @@ export class PropertyService {
           },
         })
       }
+      // if (obj.geolocation) {
+      //   allFilters.push({
+      //     geolocation: {
+      //       $geoWithin: {
+      //         $centerSphere: [
+      //           [obj.geolocation.longitude, obj.geolocation.latitude],
+      //           100 / 3963.2,
+      //         ],
+      //       },
+      //     },
+      //   })
+      // }
       if (obj.geolocation) {
         allFilters.push({
-          geolocation: {
-            $geoWithin: {
-              $centerSphere: [
-                [obj.geolocation.longitude, obj.geolocation.latitude],
-                100 / 3963.2,
-              ],
-            },
+          "geolocation": {
+            $near: {
+              $geometry: {
+                "type": "Point",
+                "coordinates": [
+                  obj.geolocation.longitude, 
+                  obj.geolocation.latitude
+                ],
+              }
+            }
           },
         })
       }
