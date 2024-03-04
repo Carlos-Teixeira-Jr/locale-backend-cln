@@ -133,7 +133,7 @@ export class UsersService {
 
       const user = await this.userModel
         .findOne({ _id, isActive: true })
-        .select('username email address cpf')
+        .select('username email address cpf picture')
 
       if (!user) {
         throw new NotFoundException(
@@ -144,7 +144,7 @@ export class UsersService {
       const owner = await this.ownerModel
         .findOne({ userId: _id, isActive: true })
         .select(
-          'adCredits plan phone cellPhone customerId creditCardInfo _id name',
+          'adCredits plan phone cellPhone customerId creditCardInfo _id name picture',
         )
 
       return {
@@ -170,6 +170,7 @@ export class UsersService {
         email,
         cpf,
         address: userAddress,
+        profilePicture,
       } = body.user
 
       //const { password, passwordConfirmattion } = body.password
@@ -180,7 +181,7 @@ export class UsersService {
       let phone: string
       let cellPhone
       let adCredits: number
-      let profilePicture: string
+      //let profilePicture: string
 
       if (body.owner) {
         ownerId = body.owner.id
@@ -189,7 +190,6 @@ export class UsersService {
         phone = body.owner.phone
         cellPhone = body.owner.cellPhone
         adCredits = body.owner.adCredits
-        profilePicture = body.owner.profilePicture
       }
 
       const userExists = await this.userModel.findOne({ _id: userId })
@@ -208,7 +208,7 @@ export class UsersService {
               email,
               cpf,
               address: userAddress,
-              profilePicture,
+              pricture: profilePicture,
             },
           },
         )
@@ -233,7 +233,7 @@ export class UsersService {
                 cpf,
                 address: userAddress,
                 password: encryptedPassword,
-                profilePicture,
+                picture: profilePicture,
               },
             },
           )
@@ -247,7 +247,7 @@ export class UsersService {
               email,
               cpf,
               address: userAddress,
-              profilePicture,
+              picture: profilePicture,
             },
           },
         )
@@ -274,7 +274,7 @@ export class UsersService {
               cellPhone,
               userId: user,
               adCredits,
-              profilePicture,
+              picture: profilePicture,
             },
           },
         )

@@ -6,7 +6,7 @@ import {
 } from 'common/schemas/Notification.schema'
 import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import { LoggerService } from 'modules/logger/logger.service'
-import { Model } from 'mongoose'
+import { Model, Schema } from 'mongoose'
 import { CreateNotificationDto } from './dto/create-notification.dto'
 import { PageQueryFilter } from 'common/utils/query.filter'
 import { DeleteNotificationDto } from 'modules/property/dto/deleteNotification.dto'
@@ -46,24 +46,17 @@ export class NotificationService {
     }
   }
 
-  async findOne(id: string, isRead: any): Promise<INotification[]> {
+  async findNotByUserId(id: Schema.Types.ObjectId): Promise<INotification[]> {
     try {
       this.logger.log({ id }, 'start findOne')
 
       const notification: INotification[] = await this.notificationModel
-        .find({ userId: id })
+        .find({ userId: id, isRead: false })
         .lean()
 
       if (!notification) {
         throw new NotFoundException(
           `A notificação com o id: ${id} não foi encontrada`,
-        )
-      }
-
-      if (isRead) {
-        await this.notificationModel.updateMany(
-          { userId: id, isRead: false },
-          { $set: { isRead: true } },
         )
       }
 
