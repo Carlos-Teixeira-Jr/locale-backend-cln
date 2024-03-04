@@ -45,7 +45,7 @@ export class PropertyController {
     @Query() queryFilter: CommonQueryFilter,
   ): Promise<IFilterReturn> {
     this.logger.log({}, 'filter')
-    return await this.propertyService.filter(queryFilter)
+    return await this.propertyService.filter(queryFilter);
   }
 
   @Get(':id')
