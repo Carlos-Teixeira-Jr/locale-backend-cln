@@ -159,8 +159,9 @@ export class PropertyService {
         highlightsFilters = clonedAllFilters
       }
 
-      const highlighFiltersWithoutGeolocation = highlightsFilters.filter(obj => !obj.hasOwnProperty('geolocation'));
-      console.log("🚀 ~ PropertyService ~ filter ~ highlighFiltersWithoutGeolocation:", highlighFiltersWithoutGeolocation)
+      const highlighFiltersWithoutGeolocation = highlightsFilters.filter(
+        obj => !obj.hasOwnProperty('geolocation'),
+      )
 
       const countHighlights = await this.propertyModel.countDocuments({
         $and: highlighFiltersWithoutGeolocation,
@@ -175,11 +176,13 @@ export class PropertyService {
         .limit(limit)
         .lean()
 
+      const filtersWithoutGeolocation = filtersOrNot.$and.filter(
+        obj => !obj.hasOwnProperty('geolocation'),
+      )
 
-      const filtersWithoutGeolocation = filtersOrNot.$and.filter(obj => !obj.hasOwnProperty('geolocation'));
-      console.log("🚀 ~ PropertyService ~ filter ~ filtersWithoutGeolocation:", filtersWithoutGeolocation)
-
-      const countDocs = await this.propertyModel.countDocuments(filtersOrNot)
+      const countDocs = await this.propertyModel.countDocuments(
+        filtersWithoutGeolocation,
+      )
 
       const propertySkipAux = (page + 1) * limit - countHighlights
       const propertyLimit = limit - highlights.length
@@ -1124,30 +1127,18 @@ export class PropertyService {
           },
         })
       }
-      // if (obj.geolocation) {
-      //   allFilters.push({
-      //     geolocation: {
-      //       $geoWithin: {
-      //         $centerSphere: [
-      //           [obj.geolocation.longitude, obj.geolocation.latitude],
-      //           100 / 3963.2,
-      //         ],
-      //       },
-      //     },
-      //   })
-      // }
       if (obj.geolocation) {
         allFilters.push({
-          "geolocation": {
+          geolocation: {
             $near: {
               $geometry: {
-                "type": "Point",
-                "coordinates": [
-                  obj.geolocation.longitude, 
-                  obj.geolocation.latitude
+                type: 'Point',
+                coordinates: [
+                  obj.geolocation.longitude,
+                  obj.geolocation.latitude,
                 ],
-              }
-            }
+              },
+            },
           },
         })
       }
