@@ -26,6 +26,9 @@ import { IProperty } from 'common/schemas/Property.schema'
 import { IOwnerPropertiesReturn } from './property.service'
 import { FilesInterceptor } from '@nestjs/platform-express'
 import { IdDto } from './dto/propertyId.dto'
+import { UploadPropertyImagesDto } from './dto/uploadPropertyImages.dto'
+import { UploadProfileImageDto } from './dto/uploadProfileImage.dto'
+import { Schema } from 'mongoose'
 
 @Controller('property')
 export class PropertyController {
@@ -92,7 +95,7 @@ export class PropertyController {
     return this.propertyService.editProperty(editPropertyDto)
   }
 
-  @Post('upload-images')
+  @Post('upload-property-images')
   @UseInterceptors(
     FilesInterceptor('images', 20, {
       limits: {
@@ -100,12 +103,29 @@ export class PropertyController {
       },
     }),
   )
-  async uploadImages(
+  async uploadPropertyImages(
     @UploadedFiles() files: Array<Express.Multer.File>,
-    @Body('id') id: IdDto,
+    @Body('propertyId') propertyId: Schema.Types.ObjectId,
   ) {
-    this.logger.info({}, 'uploadImages > params')
+    this.logger.info({}, 'uploadPropertyImages > params');
 
-    return await this.propertyService.uploadImages(files, id)
+    return await this.propertyService.uploadPropertyImages(files, propertyId)
+  }
+
+  @Post('upload-profile-image')
+  @UseInterceptors(
+    FilesInterceptor('images', 20, {
+      limits: {
+        fileSize: 1000 * 1024 * 1024,
+      },
+    }),
+  )
+  async uploadProfileImage(
+    @UploadedFiles() files: Array<Express.Multer.File>,
+    @Body('userId') userId: Schema.Types.ObjectId,
+  ) {
+    this.logger.info({}, 'uploadProfileImage > params');
+
+    return await this.propertyService.uploadProfileImage(files, userId);
   }
 }

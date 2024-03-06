@@ -7,7 +7,7 @@ import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import { LoggerService } from 'modules/logger/logger.service'
 import { InjectModel } from '@nestjs/mongoose'
 import { IProperty, PropertyModelName } from 'common/schemas/Property.schema'
-import mongoose, { Model } from 'mongoose'
+import mongoose, { Model, Schema } from 'mongoose'
 import { CommonQueryFilter } from 'common/utils/query.filter'
 import { CreatePropertyDto } from './dto/create-property.dto'
 import { IOwner, OwnerModelName } from 'common/schemas/Owner.schema'
@@ -34,6 +34,8 @@ import { TagModelName, ITag } from 'common/schemas/Tag.schema'
 import { uploadFile } from 'common/utils/uploadImages'
 import { IdDto } from './dto/propertyId.dto'
 import { cloneDeep } from 'lodash'
+import { UploadPropertyImagesDto } from './dto/uploadPropertyImages.dto'
+import { UploadProfileImageDto } from './dto/uploadProfileImage.dto'
 //import { uploadFile } from 'common/utils/uploadImages'
 
 export interface IDocsWithPagination {
@@ -105,7 +107,7 @@ export class PropertyService {
     @InjectModel(TagModelName)
     private readonly tagModel: Model<ITag>,
     private readonly authService: AuthService,
-  ) {}
+  ) { }
 
   async findOne(id: string, isEdit: boolean): Promise<IProperty> {
     try {
@@ -640,6 +642,7 @@ export class PropertyService {
           : null,
         paymentValue,
         userAlreadyExists,
+        user
       }
     } catch (error) {
       await session.abortTransaction()
@@ -965,46 +968,63 @@ export class PropertyService {
     }
   }
 
-  async uploadImages(files: Array<Express.Multer.File>, id: IdDto) {
+  async uploadPropertyImages(files: Array<Express.Multer.File>, propertyId: Schema.Types.ObjectId) {
     try {
-      this.logger.log({}, 'start upload images')
+      this.logger.log({propertyId}, 'start upload property images')
 
-      const { propertyId, userId } = id
+      const propertyFound = await this.propertyModel.findById(propertyId)
 
-      const uploadedImages = await uploadFile(files, 'images')
-
-      if (propertyId) {
-        const propertyFound = await this.propertyModel.findById(propertyId)
-
-        if (!propertyFound) {
-          throw new NotFoundException(
-            `O imóvel com o id "${propertyId}" não foi encontrado.`,
-          )
-        }
-
-        await this.propertyModel.updateOne(
-          { _id: propertyId },
-          { $push: { images: { $each: uploadedImages } } },
+      if (!propertyFound) {
+        throw new NotFoundException(
+          `O imóvel com o id "${propertyId}" não foi encontrado.`,
         )
-
-        return { success: true }
       }
-      if (userId) {
-        const userFound = await this.userModel.findById(userId)
+      const uploadedImages = await uploadFile(files, 'images');
 
-        if (!userFound) {
-          throw new NotFoundException(
-            `O imóvel com o id "${userId}" não foi encontrado.`,
-          )
-        }
 
-        await this.userModel.updateOne(
-          { _id: userId },
-          { $set: { picture: uploadedImages } },
+      await this.propertyModel.updateOne(
+        { _id: propertyId },
+        { $push: { images: { $each: uploadedImages } } },
+      )
+
+      return { success: true }
+    } catch (error) {
+      this.logger.error({
+        error: JSON.stringify(error),
+        exception: '> exception',
+      })
+      throw error
+    }
+  }
+
+  async uploadProfileImage(files: Array<Express.Multer.File>, userId: Schema.Types.ObjectId) {
+    try {
+      this.logger.log({userId}, 'start upload profile image')
+
+      const userFound = await this.userModel.findById(userId);
+      let uploadedImages: string | string[];
+      let profilePicture: string | string[];
+
+      if (!userFound) {
+        throw new NotFoundException(
+          `O usuário com o id "${userId}" não foi encontrado.`,
         )
-
-        return { success: true }
       }
+
+      if (files.length > 0){
+        uploadedImages = await uploadFile(files, 'images');
+        profilePicture = uploadedImages[0];
+      } else {
+        uploadedImages = ""
+        profilePicture = uploadedImages;
+      }
+
+      await this.userModel.updateOne(
+        { _id: userId },
+        { $set: { picture: profilePicture } },
+      )
+
+      return { success: true }
     } catch (error) {
       this.logger.error({
         error: JSON.stringify(error),

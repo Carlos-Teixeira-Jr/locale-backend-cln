@@ -133,7 +133,7 @@ export class UsersService {
 
       const user = await this.userModel
         .findOne({ _id, isActive: true })
-        .select('username email address cpf')
+        .select('username email address cpf picture')
 
       if (!user) {
         throw new NotFoundException(
