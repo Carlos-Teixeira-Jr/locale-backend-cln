@@ -129,22 +129,22 @@ export class UsersService {
     try {
       this.logger.log({ body }, 'find owner by user id')
 
-      const { userId } = body
+      const { _id } = body
 
       const user = await this.userModel
-        .findOne({ userId, isActive: true })
-        .select('username email address cpf')
+        .findOne({ _id, isActive: true })
+        .select('username email address cpf picture')
 
       if (!user) {
         throw new NotFoundException(
-          `Usuário com o id: ${userId} não foi encontrado`,
+          `Usuário com o id: ${_id} não foi encontrado`,
         )
       }
 
       const owner = await this.ownerModel
-        .findOne({ userId, isActive: true })
+        .findOne({ _id, isActive: true })
         .select(
-          'adCredits plan phone cellPhone customerId paymentData _id name',
+          'adCredits plan phone cellPhone customerId creditCardInfo _id name picture',
         )
 
       return {
@@ -170,6 +170,7 @@ export class UsersService {
         email,
         cpf,
         address: userAddress,
+        profilePicture,
       } = body.user
 
       //const { password, passwordConfirmattion } = body.password
@@ -180,7 +181,7 @@ export class UsersService {
       let phone: string
       let cellPhone
       let adCredits: number
-      let profilePicture: string
+      //let profilePicture: string
 
       if (body.owner) {
         ownerId = body.owner.id
@@ -189,7 +190,6 @@ export class UsersService {
         phone = body.owner.phone
         cellPhone = body.owner.cellPhone
         adCredits = body.owner.adCredits
-        profilePicture = body.owner.profilePicture
       }
 
       const userExists = await this.userModel.findOne({ _id: userId })
@@ -208,7 +208,7 @@ export class UsersService {
               email,
               cpf,
               address: userAddress,
-              profilePicture,
+              pricture: profilePicture,
             },
           },
         )
@@ -233,7 +233,7 @@ export class UsersService {
                 cpf,
                 address: userAddress,
                 password: encryptedPassword,
-                profilePicture,
+                picture: profilePicture,
               },
             },
           )
@@ -247,7 +247,7 @@ export class UsersService {
               email,
               cpf,
               address: userAddress,
-              profilePicture,
+              picture: profilePicture,
             },
           },
         )
@@ -274,7 +274,7 @@ export class UsersService {
               cellPhone,
               userId: user,
               adCredits,
-              profilePicture,
+              picture: profilePicture,
             },
           },
         )
