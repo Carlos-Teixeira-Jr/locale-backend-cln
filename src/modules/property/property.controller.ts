@@ -25,9 +25,6 @@ import { EditPropertyDto } from './dto/edit-property.dto'
 import { IProperty } from 'common/schemas/Property.schema'
 import { IOwnerPropertiesReturn } from './property.service'
 import { FilesInterceptor } from '@nestjs/platform-express'
-import { IdDto } from './dto/propertyId.dto'
-import { UploadPropertyImagesDto } from './dto/uploadPropertyImages.dto'
-import { UploadProfileImageDto } from './dto/uploadProfileImage.dto'
 import { Schema } from 'mongoose'
 
 @Controller('property')
@@ -107,7 +104,7 @@ export class PropertyController {
     @UploadedFiles() files: Array<Express.Multer.File>,
     @Body('propertyId') propertyId: Schema.Types.ObjectId,
   ) {
-    this.logger.info({}, 'uploadPropertyImages > params');
+    this.logger.info({}, 'uploadPropertyImages > params')
 
     return await this.propertyService.uploadPropertyImages(files, propertyId)
   }
@@ -124,8 +121,25 @@ export class PropertyController {
     @UploadedFiles() files: Array<Express.Multer.File>,
     @Body('userId') userId: Schema.Types.ObjectId,
   ) {
-    this.logger.info({}, 'uploadProfileImage > params');
+    this.logger.info({}, 'uploadProfileImage > params')
 
-    return await this.propertyService.uploadProfileImage(files, userId);
+    return await this.propertyService.uploadProfileImage(files, userId)
+  }
+
+  @Post('edit-property-images')
+  @UseInterceptors(
+    FilesInterceptor('images', 20, {
+      limits: {
+        fileSize: 1000 * 1024 * 1024,
+      },
+    }),
+  )
+  async editPropertyImages(
+    @UploadedFiles() files: Array<Express.Multer.File>,
+    @Body('data') body: string,
+  ) {
+    this.logger.info({}, 'edit property images > body')
+
+    return await this.propertyService.editPropertyImages(files, body)
   }
 }
