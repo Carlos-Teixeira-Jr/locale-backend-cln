@@ -74,6 +74,7 @@ interface IOwnerData {
   name: string
   phone: string
   cellPhone: string
+  wppNumber: string
   profilePicture: string
   plan: any
   userId: any
@@ -229,16 +230,20 @@ export class PropertyService {
       const { plan, isPlanFree, phone, cellPhone, userData, propertyData } =
         createPropertyDto
 
+      const { wppNumber } = createPropertyDto.propertyData.ownerInfo
+
       let cardName
       let cardNumber
       let ccv
       let expiry
+      let cpfCnpj
 
       if (!isPlanFree) {
         cardName = createPropertyDto.creditCardData.cardName
         cardNumber = createPropertyDto.creditCardData.cardNumber
         ccv = createPropertyDto.creditCardData.ccv
         expiry = createPropertyDto.creditCardData.expiry
+        cpfCnpj = createPropertyDto.creditCardData.cpfCnpj
       }
 
       //Verifica se o id do usuário foi passado na requisição (caso tenha criado o imóvel estando logado);
@@ -246,6 +251,7 @@ export class PropertyService {
       let userAlreadyExists: boolean
       let user: IUser | null = null
       let owner: IOwner | null = null
+      let ownerPreviousPlan
       // Busca os dados do plano selecionado;
       const selectedPlan: IPlan = await this.planModel.findById(plan).lean()
 
@@ -325,6 +331,7 @@ export class PropertyService {
           name: userData.username,
           phone,
           cellPhone,
+          wppNumber,
           plan,
           profilePicture: userData.profilePicture,
           userId: user._id,
@@ -336,9 +343,10 @@ export class PropertyService {
         }
 
         const createdOwner: any = await this.ownerModel.create([ownerData], opt)
-        owner = createdOwner[0]._doc
+        owner = createdOwner[0]
       } else {
         owner = ownerExists
+        ownerPreviousPlan = ownerExists.plan
 
         // Atualiza o plano caso tenha sido alterado ao cadastrar o imóvel;
         const ownerPlan = owner.plan
@@ -357,7 +365,7 @@ export class PropertyService {
       }
 
       // CUSTOMER
-      if (!isPlanFree && !owner.customerId) {
+      if (!isPlanFree && !owner.paymentData.customerId) {
         // Cadastrar customer no payment api;
         const response = await fetch(`${process.env.PAYMENT_URL}/customer`, {
           method: 'POST',
@@ -371,7 +379,7 @@ export class PropertyService {
             phone,
             postalCode: userData.address.zipCode,
             description: 'Confirmação de criação de id de cliente',
-            cpfCnpj: userData.cpf,
+            cpfCnpj,
             addressNumber: address.streetNumber,
           }),
         })
@@ -383,7 +391,8 @@ export class PropertyService {
         const customer = await response.json()
 
         // Atualiza o 'customerId' no 'owner' e salva no banco de dados
-        owner.customerId = customer.id
+        owner.paymentData.customerId = customer.id
+        owner.paymentData.cpfCnpj = cpfCnpj
         await owner.save()
       }
 
@@ -411,7 +420,7 @@ export class PropertyService {
         const day = currentDate.getDate().toString().padStart(2, '0')
         const formattedDate = `${year}-${month}-${day}`
 
-        if (!owner.creditCardInfo.creditCardToken) {
+        if (!owner.paymentData.creditCardInfo.creditCardToken) {
           // Chamada pra api de pagamento "subscription";
           const response = await fetch(
             `${process.env.PAYMENT_URL}/payment/subscription`,
@@ -424,7 +433,7 @@ export class PropertyService {
               body: JSON.stringify({
                 billingType: 'CREDIT_CARD',
                 cycle: 'MONTHLY',
-                customer: owner.customerId,
+                customer: owner.paymentData.customerId,
                 value: selectedPlan.price,
                 nextDueDate: formattedDate,
                 creditCard: {
@@ -432,13 +441,13 @@ export class PropertyService {
                   number: cardNumber,
                   expiryMonth,
                   expiryYear,
-                  ccv: ccv,
+                  ccv,
                 },
                 creditCardHolderInfo: {
                   name: cardName,
                   email: userData.email,
                   phone,
-                  cpfCnpj: userData.cpf,
+                  cpfCnpj,
                   postalCode: address.zipCode,
                   addressNumber: address.streetNumber,
                 },
@@ -458,15 +467,36 @@ export class PropertyService {
           // Decrementar o número de créditos disponíveis do usuário;
           owner.adCredits = owner.adCredits - 1
           // Salvar o token do cartão de crédito no banco de dados;
-          owner.creditCardInfo = creditCardInfo
-          owner.subscriptionId = subscriptionId
+          owner.paymentData.creditCardInfo = creditCardInfo
+          owner.paymentData.subscriptionId = subscriptionId
           await owner.save()
         } else {
+          //Buscr a assinatura do usuário para verificar a data de cobrança;
+          const subscriptionId = owner.paymentData.subscriptionId
+          const response = await fetch(
+            `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
+            {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                access_token: process.env.ASSAS_API_KEY || '',
+              },
+            },
+          )
+
+          if (!response.ok) {
+            throw new NotFoundException('Assinatura não encontrada.')
+          }
+
+          const subscription = await response.json()
+          const nextDueDate = subscription.nextDueDate
+
           if (owner.adCredits < 1) {
             // Caso em que o usuário não tem mais créditos e selecionou outro plano
             if (selectedPlan._id !== owner.plan) {
-              const subscriptionId = owner.subscriptionId
+              const subscriptionId = owner.paymentData.subscriptionId
               const response = await fetch(
+                //Atualiza o valor do plano;
                 `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
                 {
                   method: 'POST',
@@ -477,10 +507,12 @@ export class PropertyService {
                   body: JSON.stringify({
                     billingType: 'CREDIT_CARD',
                     cycle: 'MONTHLY',
-                    customer: owner.customerId,
+                    customer: owner.paymentData.customerId,
                     value: selectedPlan.price,
-                    nextDueDate: formattedDate,
-                    creditCardToken: owner.creditCardInfo.creditCardToken,
+                    nextDueDate,
+                    updatePendingPayments: true,
+                    creditCardToken:
+                      owner.paymentData.creditCardInfo.creditCardToken,
                   }),
                 },
               )
@@ -503,10 +535,11 @@ export class PropertyService {
                 body: JSON.stringify({
                   billingType: 'CREDIT_CARD',
                   cycle: 'MONTHLY',
-                  customer: owner.customerId,
+                  customer: owner.paymentData.customerId,
                   value: selectedPlan.price,
                   nextDueDate: formattedDate,
-                  creditCardToken: owner.creditCardInfo.creditCardToken,
+                  creditCardToken:
+                    owner.paymentData.creditCardInfo.creditCardToken,
                 }),
               },
             )
@@ -514,6 +547,47 @@ export class PropertyService {
             if (!response.ok) {
               throw new Error(
                 `Falha ao gerar a cobrança: ${response.statusText}`,
+              )
+            }
+          } else if (selectedPlan._id !== ownerPreviousPlan) {
+            //Atualiza o valor do plano
+            const response = await fetch(
+              `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  access_token: process.env.ASSAS_API_KEY || '',
+                },
+                body: JSON.stringify({
+                  billingType: 'CREDIT_CARD',
+                  cycle: 'MONTHLY',
+                  customer: owner.paymentData.customerId,
+                  value: selectedPlan.price,
+                  nextDueDate: formattedDate,
+                  updatePendingPayments: true,
+                  creditCard: {
+                    holderName: cardName,
+                    number: cardNumber,
+                    expiryMonth,
+                    expiryYear,
+                    ccv,
+                  },
+                  creditCardHolderInfo: {
+                    name: cardName,
+                    email: userData.email,
+                    phone,
+                    cpfCnpj,
+                    postalCode: address.zipCode,
+                    addressNumber: address.streetNumber,
+                  },
+                }),
+              },
+            )
+
+            if (!response.ok) {
+              throw new BadRequestException(
+                'Não foi possível atualizar a assinatura.',
               )
             }
           }
@@ -609,6 +683,7 @@ export class PropertyService {
         phones: [phone, cellPhone],
         profilePicture: userData.profilePicture,
         email: userData.email,
+        wppNumber: wppNumber,
       }
 
       // TAGS
@@ -633,8 +708,8 @@ export class PropertyService {
 
       return {
         createdProperty,
-        creditCardBrand: owner.creditCardInfo
-          ? owner.creditCardInfo.creditCardBrand
+        creditCardBrand: owner.paymentData.creditCardInfo
+          ? owner.paymentData.creditCardInfo.creditCardBrand
           : null,
         paymentValue,
         userAlreadyExists,

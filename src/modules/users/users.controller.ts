@@ -34,8 +34,10 @@ export class UsersController {
   }
 
   @Post('find-owner-by-user')
-  async findOwnerByUserId(@Body() body: GetOwnerByUserId): Promise<User_Owner> {
-    return this.usersService.findOwnerByUserId(body)
+  async findOwnerByUserId(
+    @Body() userId: GetOwnerByUserId,
+  ): Promise<User_Owner> {
+    return this.usersService.findOwnerByUserId(userId)
   }
 
   @Post('edit-user')
