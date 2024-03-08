@@ -5,7 +5,6 @@ import {
   Param,
   Post,
   Query,
-  UploadedFile,
   UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common'
@@ -26,11 +25,7 @@ import { EditPropertyDto } from './dto/edit-property.dto'
 import { IProperty } from 'common/schemas/Property.schema'
 import { IOwnerPropertiesReturn } from './property.service'
 import { FilesInterceptor } from '@nestjs/platform-express'
-import { PropertyIdDto } from './dto/propertyId.dto'
-import * as Busboy from 'busboy'
-import { createWriteStream } from 'fs'
-import path from 'path'
-import { uploadFile } from 'common/utils/uploadImages'
+import { Schema } from 'mongoose'
 
 @Controller('property')
 export class PropertyController {
@@ -97,7 +92,24 @@ export class PropertyController {
     return this.propertyService.editProperty(editPropertyDto)
   }
 
-  @Post('uploadImages')
+  @Post('upload-property-images')
+  @UseInterceptors(
+    FilesInterceptor('images', 50, {
+      limits: {
+        fileSize: 800 * 1024 * 1024,
+      },
+    }),
+  )
+  async uploadPropertyImages(
+    @UploadedFiles() files: Array<Express.Multer.File>,
+    @Body('propertyId') propertyId: Schema.Types.ObjectId,
+  ) {
+    this.logger.info({}, 'uploadPropertyImages > params')
+
+    return await this.propertyService.uploadPropertyImages(files, propertyId)
+  }
+
+  @Post('upload-profile-image')
   @UseInterceptors(
     FilesInterceptor('images', 20, {
       limits: {
@@ -105,72 +117,29 @@ export class PropertyController {
       },
     }),
   )
-  async uploadDropImageWithRarity(
+  async uploadProfileImage(
     @UploadedFiles() files: Array<Express.Multer.File>,
-    @Body('propertyId') propertyId: PropertyIdDto,
+    @Body('userId') userId: Schema.Types.ObjectId,
   ) {
-    this.logger.info({}, 'uploadImages > params')
+    this.logger.info({}, 'uploadProfileImage > params')
 
-    return await this.propertyService.uploadImages(files, propertyId)
+    return await this.propertyService.uploadProfileImage(files, userId)
   }
 
-  // @HttpCode(HttpStatus.CREATED)
-  // @uploadFiles('filename')
-  // @UseInterceptors(FilesInterceptor('filename'))
-  // @Post('upload-file')
-  // uploadMyFiles(@UploadedFiles() files: Array<Express.Multer.File>) {
-  //   console.log(files)
-  // }
+  @Post('edit-property-images')
+  @UseInterceptors(
+    FilesInterceptor('images', 20, {
+      limits: {
+        fileSize: 1000 * 1024 * 1024,
+      },
+    }),
+  )
+  async editPropertyImages(
+    @UploadedFiles() files: Array<Express.Multer.File>,
+    @Body('data') body: string,
+  ) {
+    this.logger.info({}, 'edit property images > body')
 
-  @Post('upload-images')
-  async uploadImages(@UploadedFile() file) {
-    // const { headers } = req;
-
-    // // Defina a função para notificar o progresso
-    // const notifyProgress = (size: number) => {
-    //   // Aqui você pode fazer o que desejar com o progresso do upload
-    //   console.log(`Tamanho do arquivo atual: ${size} bytes`);
-    // };
-
-    // // Crie um manipulador de upload passando a função de notificação de progresso
-    // const uploadHandler = createUploadHandler();
-
-    // // Registre os eventos de upload, passando a função de notificação de progresso
-    // const onFinish = () => {
-    //   // Aqui você pode lidar com o final do upload
-    //   res.status(200).send('Upload concluído com sucesso!');
-    // };
-
-    // const busboyInstance = uploadHandler.registerEvents(headers, onFinish, notifyProgress);
-
-    // // Exemplo simples sem pipelineAsync:
-    // req.pipe(busboyInstance);
-
-    // // Responda à solicitação
-    // res.status(200).send('Upload iniciado.');
-    const busboy = new Busboy({ headers: file })
-
-    busboy.on('file', function (file, filename) {
-      const saveTo = path.join(__dirname, '../', 'uploads', filename)
-      file.pipe(createWriteStream(saveTo))
-    })
-
-    busboy.on('finish', function () {
-      console.log('File upload finished.')
-    })
-
-    file.pipe(busboy)
-  }
-
-  @Post('upload')
-  @UseInterceptors(FilesInterceptor('file'))
-  async upload(@UploadedFiles() file: Array<Express.Multer.File>) {
-    console.log(file)
-
-    const images = await uploadFile(file, 'file')
-
-    console.log(images)
-
-    return images
+    return await this.propertyService.editPropertyImages(files, body)
   }
 }
