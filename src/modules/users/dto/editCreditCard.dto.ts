@@ -1,15 +1,12 @@
-import { Type } from 'class-transformer'
 import {
   IsCreditCard,
   IsNotEmpty,
   IsObject,
   IsOptional,
   IsString,
-  ValidateNested,
 } from 'class-validator'
 import { IOwner } from 'common/schemas/Owner.schema'
 import { IPlan } from 'common/schemas/Plan.schema'
-import { PropertyAddressDto } from 'modules/property/dto/property.dto'
 
 export class EditCreditCardDto {
   @IsNotEmpty()
@@ -26,11 +23,11 @@ export class EditCreditCardDto {
 
   @IsNotEmpty()
   @IsString()
-  cvc: string
+  ccv: string
 
   @IsNotEmpty()
   @IsString()
-  cpf: string
+  cpfCnpj: string
 
   @IsNotEmpty()
   @IsString()
@@ -45,10 +42,12 @@ export class EditCreditCardDto {
   plan: IPlan
 
   @IsNotEmpty()
-  @IsObject()
-  @ValidateNested()
-  @Type(() => PropertyAddressDto)
-  address: PropertyAddressDto
+  @IsString()
+  zipCode: string
+
+  @IsNotEmpty()
+  @IsString()
+  streetNumber: string
 
   @IsNotEmpty()
   @IsObject()

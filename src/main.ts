@@ -44,6 +44,8 @@ async function bootstrap() {
     urlencoded({ limit: '100mb', extended: true, parameterLimit: 100000000 }),
   )
 
-  await app.listen(process.env.PORT || 3001)
+  await app.listen(process.env.PORT, () =>
+    console.log(`Server is running on port ${process.env.PORT}`),
+  )
 }
 bootstrap()

@@ -25,7 +25,7 @@ import { EditPropertyDto } from './dto/edit-property.dto'
 import { IProperty } from 'common/schemas/Property.schema'
 import { IOwnerPropertiesReturn } from './property.service'
 import { FilesInterceptor } from '@nestjs/platform-express'
-import { PropertyIdDto } from './dto/propertyId.dto'
+import { Schema } from 'mongoose'
 
 @Controller('property')
 export class PropertyController {
@@ -92,7 +92,7 @@ export class PropertyController {
     return this.propertyService.editProperty(editPropertyDto)
   }
 
-  @Post('upload-images')
+  @Post('upload-property-images')
   @UseInterceptors(
     FilesInterceptor('images', 50, {
       limits: {
@@ -100,12 +100,46 @@ export class PropertyController {
       },
     }),
   )
-  async uploadImages(
+  async uploadPropertyImages(
     @UploadedFiles() files: Array<Express.Multer.File>,
-    @Body('propertyId') propertyId: PropertyIdDto,
+    @Body('propertyId') propertyId: Schema.Types.ObjectId,
   ) {
-    this.logger.info({}, 'upload-images > params')
+    this.logger.info({}, 'uploadPropertyImages > params')
 
-    return await this.propertyService.uploadImages(files, propertyId)
+    return await this.propertyService.uploadPropertyImages(files, propertyId)
+  }
+
+  @Post('upload-profile-image')
+  @UseInterceptors(
+    FilesInterceptor('images', 20, {
+      limits: {
+        fileSize: 1000 * 1024 * 1024,
+      },
+    }),
+  )
+  async uploadProfileImage(
+    @UploadedFiles() files: Array<Express.Multer.File>,
+    @Body('userId') userId: Schema.Types.ObjectId,
+  ) {
+    this.logger.info({}, 'uploadProfileImage > params')
+
+    return await this.propertyService.uploadProfileImage(files, userId)
+  }
+
+  @Post('edit-property-images')
+  @UseInterceptors(
+    FilesInterceptor('images', 20, {
+      limits: {
+        fileSize: 1000 * 1024 * 1024,
+      },
+    }),
+  )
+  async editPropertyImages(
+    @UploadedFiles() files: Array<Express.Multer.File>,
+    @Body('data') body: string,
+  ) {
+    this.logger.info({}, 'edit property images > body')
+
+    return await this.propertyService.editPropertyImages(files, body)
   }
 }

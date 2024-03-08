@@ -17,6 +17,7 @@ import { INotification } from 'common/schemas/Notification.schema'
 import { LoggerService } from 'modules/logger/logger.service'
 import { PageQueryFilter } from 'common/utils/query.filter'
 import { DeleteNotificationDto } from 'modules/property/dto/deleteNotification.dto'
+import { Schema } from 'mongoose'
 
 @Controller('notification')
 export class NotificationController {
@@ -34,13 +35,12 @@ export class NotificationController {
     return this.notificationService.createOne(createNotificationDto)
   }
 
-  @Get('/user/:id')
-  async findOne(
-    @Param('id') params: any,
-    @Query('isRead') isRead: any,
+  @Get(':id')
+  async findNotByUserId(
+    @Param('id') params: Schema.Types.ObjectId,
   ): Promise<INotification[]> {
     this.logger.log({}, 'findOne')
-    return this.notificationService.findOne(params, isRead)
+    return this.notificationService.findNotByUserId(params)
   }
 
   @Get()

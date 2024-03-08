@@ -24,7 +24,7 @@ const VALID_EXT = ['PNG', 'JPG', 'JPEG', 'GIF']
 
 const MAXIMUM_FILE_SIZE = 41943040
 
-const s3 = new S3({
+const r2 = new S3({
   region: 'us-east-1',
   endpoint: `https://${cleanString(
     R2_ACCOUNT_ID as string,
@@ -80,7 +80,7 @@ export const uploadFile = async (
     }
 
     try {
-      await s3.upload(params).promise()
+      await r2.upload(params as any).promise()
       console.log(`link da imagem: ${IMAGE_UPLOAD_PREFIX}/${fileName}`)
       uploadedFiles.push(`${IMAGE_UPLOAD_PREFIX}/${fileName}`)
     } catch (error) {
@@ -96,14 +96,14 @@ export const deleteFile = async (fileName: string) => {
     return
   }
 
-  const key = fileName.split('https://images.localeimoveis.com/')[1]
+  const key = fileName.split('https://images.localeimoveis.com.br/')[1]
 
   const params: ParamsType = {
     Bucket: R2_BUCKET_NAME,
     Key: key,
   }
   try {
-    await s3.deleteObject(params).promise()
+    await r2.deleteObject(params as any).promise()
   } catch (error) {
     return
   }
