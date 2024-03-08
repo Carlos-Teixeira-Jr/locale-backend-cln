@@ -94,9 +94,9 @@ export class PropertyController {
 
   @Post('upload-property-images')
   @UseInterceptors(
-    FilesInterceptor('images', 20, {
+    FilesInterceptor('images', 50, {
       limits: {
-        fileSize: 1000 * 1024 * 1024,
+        fileSize: 800 * 1024 * 1024,
       },
     }),
   )

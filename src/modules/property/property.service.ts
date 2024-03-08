@@ -1046,6 +1046,16 @@ export class PropertyService {
     try {
       this.logger.log({ propertyId }, 'start upload property images')
 
+      const storedImages = await this.propertyModel.findById(propertyId).lean()
+
+      const { images } = storedImages
+
+      if (images.length + files.length > 50) {
+        throw new BadRequestException(
+          `A requisição excede o limite de 50 imagens. Imagens salvas anteriormente: ${images.length} - Imagens adicionadas nesta requisição: ${files.length}.`,
+        )
+      }
+
       const propertyFound = await this.propertyModel.findById(propertyId)
 
       if (!propertyFound) {
