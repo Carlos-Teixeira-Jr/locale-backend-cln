@@ -214,16 +214,36 @@ export class UsersService {
         )
       }
 
-      //  Lida com a edição da senha caso o usuário tenha trocado;
-      const { password, passwordConfirmattion } = body.password
+      let password
+      let passwordConfirmattion
 
-      if (body.password !== undefined) {
-        if (password !== undefined && password !== passwordConfirmattion) {
-          throw new BadRequestException(
-            'A confirmação de senha não é igual a senha informada',
-          )
+      //  Lida com a edição da senha caso o usuário tenha trocado;
+      if (body.password) {
+        password = body.password.password
+        passwordConfirmattion = body.password.passwordConfirmattion
+
+        if (body.password !== undefined) {
+          if (password !== undefined && password !== passwordConfirmattion) {
+            throw new BadRequestException(
+              'A confirmação de senha não é igual a senha informada',
+            )
+          } else {
+            const encryptedPassword = await bcrypt.hash(password, 10)
+            await this.userModel.updateOne(
+              { _id: userId },
+              {
+                $set: {
+                  username: userName,
+                  email,
+                  cpf,
+                  address: userAddress,
+                  password: encryptedPassword,
+                  picture: profilePicture,
+                },
+              },
+            )
+          }
         } else {
-          const encryptedPassword = await bcrypt.hash(password, 10)
           await this.userModel.updateOne(
             { _id: userId },
             {
@@ -232,25 +252,11 @@ export class UsersService {
                 email,
                 cpf,
                 address: userAddress,
-                password: encryptedPassword,
                 picture: profilePicture,
               },
             },
           )
         }
-      } else {
-        await this.userModel.updateOne(
-          { _id: userId },
-          {
-            $set: {
-              username: userName,
-              email,
-              cpf,
-              address: userAddress,
-              picture: profilePicture,
-            },
-          },
-        )
       }
 
       let updatedOwner
