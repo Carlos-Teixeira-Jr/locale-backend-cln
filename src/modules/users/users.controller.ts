@@ -13,6 +13,7 @@ import { GetFavouritesByUserDto } from './dto/favourite-property.dto'
 import { IUser } from 'common/schemas/User.schema'
 import { EditCreditCardDto } from './dto/editCreditCard.dto'
 import { DeleteUserDto } from './dto/delete-user.dto'
+import { Schema } from 'mongoose'
 
 @ApiTags('users')
 @Controller('user')
@@ -34,8 +35,17 @@ export class UsersController {
   }
 
   @Post('find-owner-by-user')
-  async findOwnerByUserId(@Body() body: GetOwnerByUserId): Promise<User_Owner> {
-    return this.usersService.findOwnerByUserId(body)
+  async findOwnerByUserId(
+    @Body() userId: GetOwnerByUserId,
+  ): Promise<User_Owner> {
+    return this.usersService.findOwnerByUserId(userId)
+  }
+
+  @Get('find-user-by-owner/:id')
+  async findUserByOwner(
+    @Param('id') ownerId: Schema.Types.ObjectId,
+  ): Promise<any> {
+    return this.usersService.findUserByOwner(ownerId)
   }
 
   @Post('edit-user')

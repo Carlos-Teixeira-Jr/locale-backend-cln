@@ -144,6 +144,10 @@ export class CreditCardData {
   @IsNotEmpty()
   @IsString()
   ccv: string
+
+  @IsNotEmpty()
+  @IsString()
+  cpfCnpj: string
 }
 
 export class CreatePropertyDto {
