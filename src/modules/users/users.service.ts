@@ -1,4 +1,4 @@
-import mongoose, { Model } from 'mongoose'
+import mongoose, { Model, Schema } from 'mongoose'
 import {
   BadRequestException,
   Injectable,
@@ -151,6 +151,41 @@ export class UsersService {
         user,
         owner,
       }
+    } catch (error) {
+      this.logger.error({
+        error: JSON.stringify(error),
+        exception: '> exception',
+      })
+      throw error
+    }
+  }
+
+  async findUserByOwner(ownerId: Schema.Types.ObjectId) {
+    try {
+      this.logger.log({}, 'find user by owner')
+
+      const owner = await this.ownerModel.findById(ownerId).lean()
+
+      if (!owner)
+        throw new NotFoundException(
+          `O proprietário com o id ${ownerId} não foi encontrado.`,
+        )
+
+      const { userId } = owner
+
+      const user = await this.userModel
+        .find({
+          _id: userId,
+          isActive: true,
+        })
+        .lean()
+
+      const ownerData = {
+        owner,
+        user: user[0],
+      }
+
+      return ownerData
     } catch (error) {
       this.logger.error({
         error: JSON.stringify(error),
