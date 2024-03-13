@@ -79,12 +79,14 @@ interface IOwnerData {
   plan: any
   userId: any
   adCredits?: number
+  highlightCredits?: number
   email: string
 }
 
 @Injectable()
 export class PropertyService {
   constructor(
+    //@ts-ignore
     @InjectorLoggerService(PropertyService.name)
     private readonly logger: LoggerService,
     @InjectModel(PropertyModelName)
@@ -339,7 +341,8 @@ export class PropertyService {
         }
 
         if (!isPlanFree) {
-          ownerData.adCredits = selectedPlan.commonAd
+          ownerData.adCredits = selectedPlan.commonAd;
+          ownerData.highlightCredits = selectedPlan.highlightAd;
         }
 
         const createdOwner: any = await this.ownerModel.create([ownerData], opt)
@@ -358,7 +361,7 @@ export class PropertyService {
             // Modificar o schema de owner para salvar o highlightCredit;
             owner.plan = selectedPlan._id
             owner.adCredits = selectedPlan.commonAd
-            owner.highlightAd = selectedPlan.highlightAd
+            owner.highlightCredits = selectedPlan.highlightAd
           }
           await owner.save()
         }
@@ -915,7 +918,7 @@ export class PropertyService {
         )
       }
 
-      if (!propertyOwner.highlightAd || propertyOwner.highlightAd <= 0) {
+      if (!propertyOwner.highlightCredits || propertyOwner.highlightCredits <= 0) {
         throw new BadRequestException(
           `O proprietário ${propertyOwner.name} não possúi mais créditos de destaque para destacar este anúncio!`,
         )

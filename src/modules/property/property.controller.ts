@@ -30,6 +30,7 @@ import { Schema } from 'mongoose'
 @Controller('property')
 export class PropertyController {
   constructor(
+    //@ts-ignore
     @InjectorLoggerService(PropertyController.name)
     private readonly logger: LoggerService,
     private readonly propertyService: PropertyService,
