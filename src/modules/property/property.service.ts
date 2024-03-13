@@ -371,7 +371,7 @@ export class PropertyService {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            access_token: process.env.ASSAS_API_KEY || '',
+            access_token: process.env.ASAAS_API_KEY || '',
           },
           body: JSON.stringify({
             name: owner.name,
@@ -428,7 +428,7 @@ export class PropertyService {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                access_token: process.env.ASSAS_API_KEY || '',
+                access_token: process.env.ASAAS_API_KEY || '',
               },
               body: JSON.stringify({
                 billingType: 'CREDIT_CARD',
@@ -473,13 +473,17 @@ export class PropertyService {
         } else {
           //Buscr a assinatura do usuário para verificar a data de cobrança;
           const subscriptionId = owner.paymentData.subscriptionId
+          console.log(
+            '🚀 ~ PropertyService ~ createOne ~ process.env.ASSAS_API_KEY:',
+            process.env.ASAAS_API_KEY,
+          )
           const response = await fetch(
             `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
             {
               method: 'GET',
               headers: {
                 'Content-Type': 'application/json',
-                access_token: process.env.ASSAS_API_KEY || '',
+                access_token: process.env.ASAAS_API_KEY || '',
               },
             },
           )
@@ -502,7 +506,7 @@ export class PropertyService {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
-                    access_token: process.env.ASSAS_API_KEY || '',
+                    access_token: process.env.ASAAS_API_KEY || '',
                   },
                   body: JSON.stringify({
                     billingType: 'CREDIT_CARD',
@@ -530,7 +534,7 @@ export class PropertyService {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  access_token: process.env.ASSAS_API_KEY || '',
+                  access_token: process.env.ASAAS_API_KEY || '',
                 },
                 body: JSON.stringify({
                   billingType: 'CREDIT_CARD',
@@ -557,7 +561,7 @@ export class PropertyService {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  access_token: process.env.ASSAS_API_KEY || '',
+                  access_token: process.env.ASAAS_API_KEY || '',
                 },
                 body: JSON.stringify({
                   billingType: 'CREDIT_CARD',
