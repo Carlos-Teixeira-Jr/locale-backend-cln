@@ -160,20 +160,30 @@ export class PropertyService {
         highlightsFilters = clonedAllFilters
       }
 
+      const highlighFiltersWithoutGeolocation = highlightsFilters.filter(
+        obj => !obj.hasOwnProperty('geolocation'),
+      )
+
       const countHighlights = await this.propertyModel.countDocuments({
-        $and: highlightsFilters,
+        $and: highlighFiltersWithoutGeolocation,
         highlighted: true,
       })
 
       // Busca os destaques considerando a ordenação
       const highlights: IProperty[] = await this.propertyModel
-        .find({ $and: highlightsFilters })
+        .find({ $and: highlighFiltersWithoutGeolocation })
         .skip(highlightsSkip)
         .sort(sort[0])
         .limit(limit)
         .lean()
 
-      const countDocs = await this.propertyModel.countDocuments(filtersOrNot)
+      const filtersWithoutGeolocation = filtersOrNot.$and.filter(
+        obj => !obj.hasOwnProperty('geolocation'),
+      )
+
+      const countDocs = await this.propertyModel.countDocuments(
+        filtersWithoutGeolocation,
+      )
 
       const propertySkipAux = (page + 1) * limit - countHighlights
       const propertyLimit = limit - highlights.length
@@ -374,7 +384,7 @@ export class PropertyService {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            access_token: process.env.ASSAS_API_KEY || '',
+            access_token: process.env.ASAAS_API_KEY || '',
           },
           body: JSON.stringify({
             name: owner.name,
@@ -431,7 +441,7 @@ export class PropertyService {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                access_token: process.env.ASSAS_API_KEY || '',
+                access_token: process.env.ASAAS_API_KEY || '',
               },
               body: JSON.stringify({
                 billingType: 'CREDIT_CARD',
@@ -476,13 +486,17 @@ export class PropertyService {
         } else {
           //Buscr a assinatura do usuário para verificar a data de cobrança;
           const subscriptionId = owner.paymentData.subscriptionId
+          console.log(
+            '🚀 ~ PropertyService ~ createOne ~ process.env.ASSAS_API_KEY:',
+            process.env.ASAAS_API_KEY,
+          )
           const response = await fetch(
             `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
             {
               method: 'GET',
               headers: {
                 'Content-Type': 'application/json',
-                access_token: process.env.ASSAS_API_KEY || '',
+                access_token: process.env.ASAAS_API_KEY || '',
               },
             },
           )
@@ -505,7 +519,7 @@ export class PropertyService {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
-                    access_token: process.env.ASSAS_API_KEY || '',
+                    access_token: process.env.ASAAS_API_KEY || '',
                   },
                   body: JSON.stringify({
                     billingType: 'CREDIT_CARD',
@@ -533,7 +547,7 @@ export class PropertyService {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  access_token: process.env.ASSAS_API_KEY || '',
+                  access_token: process.env.ASAAS_API_KEY || '',
                 },
                 body: JSON.stringify({
                   billingType: 'CREDIT_CARD',
@@ -560,7 +574,7 @@ export class PropertyService {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  access_token: process.env.ASSAS_API_KEY || '',
+                  access_token: process.env.ASAAS_API_KEY || '',
                 },
                 body: JSON.stringify({
                   billingType: 'CREDIT_CARD',
@@ -1281,22 +1295,18 @@ export class PropertyService {
       if (obj.geolocation) {
         allFilters.push({
           geolocation: {
-            $geoWithin: {
-              $centerSphere: [
-                [obj.geolocation.longitude, obj.geolocation.latitude],
-                100 / 3963.2,
-              ],
+            $near: {
+              $geometry: {
+                type: 'Point',
+                coordinates: [
+                  obj.geolocation.longitude,
+                  obj.geolocation.latitude,
+                ],
+              },
             },
           },
         })
       }
-      // if (obj.tags) {
-      //   allFilters.push({
-      //     tags: {
-      //       $in: obj.tags,
-      //     },
-      //   })
-      // }
       if (obj.tags) {
         allFilters.push({
           tags: {
