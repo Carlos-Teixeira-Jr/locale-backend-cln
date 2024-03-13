@@ -50,7 +50,7 @@ export const OwnerSchema = new Schema(
     plan: { type: Schema.Types.ObjectId, ref: 'plan' },
     userId: { type: Schema.Types.ObjectId },
     adCredits: { type: Number },
-    highLightCredits: { type: Number },
+    highlightCredits: { type: Number },
     paymentData: {
       customerId: { type: String },
       subscriptionId: { type: String },
