@@ -576,7 +576,7 @@ export class UsersService {
       const limit = 6
       const skip = (page - 1) * limit
 
-      const user = await this.userModel.findById(id)
+      const user = await this.userModel.findById(id).lean()
 
       if (!user || !user.isActive) {
         throw new NotFoundException('Usuário não encontrado')
