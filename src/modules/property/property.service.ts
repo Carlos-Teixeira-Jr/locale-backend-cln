@@ -181,9 +181,15 @@ export class PropertyService {
         obj => !obj.hasOwnProperty('geolocation'),
       )
 
-      const countDocs = await this.propertyModel.countDocuments(
-        filtersWithoutGeolocation,
+      const formattedQuery = filtersWithoutGeolocation.reduce(
+        (accumulator, actualState) => {
+          Object.assign(accumulator, actualState)
+          return accumulator
+        },
+        {},
       )
+
+      const countDocs = await this.propertyModel.countDocuments(formattedQuery)
 
       const propertySkipAux = (page + 1) * limit - countHighlights
       const propertyLimit = limit - highlights.length
