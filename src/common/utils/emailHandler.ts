@@ -328,8 +328,8 @@ export async function senEmailToLocale(
   })
 
   const mailOptions = {
-    from: 'Locale Imóveis',
-    to: email,
+    from: email,
+    to: process.env.CONTACT_EMAIL,
     subject: 'Contato',
     html: `
       <html>
