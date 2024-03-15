@@ -36,19 +36,17 @@ const r2 = new S3({
 }) as any
 
 export const uploadFile = async (
-  file: Array<Express.Multer.File>,
+  files: Array<Express.Multer.File>,
   directory: string,
 ) => {
-  const images = file
-
-  const uploadedFiles = []
+  const images = files
 
   if (!images) {
     throw new BadRequestException(`No file provided`)
   }
 
-  for (let i = 0; i < images.length; i++) {
-    const name = images[i].originalname
+  const promises = images.map(async file => {
+    const name = file.originalname
     const ext = name.split('.').pop()
     const id = uuid()
     const fileName = `${directory}/${id}.${ext}`
@@ -65,7 +63,7 @@ export const uploadFile = async (
       )
     }
 
-    if (images[i].size > MAXIMUM_FILE_SIZE) {
+    if (file.size > MAXIMUM_FILE_SIZE) {
       throw new BadRequestException(
         `You can't upload files with more than 40MB`,
       )
@@ -74,21 +72,28 @@ export const uploadFile = async (
     const params: ParamsType = {
       Bucket: 'imoveis',
       Key: fileName,
-      ContentType: images[i].mimetype,
-      Body: images[i].buffer,
+      ContentType: file.mimetype,
+      Body: file.buffer,
       ACL: 'public-read',
     }
 
     try {
       await r2.upload(params as any).promise()
       console.log(`link da imagem: ${IMAGE_UPLOAD_PREFIX}/${fileName}`)
-      uploadedFiles.push(`${IMAGE_UPLOAD_PREFIX}/${fileName}`)
+      return `${IMAGE_UPLOAD_PREFIX}/${fileName}`
     } catch (error) {
       throw new BadRequestException(`${error.message}`)
     }
-  }
+  })
 
-  return uploadedFiles
+  try {
+    const uploadedFiles = await Promise.all(promises)
+    return uploadedFiles
+  } catch (error) {
+    throw new BadRequestException(
+      `Failed to upload some files: ${error.message}`,
+    )
+  }
 }
 
 export const deleteFile = async (fileName: string) => {
