@@ -158,20 +158,30 @@ export class PropertyService {
         highlightsFilters = clonedAllFilters
       }
 
+      const highlighFiltersWithoutGeolocation = highlightsFilters.filter(
+        obj => !obj.hasOwnProperty('geolocation'),
+      )
+
       const countHighlights = await this.propertyModel.countDocuments({
-        $and: highlightsFilters,
+        $and: highlighFiltersWithoutGeolocation,
         highlighted: true,
       })
 
       // Busca os destaques considerando a ordenação
       const highlights: IProperty[] = await this.propertyModel
-        .find({ $and: highlightsFilters })
+        .find({ $and: highlighFiltersWithoutGeolocation })
         .skip(highlightsSkip)
         .sort(sort[0])
         .limit(limit)
         .lean()
 
-      const countDocs = await this.propertyModel.countDocuments(filtersOrNot)
+      const filtersWithoutGeolocation = filtersOrNot.$and.filter(
+        obj => !obj.hasOwnProperty('geolocation'),
+      )
+
+      const countDocs = await this.propertyModel.countDocuments(
+        filtersWithoutGeolocation,
+      )
 
       const propertySkipAux = (page + 1) * limit - countHighlights
       const propertyLimit = limit - highlights.length
@@ -1282,22 +1292,18 @@ export class PropertyService {
       if (obj.geolocation) {
         allFilters.push({
           geolocation: {
-            $geoWithin: {
-              $centerSphere: [
-                [obj.geolocation.longitude, obj.geolocation.latitude],
-                100 / 3963.2,
-              ],
+            $near: {
+              $geometry: {
+                type: 'Point',
+                coordinates: [
+                  obj.geolocation.longitude,
+                  obj.geolocation.latitude,
+                ],
+              },
             },
           },
         })
       }
-      // if (obj.tags) {
-      //   allFilters.push({
-      //     tags: {
-      //       $in: obj.tags,
-      //     },
-      //   })
-      // }
       if (obj.tags) {
         allFilters.push({
           tags: {
