@@ -12,6 +12,7 @@
     "baseUrl": "src",
     "incremental": true,
     "allowJs": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "noImplicitUseStrict": false
   }
 }
