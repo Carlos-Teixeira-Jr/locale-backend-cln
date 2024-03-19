@@ -76,7 +76,7 @@ interface IOwnerData {
   phone: string
   cellPhone: string
   wppNumber: string
-  profilePicture: string
+  ownerPicture: string
   plan: any
   userId: any
   adCredits?: number
@@ -351,7 +351,7 @@ export class PropertyService {
           cellPhone,
           wppNumber,
           plan,
-          profilePicture: userData.profilePicture,
+          ownerPicture: userData.profilePicture,
           userId: user._id,
           email: userData.email,
           adCredits: 0,
@@ -393,7 +393,7 @@ export class PropertyService {
           {
             name: owner.name,
             email: userData.email,
-            phone,
+            phone: cellPhone,
             postalCode: userData.address.zipCode,
             description: 'Confirmação de criação de id de cliente',
             cpfCnpj,
@@ -460,10 +460,10 @@ export class PropertyService {
               creditCardHolderInfo: {
                 name: cardName,
                 email: userData.email,
-                phone,
+                phone: cellPhone,
                 cpfCnpj,
-                postalCode: address.zipCode,
-                addressNumber: address.streetNumber,
+                postalCode: userData.address.zipCode,
+                addressNumber: userData.address.streetNumber,
               },
             },
             {
@@ -589,7 +589,7 @@ export class PropertyService {
                   creditCardHolderInfo: {
                     name: cardName,
                     email: userData.email,
-                    phone,
+                    phone: cellPhone,
                     cpfCnpj,
                     postalCode: address.zipCode,
                     addressNumber: address.streetNumber,
@@ -702,7 +702,7 @@ export class PropertyService {
       propertyData.ownerInfo = {
         name: owner.name,
         phones: [phone, cellPhone],
-        profilePicture: userData.profilePicture,
+        ownerPicture: userData.profilePicture,
         email: userData.email,
         wppNumber: wppNumber,
       }
@@ -1142,18 +1142,21 @@ export class PropertyService {
   async uploadProfileImage(
     files: Array<Express.Multer.File>,
     userId: Schema.Types.ObjectId,
+    type: string,
   ) {
     try {
       this.logger.log({ userId }, 'start upload profile image')
 
-      const userFound = await this.userModel.findById(userId)
+      let isUser = null
       let uploadedImages: string | string[]
       let profilePicture: string | string[]
+      let userFound
+      let ownerFound
 
-      if (!userFound) {
-        throw new NotFoundException(
-          `O usuário com o id "${userId}" não foi encontrado.`,
-        )
+      if (type === 'user') {
+        isUser = true
+      } else if (type === 'owner') {
+        isUser = false
       }
 
       if (files.length > 0) {
@@ -1164,10 +1167,33 @@ export class PropertyService {
         profilePicture = uploadedImages
       }
 
-      await this.userModel.updateOne(
-        { _id: userId },
-        { $set: { picture: profilePicture } },
-      )
+      if (isUser !== null && isUser) {
+        userFound = await this.userModel.findById(userId)
+
+        if (!userFound) {
+          throw new NotFoundException(
+            `O usuário com o id "${userId}" não foi encontrado.`,
+          )
+        }
+
+        await this.userModel.updateOne(
+          { _id: userId },
+          { $set: { picture: profilePicture } },
+        )
+      }
+
+      if (isUser !== null && !isUser) {
+        ownerFound = await this.ownerModel.find({ userId })
+
+        if (!ownerFound) {
+          throw new NotFoundException(`O proprietário não foi encontrado.`)
+        }
+
+        await this.ownerModel.updateOne(
+          { _id: userId },
+          { $set: { ownerPicture: profilePicture } },
+        )
+      }
 
       return { success: true }
     } catch (error) {
