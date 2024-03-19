@@ -76,7 +76,7 @@ interface IOwnerData {
   phone: string
   cellPhone: string
   wppNumber: string
-  ownerPicture: string
+  picture: string
   plan: any
   userId: any
   adCredits?: number
@@ -351,7 +351,7 @@ export class PropertyService {
           cellPhone,
           wppNumber,
           plan,
-          ownerPicture: userData.profilePicture,
+          picture: userData.profilePicture,
           userId: user._id,
           email: userData.email,
           adCredits: 0,
@@ -702,7 +702,7 @@ export class PropertyService {
       propertyData.ownerInfo = {
         name: owner.name,
         phones: [phone, cellPhone],
-        ownerPicture: userData.profilePicture,
+        picture: userData.profilePicture,
         email: userData.email,
         wppNumber: wppNumber,
       }
@@ -1191,7 +1191,7 @@ export class PropertyService {
 
         await this.ownerModel.updateOne(
           { _id: userId },
-          { $set: { ownerPicture: profilePicture } },
+          { $set: { picture: profilePicture } },
         )
       }
 

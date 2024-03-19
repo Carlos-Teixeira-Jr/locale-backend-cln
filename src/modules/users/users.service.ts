@@ -144,7 +144,7 @@ export class UsersService {
       const owner = await this.ownerModel
         .findOne({ userId, isActive: true })
         .select(
-          'adCredits plan phone cellPhone customerId creditCardInfo _id name picture',
+          'adCredits plan phone cellPhone customerId paymentData _id name picture',
         )
 
       return {

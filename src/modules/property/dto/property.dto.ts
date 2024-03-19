@@ -43,7 +43,7 @@ export class PropertyOwnerInfoDto {
   name: string
 
   @IsString()
-  ownerPicture: string
+  picture: string
 
   @IsOptional()
   @IsArray()
