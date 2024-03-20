@@ -109,7 +109,7 @@ export class PropertyController {
     return await this.propertyService.uploadPropertyImages(files, propertyId)
   }
 
-  @Post('upload-profile-image')
+  @Post('upload-profile-image/:type')
   @UseInterceptors(
     FilesInterceptor('images', 20, {
       limits: {
@@ -120,10 +120,11 @@ export class PropertyController {
   async uploadProfileImage(
     @UploadedFiles() files: Array<Express.Multer.File>,
     @Body('userId') userId: Schema.Types.ObjectId,
+    @Param('type') type: string,
   ) {
     this.logger.info({}, 'uploadProfileImage > params')
 
-    return await this.propertyService.uploadProfileImage(files, userId)
+    return await this.propertyService.uploadProfileImage(files, userId, type)
   }
 
   @Post('edit-property-images')

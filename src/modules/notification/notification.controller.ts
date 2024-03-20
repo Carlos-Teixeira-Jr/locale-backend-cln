@@ -51,6 +51,12 @@ export class NotificationController {
     return await this.notificationService.findAll(pageQueryFilter)
   }
 
+  @Post('update-notifications')
+  async updateNotifications(@Body() notifications: INotification[]) {
+    this.logger.log({}, 'findAll')
+    return await this.notificationService.updateNotifications(notifications)
+  }
+
   @Delete()
   async DeleteNotificationDto(
     @Body() deleteNotificationDto: DeleteNotificationDto,
