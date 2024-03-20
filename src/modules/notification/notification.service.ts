@@ -51,7 +51,7 @@ export class NotificationService {
       this.logger.log({ id }, 'start findOne')
 
       const notification: INotification[] = await this.notificationModel
-        .find({ userId: id, isRead: false })
+        .find({ userId: id })
         .lean()
 
       if (!notification) {
@@ -61,6 +61,35 @@ export class NotificationService {
       }
 
       return notification
+    } catch (error) {
+      this.logger.error({
+        error: JSON.stringify(error),
+        exception: '> exception',
+      })
+      throw error
+    }
+  }
+
+  async updateNotifications(notifications: INotification[]) {
+    try {
+      this.logger.log({ notifications }, 'start findOne')
+
+      const notesIds = notifications.map(item => {
+        item._id
+      })
+
+      // Atualiza os documentos com os IDs presentes em notesIds
+      const result = await this.notificationModel.updateMany(
+        { _id: { $in: notesIds } }, // Condição de pesquisa
+        { $set: { isRead: true } }, // Atualização a ser realizada
+      )
+
+      // Verifica se houve algum erro durante a atualização
+      if (result.modifiedCount !== notifications.length) {
+        throw new Error('Erro ao atualizar notificações')
+      }
+
+      return { success: true }
     } catch (error) {
       this.logger.error({
         error: JSON.stringify(error),

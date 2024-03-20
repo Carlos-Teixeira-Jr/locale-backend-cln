@@ -6,6 +6,8 @@ import {
   Param,
   Post,
   Delete,
+  Put,
+  Patch,
 } from '@nestjs/common'
 import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import {
@@ -49,6 +51,14 @@ export class NotificationController {
   ): Promise<INotificationsWithPagination> {
     this.logger.log({}, 'findAll')
     return await this.notificationService.findAll(pageQueryFilter)
+  }
+
+  @Post('update-notifications')
+  async updateNotifications(
+    @Body() notifications: INotification[],
+  ) {
+    this.logger.log({}, 'findAll')
+    return await this.notificationService.updateNotifications(notifications)
   }
 
   @Delete()
