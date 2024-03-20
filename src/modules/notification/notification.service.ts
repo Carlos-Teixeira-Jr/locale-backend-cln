@@ -74,8 +74,10 @@ export class NotificationService {
     try {
       this.logger.log({ notifications }, 'start findOne')
 
-      const notesIds = notifications.map(item => {
-        item._id
+      const notesIds = []
+
+      notifications.forEach(item => {
+        notesIds.push(item._id)
       })
 
       // Atualiza os documentos com os IDs presentes em notesIds

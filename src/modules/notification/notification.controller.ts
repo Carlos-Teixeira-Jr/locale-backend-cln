@@ -6,8 +6,6 @@ import {
   Param,
   Post,
   Delete,
-  Put,
-  Patch,
 } from '@nestjs/common'
 import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import {
@@ -54,9 +52,7 @@ export class NotificationController {
   }
 
   @Post('update-notifications')
-  async updateNotifications(
-    @Body() notifications: INotification[],
-  ) {
+  async updateNotifications(@Body() notifications: INotification[]) {
     this.logger.log({}, 'findAll')
     return await this.notificationService.updateNotifications(notifications)
   }
