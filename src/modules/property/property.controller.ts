@@ -13,20 +13,18 @@ import { LoggerService } from 'modules/logger/logger.service'
 import { GetPropertyParams } from './dto/getProperty.params'
 import { CommonQueryFilter } from 'common/utils/query.filter'
 import { CreatePropertyDto } from './dto/create-property.dto'
-import {
-  IFilterReturn,
-  IFindByCodeReturn,
-  PropertyService,
-} from './property.service'
+import { IFilterReturn, PropertyService } from './services/property.service'
 import { GetPropertiesByOwnerDto } from './dto/getPropertiesByOwner.dto'
 import { HighlightPropertyDto } from './dto/highlight-property.dto'
 import { PropertyActivationDto } from './dto/property-activation.dto'
 import { EditPropertyDto } from './dto/edit-property.dto'
 import { IProperty } from 'common/schemas/Property.schema'
-import { IOwnerPropertiesReturn } from './property.service'
+import { IOwnerPropertiesReturn } from './services/property.service'
 import { FilesInterceptor } from '@nestjs/platform-express'
 import { Schema } from 'mongoose'
+import { ApiOperation, ApiTags } from '@nestjs/swagger'
 
+@ApiTags('property')
 @Controller('property')
 export class PropertyController {
   constructor(
@@ -36,6 +34,10 @@ export class PropertyController {
   ) {}
 
   @Get('/filter')
+  @ApiOperation({
+    summary:
+      'Search properties based on filter params passed on the query and provides pagination data.',
+  })
   async filter(
     @Query() queryFilter: CommonQueryFilter,
   ): Promise<IFilterReturn> {
@@ -44,6 +46,9 @@ export class PropertyController {
   }
 
   @Get(':id')
+  @ApiOperation({
+    summary: 'Search a specific property based on the query params.',
+  })
   async findOne(
     @Param() params: GetPropertyParams,
     @Query('isEdit') isEdit: boolean,
@@ -53,6 +58,9 @@ export class PropertyController {
   }
 
   @Post()
+  @ApiOperation({
+    summary: 'Create a new property and save al relative data on database.',
+  })
   async createOne(
     @Body() createPropertyDto: CreatePropertyDto,
   ): Promise<IProperty> {
@@ -61,14 +69,20 @@ export class PropertyController {
   }
 
   @Get('/announcementCode/:announcementCode')
+  @ApiOperation({
+    summary: 'Search a property based on his announcement code.',
+  })
   async findByAnnouncementCode(
     @Param('announcementCode') announcementCode: string,
-  ): Promise<IFindByCodeReturn> {
+  ): Promise<IFilterReturn> {
     this.logger.log({}, 'findByAnnouncementCode')
     return this.propertyService.findByAnnouncementCode(announcementCode)
   }
 
   @Post('owner-properties')
+  @ApiOperation({
+    summary: 'Search all properties of an owner basedon his ownerId.',
+  })
   async findByOwner(
     @Body() getPropertiesByOwnerDto: GetPropertiesByOwnerDto,
   ): Promise<IOwnerPropertiesReturn> {
@@ -76,6 +90,9 @@ export class PropertyController {
   }
 
   @Post('property-activation')
+  @ApiOperation({
+    summary: 'Deactivate a property based on his propertyId.',
+  })
   async propertyActivation(
     @Body() propertyActivationDto: PropertyActivationDto,
   ) {
@@ -83,16 +100,25 @@ export class PropertyController {
   }
 
   @Post('highlight-property')
+  @ApiOperation({
+    summary: 'Highlight a property based on his propertyId.',
+  })
   async highlightProperty(@Body() highlightPropertyDto: HighlightPropertyDto) {
     return this.propertyService.highlightProperty(highlightPropertyDto)
   }
 
   @Post('edit-property')
+  @ApiOperation({
+    summary: 'Update infos of an specific property.',
+  })
   async editProperty(@Body() editPropertyDto: EditPropertyDto) {
     return this.propertyService.editProperty(editPropertyDto)
   }
 
   @Post('upload-property-images')
+  @ApiOperation({
+    summary: 'Upload property images based on his propertyId.',
+  })
   @UseInterceptors(
     FilesInterceptor('images', 50, {
       limits: {
@@ -110,6 +136,9 @@ export class PropertyController {
   }
 
   @Post('upload-profile-image/:type')
+  @ApiOperation({
+    summary: 'Upload user profile image based on his userId.',
+  })
   @UseInterceptors(
     FilesInterceptor('images', 20, {
       limits: {
@@ -128,6 +157,9 @@ export class PropertyController {
   }
 
   @Post('edit-property-images')
+  @ApiOperation({
+    summary: 'Update the images of an specific property.',
+  })
   @UseInterceptors(
     FilesInterceptor('images', 20, {
       limits: {
