@@ -8,7 +8,11 @@ import { InjectModel } from '@nestjs/mongoose'
 import { PropertyModelName, IProperty } from 'common/schemas/Property.schema'
 import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import mongoose, { Model } from 'mongoose'
-import { CreatePropertyDto, UserData } from '../dto/create-property.dto'
+import {
+  CreatePropertyDto,
+  CreditCardData,
+  UserData,
+} from '../dto/create-property.dto'
 import { IOwner, OwnerModelName } from 'common/schemas/Owner.schema'
 import { IPlan, PlanModelName } from 'common/schemas/Plan.schema'
 import { IUser, UserModelName } from 'common/schemas/User.schema'
@@ -93,15 +97,17 @@ export class CreateProperty_Service {
         creditCardData,
       )
 
-      await this.handlePayment(
-        isPlanFree,
-        selectedPlan,
-        owner,
-        userData,
-        creditCardData,
-        cellPhone,
-        ownerPreviousPlan,
-      )
+      if (!isPlanFree) {
+        await this.handlePayment(
+          isPlanFree,
+          selectedPlan,
+          owner,
+          userData,
+          creditCardData,
+          cellPhone,
+          ownerPreviousPlan,
+        )
+      }
 
       await this.handleLocationCreation(propertyData.address, session)
       await this.handlePropertyTypeCreation(propertyData.propertyType, session)
@@ -262,7 +268,14 @@ export class CreateProperty_Service {
       ownerPreviousPlan = ownerExists.plan
     }
 
-    return { owner, userAlreadyExists, user, selectedPlan, ownerPreviousPlan }
+    return {
+      owner,
+      userAlreadyExists,
+      user,
+      selectedPlan,
+      ownerPreviousPlan,
+      selectedPlanData: selectedPlan,
+    }
   }
 
   private async handleCustomer(
@@ -272,11 +285,12 @@ export class CreateProperty_Service {
     cellPhone: string,
     creditCardData: any,
   ) {
-    const { cpfCnpj } = creditCardData
+    let cpfCnpj: string
     const { address, email } = userData
     const { paymentData, name } = owner
 
     if (!isPlanFree && !paymentData.customerId) {
+      cpfCnpj = creditCardData.cpfCnpj
       // Cadastrar customer no payment api;
       const response = await axios.post(
         `${process.env.PAYMENT_URL}/customer`,
@@ -315,14 +329,27 @@ export class CreateProperty_Service {
     selectedPlan: IPlan,
     owner: IOwner,
     userData: UserData,
-    creditCardData: any,
+    creditCardData: CreditCardData,
     cellPhone: string,
     ownerPreviousPlan: string,
   ) {
-    const { cpfCnpj, expiry, cardName, cardNumber, ccv } = creditCardData
+    let cpfCnpj: string
+    let expiry: string
+    let cardName: string
+    let cardNumber: string
+    let ccv: string
+
     const { address, email } = userData
     const { paymentData, adCredits, plan: ownerActualPlan } = owner
     const { price, _id: planId } = selectedPlan
+
+    if (creditCardData !== undefined) {
+      cpfCnpj = creditCardData.cpfCnpj
+      cardName = creditCardData.cardName
+      cardNumber = creditCardData.cardNumber
+      expiry = creditCardData.expiry
+      ccv = creditCardData.ccv
+    }
 
     if (!isPlanFree) {
       if (adCredits < 1) {
