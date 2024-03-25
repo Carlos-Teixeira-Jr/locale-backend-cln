@@ -5,7 +5,7 @@ import {
   PropertyModelName,
   PropertySchema,
 } from 'common/schemas/Property.schema'
-import { PropertyService } from './property.service'
+import { PropertyService } from './services/property.service'
 import { OwnerModelName, OwnerSchema } from 'common/schemas/Owner.schema'
 import {
   LocationModelName,
@@ -26,6 +26,14 @@ import { AuthService } from 'modules/auth/auth.service'
 import { JwtService } from '@nestjs/jwt'
 import { UsersService } from 'modules/users/users.service'
 import { TagModelName, TagSchema } from 'common/schemas/Tag.schema'
+import { PropertyFilter_Service } from './services/property-filter.service'
+import { CreateProperty_Service } from './services/create-property.service'
+
+const services = [
+  PropertyService,
+  PropertyFilter_Service,
+  CreateProperty_Service,
+]
 
 @Module({
   imports: [
@@ -66,7 +74,7 @@ import { TagModelName, TagSchema } from 'common/schemas/Tag.schema'
   ],
   controllers: [PropertyController],
   providers: [
-    PropertyService,
+    ...services,
     MessageService,
     AuthService,
     JwtService,
