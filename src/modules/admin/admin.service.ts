@@ -5,7 +5,7 @@ import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import { LoggerService } from 'modules/logger/logger.service'
 import { InjectModel } from '@nestjs/mongoose'
 import { IProperty, PropertyModelName } from 'common/schemas/Property.schema'
-import { Model } from 'mongoose'
+import { Model, Schema } from 'mongoose'
 
 @Injectable()
 export class AdminService {
@@ -24,7 +24,7 @@ export class AdminService {
     return `This action returns all admin`
   }
 
-  async findOne(id: string): Promise<IProperty> {
+  async findOne(id: Schema.Types.ObjectId): Promise<IProperty> {
     try {
       this.logger.log({}, 'start findOne')
 
