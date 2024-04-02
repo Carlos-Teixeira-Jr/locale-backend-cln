@@ -11,11 +11,6 @@ import mongoose, { Model, Schema } from 'mongoose'
 import { CommonQueryFilter } from 'common/utils/query.filter'
 import { CreatePropertyDto } from '../dto/create-property.dto'
 import { IOwner, OwnerModelName } from 'common/schemas/Owner.schema'
-import { LocationModelName, ILocation } from 'common/schemas/Location.schema'
-import {
-  IPropertyType,
-  PropertyTypeModelName,
-} from 'common/schemas/PropertyType.schema'
 import { GetPropertiesByOwnerDto } from '../dto/getPropertiesByOwner.dto'
 import { HighlightPropertyDto } from '../dto/highlight-property.dto'
 import { PropertyActivationDto } from '../dto/property-activation.dto'
@@ -25,12 +20,19 @@ import {
   MessageOwnerModelName,
 } from 'common/schemas/Message_owner.schema'
 import { IUser, UserModelName } from 'common/schemas/User.schema'
-import { IPlan, PlanModelName } from 'common/schemas/Plan.schema'
-import { AuthService } from 'modules/auth/auth.service'
 import { TagModelName, ITag } from 'common/schemas/Tag.schema'
 import { uploadFile } from 'common/utils/uploadImages'
 import { PropertyFilter_Service } from './property-filter.service'
 import { CreateProperty_Service } from './create-property.service'
+import {
+  getPropertyById,
+  incrementViews,
+  findActivePropertiesByAnnouncementCode,
+  getPropertiesData,
+  updatePropertyImages,
+} from '../auxiliar/auxiliar-functions.service'
+import { findActiveOwner } from 'modules/users/auxiliar/auxiliarFunctions'
+import { findOwnerMessages } from 'modules/message/auxiliar/auxiliarFunctions'
 
 export interface IDocsWithPagination {
   docs: IProperty[]
@@ -75,17 +77,10 @@ export class PropertyService {
     private readonly ownerModel: Model<IOwner>,
     @InjectModel(UserModelName)
     private readonly userModel: Model<IUser>,
-    @InjectModel(PlanModelName)
-    private readonly planModel: Model<IPlan>,
-    @InjectModel(LocationModelName)
-    private readonly locationModel: Model<ILocation>,
-    @InjectModel(PropertyTypeModelName)
-    private readonly propertyTypeModel: Model<IPropertyType>,
     @InjectModel(MessageOwnerModelName)
     private readonly messageModel: Model<IMessageOwner>,
     @InjectModel(TagModelName)
     private readonly tagModel: Model<ITag>,
-    private readonly authService: AuthService,
     private readonly propertyFilter_Service: PropertyFilter_Service,
     private readonly createProperty_Service: CreateProperty_Service,
   ) {}
@@ -94,23 +89,18 @@ export class PropertyService {
     return await this.propertyFilter_Service.filter(queryFilter)
   }
 
-  async findOne(id: string, isEdit: boolean): Promise<IProperty> {
+  async findOne(
+    id: Schema.Types.ObjectId,
+    isEdit: boolean,
+  ): Promise<IProperty> {
     try {
       this.logger.log({}, 'start findOne')
 
-      const property: IProperty = await this.propertyModel.findById(id).lean()
+      const property: IProperty = await getPropertyById(id, this.propertyModel)
 
-      if (!property || !property.isActive) {
-        throw new NotFoundException(`O id: ${id} não foi encontrado`)
-      }
+      if (!property) throw new NotFoundException(`O imóvel não foi encontrado.`)
 
-      // Incrementa o número de visualizações do imóvel quando não for página de edição de imóvel;
-      if (!isEdit) {
-        await this.propertyModel.updateOne(
-          { _id: property._id },
-          { $inc: { views: 1 } },
-        )
-      }
+      await incrementViews(property, isEdit, this.propertyModel)
 
       return property
     } catch (error) {
@@ -122,520 +112,6 @@ export class PropertyService {
     }
   }
 
-  // async createOne(createPropertyDto: CreatePropertyDto): Promise<any> {
-  //   const mongodbUri = `${process.env.DB_HOST}`
-  //   const db = await mongoose.createConnection(mongodbUri).asPromise()
-  //   const session = await db.startSession()
-  //   const opt = { session, new: true }
-  //   try {
-  //     await session.startTransaction()
-  //     this.logger.log({}, 'start createOne')
-
-  //     const { propertyType, address } = createPropertyDto.propertyData
-
-  //     const { plan, isPlanFree, phone, cellPhone, userData, propertyData } =
-  //       createPropertyDto
-
-  //     const { wppNumber } = createPropertyDto.propertyData.ownerInfo
-
-  //     let cardName
-  //     let cardNumber
-  //     let ccv
-  //     let expiry
-  //     let cpfCnpj
-
-  //     if (!isPlanFree) {
-  //       cardName = createPropertyDto.creditCardData.cardName
-  //       cardNumber = createPropertyDto.creditCardData.cardNumber
-  //       ccv = createPropertyDto.creditCardData.ccv
-  //       expiry = createPropertyDto.creditCardData.expiry
-  //       cpfCnpj = createPropertyDto.creditCardData.cpfCnpj
-  //     }
-
-  //     //Verifica se o id do usuário foi passado na requisição (caso tenha criado o imóvel estando logado);
-  //     const userId = userData._id ? userData._id : null
-  //     let userAlreadyExists: boolean
-  //     let user: IUser | null = null
-  //     let owner: IOwner | null = null
-  //     let ownerPreviousPlan
-  //     // Busca os dados do plano selecionado;
-  //     const selectedPlan: IPlan = await this.planModel.findById(plan).lean()
-
-  //     // USER
-
-  //     if (userId) {
-  //       user = await this.userModel.findById(userId).lean()
-
-  //       if (!user || !user.isActive) {
-  //         throw new NotFoundException(
-  //           `O usuário com o id : ${userId} não foi encontrado.`,
-  //         )
-  //       }
-
-  //       //Indica que este usuário já tem cadastro prévio como 'user' no banco de dados;
-  //       userAlreadyExists = true
-  //     } else {
-  //       //Verifica se apesar do usuário não estar logado ao criar o anúncio o email dele já havia sido usado para cadastrar algum 'user' no banco de dados;
-  //       const userEmailExists = await this.userModel.findOne({
-  //         email: userData.email,
-  //         isActive: true,
-  //       })
-
-  //       if (!userEmailExists) {
-  //         // Gera uma senha provisória aleatória;
-  //         const randomPassword: string = generateRandomString()
-
-  //         const registerUserParams = {
-  //           email: userData.email,
-  //           password: randomPassword,
-  //           passwordConfirmation: randomPassword,
-  //         }
-
-  //         const sendPasswordEmailParams: SendAutoGeneratedPasswordDto = {
-  //           email: userData.email,
-  //           username: userData.username,
-  //           password: randomPassword,
-  //         }
-
-  //         // Cria o usuário no banco de dados;
-  //         const registerUser = await this.authService.register(
-  //           registerUserParams,
-  //         )
-
-  //         await sendAutoGeneratedPasswordEmail(sendPasswordEmailParams)
-
-  //         // Use o método updateOne para adicionar a propriedade 'cpf' ao usuário
-  //         await this.userModel.updateOne(
-  //           { _id: registerUser._id },
-  //           {
-  //             cpf: userData.cpf,
-  //             address: userData.address,
-  //             username: userData.username,
-  //             email: userData.email,
-  //           },
-  //           opt,
-  //         )
-
-  //         // Busca o usuário atualizado
-  //         user = await this.userModel.findById(registerUser._id)
-  //       } else {
-  //         user = userEmailExists
-  //       }
-  //       userAlreadyExists = false
-  //     }
-
-  //     // OWNER
-
-  //     // Verifica se o 'user' já é um 'owner';
-  //     const ownerExists: IOwner = await this.ownerModel.findOne({
-  //       userId: user._id,
-  //       isActive: true,
-  //     })
-
-  //     if (!ownerExists) {
-  //       const ownerData: IOwnerData = {
-  //         name: userData.username,
-  //         phone,
-  //         cellPhone,
-  //         wppNumber,
-  //         plan,
-  //         picture: userData.profilePicture,
-  //         userId: user._id,
-  //         email: userData.email,
-  //         adCredits: 0,
-  //         highlightCredits: 0,
-  //       }
-
-  //       if (!isPlanFree) {
-  //         ownerData.adCredits = selectedPlan.commonAd
-  //         ownerData.highlightCredits = selectedPlan.highlightAd
-  //       }
-
-  //       const createdOwner: any = await this.ownerModel.create([ownerData], opt)
-  //       owner = createdOwner[0]
-  //     } else {
-  //       owner = ownerExists
-  //       ownerPreviousPlan = ownerExists.plan
-
-  //       // Atualiza o plano caso tenha sido alterado ao cadastrar o imóvel;
-  //       const ownerPlan = owner.plan
-
-  //       if (selectedPlan._id !== ownerPlan) {
-  //         owner.plan = selectedPlan._id
-  //         owner.adCredits = selectedPlan.commonAd
-  //         if (selectedPlan.name === 'Locale Plus') {
-  //           // Modificar o schema de owner para salvar o highlightCredit;
-  //           owner.plan = selectedPlan._id
-  //           owner.adCredits = selectedPlan.commonAd
-  //           owner.highlightCredits = selectedPlan.highlightAd
-  //         }
-  //         await owner.save()
-  //       }
-  //     }
-
-  //     // CUSTOMER
-  //     if (!isPlanFree && !owner.paymentData.customerId) {
-  //       // Cadastrar customer no payment api;
-  //       const response = await axios.post(
-  //         `${process.env.PAYMENT_URL}/customer`,
-  //         {
-  //           name: owner.name,
-  //           email: userData.email,
-  //           phone: cellPhone,
-  //           postalCode: userData.address.zipCode,
-  //           description: 'Confirmação de criação de id de cliente',
-  //           cpfCnpj,
-  //           addressNumber: address.streetNumber,
-  //         },
-  //         {
-  //           headers: {
-  //             'Content-Type': 'application/json',
-  //             access_token: process.env.ASAAS_API_KEY || '',
-  //           },
-  //         },
-  //       )
-
-  //       if (response.status >= 200 && response.status < 300) {
-  //         const customer = response.data
-
-  //         // Atualiza o 'customerId' no 'owner' e salva no banco de dados
-  //         owner.paymentData.customerId = customer.id
-  //         owner.paymentData.cpfCnpj = cpfCnpj
-  //         await owner.save()
-  //       } else {
-  //         throw new Error(`Falha ao criar o cliente: ${response.statusText}`)
-  //       }
-  //     }
-
-  //     // PAYMENT
-
-  //     const paymentValue = null
-
-  //     // Validar se tem plano e se há creditos no plano;
-  //     if (!isPlanFree) {
-  //       if (owner.adCredits < 1) {
-  //         throw new BadRequestException(
-  //           `O usuário não tem mais créditos para criar um novo anúncio.`,
-  //         )
-  //       }
-
-  //       //const formattedExpiry = expiry.split('-')
-  //       const expiryYear = `20${expiry[2] + expiry[3]}`
-  //       const expiryMonth = `${expiry[0] + expiry[1]}`
-
-  //       const currentDate = new Date()
-  //       const year = currentDate.getFullYear()
-  //       const month = (currentDate.getMonth() + 1).toString().padStart(2, '0')
-  //       const day = currentDate.getDate().toString().padStart(2, '0')
-  //       const formattedDate = `${year}-${month}-${day}`
-
-  //       if (!owner.paymentData.creditCardInfo.creditCardToken) {
-  //         const response = await axios.post(
-  //           `${process.env.PAYMENT_URL}/payment/subscription`,
-  //           {
-  //             billingType: 'CREDIT_CARD',
-  //             cycle: 'MONTHLY',
-  //             customer: owner.paymentData.customerId,
-  //             value: selectedPlan.price,
-  //             nextDueDate: formattedDate,
-  //             creditCard: {
-  //               holderName: cardName,
-  //               number: cardNumber,
-  //               expiryMonth,
-  //               expiryYear,
-  //               ccv,
-  //             },
-  //             creditCardHolderInfo: {
-  //               name: cardName,
-  //               email: userData.email,
-  //               phone: cellPhone,
-  //               cpfCnpj,
-  //               postalCode: userData.address.zipCode,
-  //               addressNumber: userData.address.streetNumber,
-  //             },
-  //           },
-  //           {
-  //             headers: {
-  //               'Content-Type': 'application/json',
-  //               access_token: process.env.ASAAS_API_KEY || '',
-  //             },
-  //           },
-  //         )
-
-  //         if (response.status >= 200 && response.status < 300) {
-  //           // Se a resposta for bem-sucedida, manipule os dados da resposta
-  //           const responseData = response.data
-
-  //           // Atribuir os valores da resposta às variáveis
-  //           const creditCardInfo = responseData.creditCard
-  //           const subscriptionId = responseData.id
-
-  //           // Decrementar o número de créditos disponíveis do usuário
-  //           owner.adCredits = owner.adCredits - 1
-
-  //           // Salvar o token do cartão de crédito no banco de dados
-  //           owner.paymentData.creditCardInfo = creditCardInfo
-  //           owner.paymentData.subscriptionId = subscriptionId
-
-  //           // Salvar as alterações no banco de dados
-  //           await owner.save()
-  //         } else {
-  //           // Se a resposta não for bem-sucedida, lançar um erro
-  //           throw new Error(`Falha ao gerar a cobrança: ${response.statusText}`)
-  //         }
-  //       } else {
-  //         //Buscr a assinatura do usuário para verificar a data de cobrança;
-  //         const subscriptionId = owner.paymentData.subscriptionId
-  //         const response = await axios.get(
-  //           `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
-  //           {
-  //             headers: {
-  //               'Content-Type': 'application/json',
-  //               access_token: process.env.ASAAS_API_KEY || '',
-  //             },
-  //           },
-  //         )
-
-  //         if (response.status >= 200 && response.status < 300) {
-  //           const subscription = response.data
-  //           const nextDueDate = subscription.nextDueDate
-
-  //           if (owner.adCredits < 1) {
-  //             // Caso em que o usuário não tem mais créditos e selecionou outro plano
-  //             if (selectedPlan._id !== owner.plan) {
-  //               const subscriptionId = owner.paymentData.subscriptionId
-  //               const response = await axios.post(
-  //                 //Atualiza o valor do plano;
-  //                 `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
-  //                 {
-  //                   billingType: 'CREDIT_CARD',
-  //                   cycle: 'MONTHLY',
-  //                   customer: owner.paymentData.customerId,
-  //                   value: selectedPlan.price,
-  //                   nextDueDate,
-  //                   updatePendingPayments: true,
-  //                   creditCardToken:
-  //                     owner.paymentData.creditCardInfo.creditCardToken,
-  //                 },
-  //                 {
-  //                   headers: {
-  //                     'Content-Type': 'application/json',
-  //                     access_token: process.env.ASAAS_API_KEY || '',
-  //                   },
-  //                 },
-  //               )
-
-  //               if (response.status <= 200 && response.status > 300) {
-  //                 throw new Error(
-  //                   `Falha ao atualizar a assinatura: ${response.statusText}`,
-  //                 )
-  //               }
-  //             }
-  //             // Chamada pra api de pagamento "subscription" no caso de o usuário já ter seus dados de cartão salvos no banco;
-  //             const response = await axios.post(
-  //               `${process.env.PAYMENT_URL}/payment/subscription`,
-  //               {
-  //                 billingType: 'CREDIT_CARD',
-  //                 cycle: 'MONTHLY',
-  //                 customer: owner.paymentData.customerId,
-  //                 value: selectedPlan.price,
-  //                 nextDueDate: formattedDate,
-  //                 creditCardToken:
-  //                   owner.paymentData.creditCardInfo.creditCardToken,
-  //               },
-  //               {
-  //                 headers: {
-  //                   'Content-Type': 'application/json',
-  //                   access_token: process.env.ASAAS_API_KEY || '',
-  //                 },
-  //               },
-  //             )
-
-  //             if (response.status <= 200 && response.status > 300) {
-  //               throw new Error(
-  //                 `Falha ao gerar a cobrança: ${response.statusText}`,
-  //               )
-  //             }
-  //           } else if (selectedPlan._id !== ownerPreviousPlan) {
-  //             //Atualiza o valor do plano
-  //             const response = await axios.post(
-  //               `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
-  //               {
-  //                 billingType: 'CREDIT_CARD',
-  //                 cycle: 'MONTHLY',
-  //                 customer: owner.paymentData.customerId,
-  //                 value: selectedPlan.price,
-  //                 nextDueDate: formattedDate,
-  //                 updatePendingPayments: true,
-  //                 creditCard: {
-  //                   holderName: cardName,
-  //                   number: cardNumber,
-  //                   expiryMonth,
-  //                   expiryYear,
-  //                   ccv,
-  //                 },
-  //                 creditCardHolderInfo: {
-  //                   name: cardName,
-  //                   email: userData.email,
-  //                   phone: cellPhone,
-  //                   cpfCnpj,
-  //                   postalCode: address.zipCode,
-  //                   addressNumber: address.streetNumber,
-  //                 },
-  //               },
-  //               {
-  //                 headers: {
-  //                   'Content-Type': 'application/json',
-  //                   access_token: process.env.ASAAS_API_KEY || '',
-  //                 },
-  //               },
-  //             )
-
-  //             if (response.status <= 200 && response.status > 300) {
-  //               throw new BadRequestException(
-  //                 'Não foi possível atualizar a assinatura.',
-  //               )
-  //             }
-  //           }
-
-  //           // Decrementar o número de créditos disponíveis do usuário;
-  //           owner.adCredits = owner.adCredits - 1
-  //           await owner.save()
-  //         } else {
-  //           throw new NotFoundException('Assinatura não encontrada.')
-  //         }
-  //       }
-  //     }
-
-  //     // LOCATION
-
-  //     // lida com o cadastro da cidade
-  //     const foundCity = await this.locationModel
-  //       .findOne({ name: address.city, category: 'city' })
-  //       .lean()
-
-  //     if (!foundCity) {
-  //       await this.locationModel.create(
-  //         [
-  //           {
-  //             name: address.city,
-  //             category: 'city',
-  //           },
-  //         ],
-  //         opt,
-  //       )
-  //     }
-
-  //     // lida com o cadastro do estado
-  //     const foundUf = await this.locationModel
-  //       .findOne({ name: address.uf, category: 'uf' })
-  //       .lean()
-
-  //     if (!foundUf) {
-  //       await this.locationModel.create(
-  //         [{ name: address.uf, category: 'uf' }],
-  //         opt,
-  //       )
-  //     }
-
-  //     // lida com o cadastro da rua
-  //     const foundStreetName = await this.locationModel
-  //       .findOne({ name: address.streetName, category: 'streetName' })
-  //       .lean()
-
-  //     if (!foundStreetName) {
-  //       await this.locationModel.create(
-  //         [
-  //           {
-  //             name: address.streetName,
-  //             category: 'streetName',
-  //           },
-  //         ],
-  //         opt,
-  //       )
-  //     }
-
-  //     // Lida com o cadastro do bairro
-  //     const foundNeighborhood = await this.locationModel
-  //       .findOne({ name: address.neighborhood, category: 'neighborhood' })
-  //       .lean()
-
-  //     if (!foundNeighborhood) {
-  //       await this.locationModel.create(
-  //         [
-  //           {
-  //             name: address.neighborhood,
-  //             category: 'neighborhood',
-  //           },
-  //         ],
-  //         opt,
-  //       )
-  //     }
-
-  //     // PROPERTY TYPE
-
-  //     // lida com o cadastro do propertyType
-  //     const foundPropertyType = await this.propertyTypeModel
-  //       .findOne({ name: propertyType })
-  //       .lean()
-
-  //     if (!foundPropertyType) {
-  //       await this.propertyTypeModel.create([{ name: propertyType }], opt)
-  //     }
-
-  //     // PROPERTY
-
-  //     propertyData.owner = owner._id
-
-  //     propertyData.ownerInfo = {
-  //       name: owner.name,
-  //       phones: [phone, cellPhone],
-  //       picture: userData.profilePicture,
-  //       email: userData.email,
-  //       wppNumber: wppNumber,
-  //     }
-
-  //     // TAGS
-  //     if (propertyData.tags) {
-  //       const tagObjects: any = propertyData.tags?.map(tag => ({
-  //         updateOne: {
-  //           filter: { name: tag },
-  //           update: {
-  //             $inc: { amount: 1 },
-  //           },
-  //           upsert: true,
-  //         },
-  //       }))
-
-  //       await this.tagModel.bulkWrite(tagObjects)
-  //     }
-
-  //     // lida com a criação da property no DB
-  //     const createdProperty = await this.propertyModel.create(propertyData)
-
-  //     await session.commitTransaction()
-
-  //     return {
-  //       createdProperty,
-  //       creditCardBrand: owner.paymentData.creditCardInfo
-  //         ? owner.paymentData.creditCardInfo.creditCardBrand
-  //         : null,
-  //       paymentValue,
-  //       userAlreadyExists,
-  //       user,
-  //     }
-  //   } catch (error) {
-  //     await session.abortTransaction()
-  //     this.logger.error({
-  //       error: JSON.stringify(error),
-  //       exception: '> exception',
-  //     })
-  //     throw error
-  //   } finally {
-  //     session.endSession()
-  //   }
-  // }
-
   async createOne(createPropertyDto: CreatePropertyDto): Promise<any> {
     return await this.createProperty_Service.createOne(createPropertyDto)
   }
@@ -644,15 +120,16 @@ export class PropertyService {
     announcementCode: string,
   ): Promise<IFilterReturn> {
     try {
-      this.logger.log({}, 'start findByAnnouncementCode')
+      this.logger.log(
+        {},
+        `start findByAnnouncementCode > [code]: ${announcementCode}`,
+      )
 
-      const page = 1
-      const totalCount = 1
-      const totalPages = 1
-
-      const foundAnnouncementCode: IProperty[] = await this.propertyModel
-        .find({ announcementCode: announcementCode, isActive: true })
-        .exec()
+      const foundAnnouncementCode =
+        await findActivePropertiesByAnnouncementCode(
+          announcementCode,
+          this.propertyModel,
+        )
 
       if (foundAnnouncementCode.length === 0) {
         throw new NotFoundException(
@@ -662,9 +139,9 @@ export class PropertyService {
 
       return {
         docs: foundAnnouncementCode,
-        totalCount,
-        totalPages,
-        page,
+        totalCount: 1,
+        totalPages: 1,
+        page: 1,
       }
     } catch (error) {
       this.logger.error({
@@ -685,33 +162,16 @@ export class PropertyService {
       const limit = 10
       const skip = (page - 1) * limit
 
-      let ownerProperties: IProperty[]
-      let count: number
-      let totalPages: number
+      const userIsOwner = await findActiveOwner(ownerId, this.ownerModel)
 
-      // Verifica se o userId recebido é um owner;
+      const { ownerProperties, count, totalPages } = await getPropertiesData(
+        userIsOwner,
+        skip,
+        limit,
+        this.propertyModel,
+      )
 
-      const userIsOwner = await this.ownerModel.findById(ownerId)
-
-      if (!userIsOwner || !userIsOwner.isActive) {
-        ownerProperties = []
-      } else {
-        ownerProperties = await this.propertyModel
-          .find({ owner: userIsOwner._id })
-          .skip(skip)
-          .limit(limit)
-          .lean()
-
-        count = await this.propertyModel.countDocuments({
-          owner: userIsOwner._id,
-          isActive: true,
-        })
-        totalPages = Math.ceil(count / limit)
-      }
-
-      const messages: IMessageOwner[] = await this.messageModel
-        .find({ owner_id: ownerId })
-        .lean()
+      const messages = await findOwnerMessages(ownerId, this.messageModel)
 
       return {
         docs: ownerProperties,
@@ -964,6 +424,47 @@ export class PropertyService {
     }
   }
 
+  // async uploadPropertyImages(
+  //   files: Array<Express.Multer.File>,
+  //   propertyId: Schema.Types.ObjectId,
+  // ) {
+  //   try {
+  //     this.logger.log({ propertyId }, 'start upload property images')
+
+  //     const storedImages = await this.propertyModel.findById(propertyId).lean()
+
+  //     const { images } = storedImages
+
+  //     if (images.length + files.length > 50) {
+  //       throw new BadRequestException(
+  //         `A requisição excede o limite de 50 imagens. Imagens salvas anteriormente: ${images.length} - Imagens adicionadas nesta requisição: ${files.length}.`,
+  //       )
+  //     }
+
+  //     const propertyFound = await this.propertyModel.findById(propertyId)
+
+  //     if (!propertyFound) {
+  //       throw new NotFoundException(
+  //         `O imóvel com o id "${propertyId}" não foi encontrado.`,
+  //       )
+  //     }
+  //     const uploadedImages = await uploadFile(files, 'images')
+
+  //     await this.propertyModel.updateOne(
+  //       { _id: propertyId },
+  //       { $push: { images: { $each: uploadedImages } } },
+  //     )
+
+  //     return { success: true }
+  //   } catch (error) {
+  //     this.logger.error({
+  //       error: JSON.stringify(error),
+  //       exception: '> exception',
+  //     })
+  //     throw error
+  //   }
+  // }
+
   async uploadPropertyImages(
     files: Array<Express.Multer.File>,
     propertyId: Schema.Types.ObjectId,
@@ -971,7 +472,7 @@ export class PropertyService {
     try {
       this.logger.log({ propertyId }, 'start upload property images')
 
-      const storedImages = await this.propertyModel.findById(propertyId).lean()
+      const storedImages = await getPropertyById(propertyId, this.propertyModel)
 
       const { images } = storedImages
 
@@ -981,19 +482,9 @@ export class PropertyService {
         )
       }
 
-      const propertyFound = await this.propertyModel.findById(propertyId)
-
-      if (!propertyFound) {
-        throw new NotFoundException(
-          `O imóvel com o id "${propertyId}" não foi encontrado.`,
-        )
-      }
       const uploadedImages = await uploadFile(files, 'images')
 
-      await this.propertyModel.updateOne(
-        { _id: propertyId },
-        { $push: { images: { $each: uploadedImages } } },
-      )
+      await updatePropertyImages(propertyId, uploadedImages, this.propertyModel)
 
       return { success: true }
     } catch (error) {
