@@ -13,12 +13,6 @@ export async function getPropertyById(
   return property
 }
 
-export function validateProperty(property: IProperty): void {
-  if (!property.isActive) {
-    throw new NotFoundException(`Property is not active`)
-  }
-}
-
 export async function incrementViews(
   property: IProperty,
   isEdit: boolean,

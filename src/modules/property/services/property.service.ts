@@ -26,7 +26,6 @@ import { PropertyFilter_Service } from './property-filter.service'
 import { CreateProperty_Service } from './create-property.service'
 import {
   getPropertyById,
-  validateProperty,
   incrementViews,
 } from '../auxiliar/auxiliar-functions.service'
 
@@ -91,7 +90,7 @@ export class PropertyService {
 
       const property: IProperty = await getPropertyById(id, this.propertyModel)
 
-      validateProperty(property)
+      if (!property) throw new NotFoundException(`O imóvel não foi encontrado.`)
 
       await incrementViews(property, isEdit, this.propertyModel)
 
