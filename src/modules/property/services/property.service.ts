@@ -27,7 +27,12 @@ import { CreateProperty_Service } from './create-property.service'
 import {
   getPropertyById,
   incrementViews,
+  findActivePropertiesByAnnouncementCode,
+  getPropertiesData,
+  updatePropertyImages,
 } from '../auxiliar/auxiliar-functions.service'
+import { findActiveOwner } from 'modules/users/auxiliar/auxiliarFunctions'
+import { findOwnerMessages } from 'modules/message/auxiliar/auxiliarFunctions'
 
 export interface IDocsWithPagination {
   docs: IProperty[]
@@ -84,7 +89,10 @@ export class PropertyService {
     return await this.propertyFilter_Service.filter(queryFilter)
   }
 
-  async findOne(id: string, isEdit: boolean): Promise<IProperty> {
+  async findOne(
+    id: Schema.Types.ObjectId,
+    isEdit: boolean,
+  ): Promise<IProperty> {
     try {
       this.logger.log({}, 'start findOne')
 
@@ -112,15 +120,16 @@ export class PropertyService {
     announcementCode: string,
   ): Promise<IFilterReturn> {
     try {
-      this.logger.log({}, 'start findByAnnouncementCode')
+      this.logger.log(
+        {},
+        `start findByAnnouncementCode > [code]: ${announcementCode}`,
+      )
 
-      const page = 1
-      const totalCount = 1
-      const totalPages = 1
-
-      const foundAnnouncementCode: IProperty[] = await this.propertyModel
-        .find({ announcementCode: announcementCode, isActive: true })
-        .exec()
+      const foundAnnouncementCode =
+        await findActivePropertiesByAnnouncementCode(
+          announcementCode,
+          this.propertyModel,
+        )
 
       if (foundAnnouncementCode.length === 0) {
         throw new NotFoundException(
@@ -130,9 +139,9 @@ export class PropertyService {
 
       return {
         docs: foundAnnouncementCode,
-        totalCount,
-        totalPages,
-        page,
+        totalCount: 1,
+        totalPages: 1,
+        page: 1,
       }
     } catch (error) {
       this.logger.error({
@@ -153,33 +162,16 @@ export class PropertyService {
       const limit = 10
       const skip = (page - 1) * limit
 
-      let ownerProperties: IProperty[]
-      let count: number
-      let totalPages: number
+      const userIsOwner = await findActiveOwner(ownerId, this.ownerModel)
 
-      // Verifica se o userId recebido é um owner;
+      const { ownerProperties, count, totalPages } = await getPropertiesData(
+        userIsOwner,
+        skip,
+        limit,
+        this.propertyModel,
+      )
 
-      const userIsOwner = await this.ownerModel.findById(ownerId)
-
-      if (!userIsOwner || !userIsOwner.isActive) {
-        ownerProperties = []
-      } else {
-        ownerProperties = await this.propertyModel
-          .find({ owner: userIsOwner._id })
-          .skip(skip)
-          .limit(limit)
-          .lean()
-
-        count = await this.propertyModel.countDocuments({
-          owner: userIsOwner._id,
-          isActive: true,
-        })
-        totalPages = Math.ceil(count / limit)
-      }
-
-      const messages: IMessageOwner[] = await this.messageModel
-        .find({ owner_id: ownerId })
-        .lean()
+      const messages = await findOwnerMessages(ownerId, this.messageModel)
 
       return {
         docs: ownerProperties,
@@ -432,6 +424,47 @@ export class PropertyService {
     }
   }
 
+  // async uploadPropertyImages(
+  //   files: Array<Express.Multer.File>,
+  //   propertyId: Schema.Types.ObjectId,
+  // ) {
+  //   try {
+  //     this.logger.log({ propertyId }, 'start upload property images')
+
+  //     const storedImages = await this.propertyModel.findById(propertyId).lean()
+
+  //     const { images } = storedImages
+
+  //     if (images.length + files.length > 50) {
+  //       throw new BadRequestException(
+  //         `A requisição excede o limite de 50 imagens. Imagens salvas anteriormente: ${images.length} - Imagens adicionadas nesta requisição: ${files.length}.`,
+  //       )
+  //     }
+
+  //     const propertyFound = await this.propertyModel.findById(propertyId)
+
+  //     if (!propertyFound) {
+  //       throw new NotFoundException(
+  //         `O imóvel com o id "${propertyId}" não foi encontrado.`,
+  //       )
+  //     }
+  //     const uploadedImages = await uploadFile(files, 'images')
+
+  //     await this.propertyModel.updateOne(
+  //       { _id: propertyId },
+  //       { $push: { images: { $each: uploadedImages } } },
+  //     )
+
+  //     return { success: true }
+  //   } catch (error) {
+  //     this.logger.error({
+  //       error: JSON.stringify(error),
+  //       exception: '> exception',
+  //     })
+  //     throw error
+  //   }
+  // }
+
   async uploadPropertyImages(
     files: Array<Express.Multer.File>,
     propertyId: Schema.Types.ObjectId,
@@ -439,7 +472,7 @@ export class PropertyService {
     try {
       this.logger.log({ propertyId }, 'start upload property images')
 
-      const storedImages = await this.propertyModel.findById(propertyId).lean()
+      const storedImages = await getPropertyById(propertyId, this.propertyModel)
 
       const { images } = storedImages
 
@@ -449,19 +482,9 @@ export class PropertyService {
         )
       }
 
-      const propertyFound = await this.propertyModel.findById(propertyId)
-
-      if (!propertyFound) {
-        throw new NotFoundException(
-          `O imóvel com o id "${propertyId}" não foi encontrado.`,
-        )
-      }
       const uploadedImages = await uploadFile(files, 'images')
 
-      await this.propertyModel.updateOne(
-        { _id: propertyId },
-        { $push: { images: { $each: uploadedImages } } },
-      )
+      await updatePropertyImages(propertyId, uploadedImages, this.propertyModel)
 
       return { success: true }
     } catch (error) {

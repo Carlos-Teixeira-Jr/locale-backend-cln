@@ -38,7 +38,9 @@ export class UsersController {
   async findOwnerByUserId(
     @Body() userId: GetOwnerByUserId,
   ): Promise<User_Owner> {
-    return this.usersService.findOwnerByUserId(userId)
+    const owner = await this.usersService.findOwnerByUserId(userId)
+
+    return owner
   }
 
   @Get('find-user-by-owner/:id')

@@ -1,8 +1,9 @@
-import { IsString, Validate } from 'class-validator'
+import { IsNotEmpty, Validate } from 'class-validator'
 import { IDValidator } from 'common/validators/ID.validator'
+import { Schema } from 'mongoose'
 
 export class GetPropertyParams {
-  @IsString()
+  @IsNotEmpty()
   @Validate(IDValidator)
-  id: string
+  id: Schema.Types.ObjectId
 }
