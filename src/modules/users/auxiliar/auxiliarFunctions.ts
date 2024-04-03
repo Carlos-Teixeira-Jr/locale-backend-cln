@@ -1,8 +1,8 @@
 import { IOwner } from 'common/schemas/Owner.schema'
-import { Model } from 'mongoose'
+import { Model, Schema } from 'mongoose'
 
 export async function findActiveOwner(
-  ownerId: string,
+  ownerId: Schema.Types.ObjectId,
   ownerModel: Model<IOwner>,
 ): Promise<IOwner | null> {
   const owner = await ownerModel.findById(ownerId)

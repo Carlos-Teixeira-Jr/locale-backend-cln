@@ -1,6 +1,13 @@
 import { Controller, Get, UseGuards, Post, Body } from '@nestjs/common'
 import { JwtAuthGuard } from './guards/jwt-auth.guard'
-import { AuthService } from './auth.service'
+import {
+  AuthService,
+  ILoginOutput,
+  RefreshToken,
+  Register,
+  SocialRegister,
+  VerifyEmail,
+} from './auth.service'
 import { RequestPasswordDto } from './dto/request-password.dto'
 import { RefreshTokenDto } from './dto/refresh-token.dto'
 import { RegisterDto } from './dto/register.dto'
@@ -8,55 +15,90 @@ import { LocalLoginDto } from './dto/local-login.dto'
 import { VerifyEmailDto } from './dto/verify-email.dto'
 import { SocialRegisterDto } from './dto/google-register.dto'
 import { ReSendVerifyEmailDto } from './dto/re-send-verify-email.dto'
+import { ApiOperation, ApiTags } from '@nestjs/swagger'
 
+@ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
-  async localLogin(@Body() localLoginDto: LocalLoginDto) {
+  @ApiOperation({
+    summary:
+      'Realizes the login using email and password and return user data.',
+  })
+  async localLogin(
+    @Body() localLoginDto: LocalLoginDto,
+  ): Promise<ILoginOutput> {
     return await this.authService.localLogin(localLoginDto)
   }
 
-  @Post('refresh')
-  async refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
-    return this.authService.refreshToken(refreshTokenDto)
-  }
-
-  // @Post('google-register')
-  // async googleRegister(@Body() googleRegisterDto: GoogleRegisterDto) {
-  //   return await this.authService.googleRegister(googleRegisterDto)
-  // }
-
   @Post('register')
-  async register(@Body() registerDto: RegisterDto) {
+  @ApiOperation({
+    summary:
+      'Creates an account using email, password and password confirmation and returns user data.',
+  })
+  async register(@Body() registerDto: RegisterDto): Promise<Register> {
     return await this.authService.register(registerDto)
   }
 
+  @Post('social-register')
+  @ApiOperation({
+    summary:
+      'Creates an account or log in an existing account and returns user data.',
+  })
+  async socialRegister(
+    @Body() socialRegister: SocialRegisterDto,
+  ): Promise<SocialRegister> {
+    return await this.authService.socialRegister(socialRegister)
+  }
+
   @Post('verify-email')
-  async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
+  @ApiOperation({
+    summary:
+      'Verify if the verification code that was send to the user email is valid.',
+  })
+  async verifyEmail(
+    @Body() verifyEmailDto: VerifyEmailDto,
+  ): Promise<{ message: string }> {
     return await this.authService.verifyEmail(verifyEmailDto)
   }
 
   @Post('re-send-email-verify')
-  async reSendVerifyEmail(@Body() reSendVerifyEmailDto: ReSendVerifyEmailDto) {
+  @ApiOperation({
+    summary:
+      'Re-send the email verification code to the email used on register.',
+  })
+  async reSendVerifyEmail(
+    @Body() reSendVerifyEmailDto: ReSendVerifyEmailDto,
+  ): Promise<VerifyEmail> {
     return await this.authService.reSendVerifyEmail(reSendVerifyEmailDto)
   }
 
-  @Post('social-register')
-  async socialRegister(@Body() socialRegister: SocialRegisterDto) {
-    return await this.authService.socialRegister(socialRegister)
-  }
-
-  //Rota para testar o middleware que exige e verifica o token jwt;
-  @Get('protected')
-  @UseGuards(JwtAuthGuard)
-  async protected() {
-    return 'success'
+  @Post('refresh')
+  @ApiOperation({
+    summary:
+      'Update the token and refresh token expiry.',
+  })
+  async refreshToken(
+    @Body() refreshTokenDto: RefreshTokenDto,
+  ): Promise<RefreshToken> {
+    return this.authService.refreshToken(refreshTokenDto)
   }
 
   @Post('request-password')
+  @ApiOperation({
+    summary:
+      'Send an random code for the user email that can be used as password.',
+  })
   async requestPassword(@Body() requestPasswordDto: RequestPasswordDto) {
     return await this.authService.requestPassword(requestPasswordDto)
   }
+
+  //Rota para testar o middleware que exige e verifica o token jwt;
+  // @Get('protected')
+  // @UseGuards(JwtAuthGuard)
+  // async protected() {
+  //   return 'success'
+  // }
 }
