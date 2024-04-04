@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { InjectModel } from '@nestjs/mongoose'
-import { IUser, UserModelName } from 'common/schemas/User.schema'
 import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import { LoggerService } from 'modules/logger/logger.service'
 import { Model, Schema } from 'mongoose'
@@ -25,34 +24,35 @@ import { LocalLoginDto } from './dto/local-login.dto'
 import { VerifyEmailDto } from './dto/verify-email.dto'
 import { SocialRegisterDto } from './dto/google-register.dto'
 import { ReSendVerifyEmailDto } from './dto/re-send-verify-email.dto'
+import { IUser, UserModelName } from 'common/schemas/User.schema'
 
-export interface UserPartialData {
+export interface IUserPartialData {
   username: string
   email: string
 }
 
-export interface User extends UserPartialData {
+export interface IUserReturn extends IUserPartialData {
   _id: Schema.Types.ObjectId
   isEmailVerified?: boolean
 }
 
-export interface RefreshToken extends User {
+export interface IRefreshToken extends IUserReturn {
   access_token: string
   refresh_token: string
 }
 
-export interface ILoginOutput extends User, RefreshToken {
+export interface ILoginOutput extends IUserReturn, IRefreshToken {
   picture: string
 }
 
-export interface VerifyEmail {
+export interface IVerifyEmail {
   emailVerificationCode: string
   emailVerificationExpiry: Date
 }
 
-export interface Register extends User, VerifyEmail {}
+export interface IRegister extends IUserReturn, IVerifyEmail {}
 
-export interface SocialRegister extends User, ILoginOutput {}
+export interface ISocialRegister extends IUserReturn, ILoginOutput {}
 
 @Injectable()
 export class AuthService {
@@ -123,7 +123,7 @@ export class AuthService {
   }
 
   // Cadastro de usuário
-  async register(registerDto: RegisterDto): Promise<Register> {
+  async register(registerDto: RegisterDto): Promise<IRegister> {
     try {
       this.logger.log({}, 'start register')
 
@@ -175,7 +175,7 @@ export class AuthService {
 
   async socialRegister(
     socialRegisterDto: SocialRegisterDto,
-  ): Promise<SocialRegister> {
+  ): Promise<ISocialRegister> {
     try {
       this.logger.log({ socialRegisterDto }, 'start social-register')
 
@@ -297,7 +297,7 @@ export class AuthService {
 
   async reSendVerifyEmail(
     reSendVerifyEmailDto: ReSendVerifyEmailDto,
-  ): Promise<VerifyEmail> {
+  ): Promise<IVerifyEmail> {
     try {
       this.logger.log({}, 'start re-send-verify-email')
 
@@ -340,7 +340,7 @@ export class AuthService {
     }
   }
 
-  async refreshToken(refreshTokenDto: RefreshTokenDto): Promise<RefreshToken> {
+  async refreshToken(refreshTokenDto: RefreshTokenDto): Promise<IRefreshToken> {
     try {
       this.logger.log({}, 'start refresh token')
 
@@ -424,8 +424,8 @@ export class AuthService {
   // async validateUser(
   //   username: string,
   //   password: string,
-  // ): Promise<UserPartialData | null> {
-  //   const user: IUser = await this.userService.findOneByUsername(username)
+  // ): Promise<IUserPartialData | null> {
+  //   const user: IUserReturn = await this.userService.findOneByUsername(username)
 
   //   if (user && user.password === password) {
   //     const userData = { username: user.username, email: user.email }

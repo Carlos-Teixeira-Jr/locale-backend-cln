@@ -1,12 +1,11 @@
-import { Controller, Get, UseGuards, Post, Body } from '@nestjs/common'
-import { JwtAuthGuard } from './guards/jwt-auth.guard'
+import { Controller, Post, Body } from '@nestjs/common'
 import {
   AuthService,
   ILoginOutput,
-  RefreshToken,
-  Register,
-  SocialRegister,
-  VerifyEmail,
+  IRefreshToken,
+  IRegister,
+  ISocialRegister,
+  IVerifyEmail,
 } from './auth.service'
 import { RequestPasswordDto } from './dto/request-password.dto'
 import { RefreshTokenDto } from './dto/refresh-token.dto'
@@ -38,7 +37,7 @@ export class AuthController {
     summary:
       'Creates an account using email, password and password confirmation and returns user data.',
   })
-  async register(@Body() registerDto: RegisterDto): Promise<Register> {
+  async register(@Body() registerDto: RegisterDto): Promise<IRegister> {
     return await this.authService.register(registerDto)
   }
 
@@ -49,7 +48,7 @@ export class AuthController {
   })
   async socialRegister(
     @Body() socialRegister: SocialRegisterDto,
-  ): Promise<SocialRegister> {
+  ): Promise<ISocialRegister> {
     return await this.authService.socialRegister(socialRegister)
   }
 
@@ -71,18 +70,17 @@ export class AuthController {
   })
   async reSendVerifyEmail(
     @Body() reSendVerifyEmailDto: ReSendVerifyEmailDto,
-  ): Promise<VerifyEmail> {
+  ): Promise<IVerifyEmail> {
     return await this.authService.reSendVerifyEmail(reSendVerifyEmailDto)
   }
 
   @Post('refresh')
   @ApiOperation({
-    summary:
-      'Update the token and refresh token expiry.',
+    summary: 'Update the token and refresh token expiry.',
   })
   async refreshToken(
     @Body() refreshTokenDto: RefreshTokenDto,
-  ): Promise<RefreshToken> {
+  ): Promise<IRefreshToken> {
     return this.authService.refreshToken(refreshTokenDto)
   }
 
