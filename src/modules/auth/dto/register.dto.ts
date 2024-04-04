@@ -1,8 +1,9 @@
-import { IsNotEmpty, IsString } from 'class-validator'
+import { IsEmail, IsNotEmpty, IsString, Validate } from 'class-validator'
 
 export class RegisterDto {
   @IsNotEmpty()
   @IsString()
+  @IsEmail()
   email: string
 
   @IsNotEmpty()
@@ -11,5 +12,6 @@ export class RegisterDto {
 
   @IsNotEmpty()
   @IsString()
+  @Validate((value, args) => value === args.object.password)
   passwordConfirmation: string
 }

@@ -8,6 +8,7 @@ import {
   Validate,
   IsBoolean,
   IsCreditCard,
+  IsEmail,
 } from 'class-validator'
 import {
   PropertyAddressDto,
@@ -36,6 +37,7 @@ export class UserData {
 
   @IsNotEmpty()
   @IsString()
+  @IsEmail()
   email: string
 
   @IsNotEmpty()
@@ -94,6 +96,7 @@ export class PropertyData {
   @IsString({ each: true })
   images: string[]
 
+  @IsObject()
   @ValidateNested()
   @Type(() => PropertySizeDto)
   size: PropertySizeDto
