@@ -2,6 +2,7 @@ import {
   IsArray,
   IsBoolean,
   IsDefined,
+  IsEmail,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -51,10 +52,11 @@ export class PropertyOwnerInfoDto {
   phones: string[]
 
   @IsOptional()
-  @IsArray()
+  @IsString()
   creci?: string
 
   @IsString()
+  @IsEmail()
   email: string
 
   @IsOptional()
