@@ -7,7 +7,9 @@ import { AppService } from 'app.service'
 import { TagDto } from 'modules/property/dto/tag.dto'
 import { AuthService } from 'modules/auth/auth.service'
 import { SendEmailToLocaleDto } from 'app-dto/sendEmailToLocale.dto'
+import { ApiOperation, ApiTags } from '@nestjs/swagger'
 
+@ApiTags('app')
 @Controller()
 export class AppController {
   constructor(
@@ -45,8 +47,13 @@ export class AppController {
     return await this.appService.createTag(tagDto)
   }
 
+  @ApiOperation({
+    summary: 'Send an email to Locale admin mailbox.',
+  })
   @Post('/send-email-to-locale')
-  async sendEmailToLocale(@Body() sendEmailToLocaleDto: SendEmailToLocaleDto) {
+  async sendEmailToLocale(
+    @Body() sendEmailToLocaleDto: SendEmailToLocaleDto,
+  ): Promise<{ success: true }> {
     this.logger.log({ sendEmailToLocaleDto }, 'email to locale')
     return await this.appService.sendEmailToLocale(sendEmailToLocaleDto)
   }
