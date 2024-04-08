@@ -67,11 +67,11 @@ export class AppService {
     }
   }
 
-  async findAllTags(): Promise<{ name: string; amount: number }[]> {
+  async findAllTags(): Promise<ITag[]> {
     try {
-      this.logger.log({}, 'start findAllTags')
+      this.logger.log({}, 'start find all tags > [service]')
 
-      const tags = await this.tagModel
+      const tags: ITag[] = await this.tagModel
         .find()
         .sort({ name: 1 })
         .collation({ locale: 'pt', strength: 2 })
