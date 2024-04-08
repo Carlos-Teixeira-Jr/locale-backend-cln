@@ -10,6 +10,7 @@ export interface IMessageOwner extends BaseModel, Document {
   phone: string
   email: string
   message: string
+  isRead: boolean
   ownerId: Schema.Types.ObjectId
   propertyId: Schema.Types.ObjectId
 }
@@ -26,6 +27,7 @@ export const MessageOwnerSchema = new Schema<IMessageOwner>(
     phone: { type: String },
     email: { type: String },
     message: { type: String },
+    isRead: { type: Boolean },
     ownerId: { type: Schema.Types.ObjectId },
     propertyId: { type: Schema.Types.ObjectId },
   },

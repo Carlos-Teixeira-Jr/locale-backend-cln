@@ -48,7 +48,7 @@ export class NotificationService {
 
   async findNotByUserId(id: Schema.Types.ObjectId): Promise<INotification[]> {
     try {
-      this.logger.log({ id }, 'start findOne')
+      this.logger.log({ id }, 'start find one by user id > [service]')
 
       const notification: INotification[] = await this.notificationModel
         .find({ userId: id })
@@ -72,7 +72,10 @@ export class NotificationService {
 
   async updateNotifications(notifications: INotification[]) {
     try {
-      this.logger.log({ notifications }, 'start findOne')
+      this.logger.log(
+        { notifications },
+        'start update notification > [service]',
+      )
 
       const notesIds = []
 
