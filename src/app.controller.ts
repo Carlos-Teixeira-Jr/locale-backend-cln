@@ -8,6 +8,7 @@ import { TagDto } from 'modules/property/dto/tag.dto'
 import { AuthService } from 'modules/auth/auth.service'
 import { SendEmailToLocaleDto } from 'app-dto/sendEmailToLocale.dto'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
+import { ITag } from 'common/schemas/Tag.schema'
 
 @ApiTags('app')
 @Controller()
@@ -35,9 +36,12 @@ export class AppController {
     return await this.appService.shortcut(queryFilter)
   }
 
+  @ApiOperation({
+    summary: 'Returns all tags.',
+  })
   @Get('/tag')
-  async findAllTags(): Promise<{ name: string; amount: number }[]> {
-    this.logger.log({}, 'findAllTags')
+  async findAllTags(): Promise<ITag[]> {
+    this.logger.log({}, 'find all tags > [controller]')
     return await this.appService.findAllTags()
   }
 
