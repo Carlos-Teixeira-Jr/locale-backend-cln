@@ -132,11 +132,11 @@ export class MessageService {
     try {
       this.logger.log(
         { findByPropertyIdDto },
-        'start find-messages-by-property-id',
+        'start find-messages-by-property-id > [service]',
       )
 
       const { propertyId, page } = findByPropertyIdDto
-      const limit = 2
+      const limit = 5
       const skip = (page - 1) * limit
 
       const property: IProperty = await this.propertyModel.findById(propertyId)
