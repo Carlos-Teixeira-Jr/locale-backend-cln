@@ -6,7 +6,7 @@ import {
 } from 'common/schemas/Message_owner.schema'
 import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import { LoggerService } from 'modules/logger/logger.service'
-import { Model } from 'mongoose'
+import { Model, Schema } from 'mongoose'
 import { CreateMessageDto } from './dto/create-message.dto'
 import { IOwner, OwnerModelName } from 'common/schemas/Owner.schema'
 import { FindByPropertyIdDto } from './dto/find-by-prperty-id.dto'
@@ -168,6 +168,64 @@ export class MessageService {
         messages,
         property,
       }
+    } catch (error) {
+      this.logger.error({
+        error: JSON.stringify(error),
+        exception: '> exception',
+      })
+      throw error
+    }
+  }
+
+  async updateMessages(
+    updateMessagesDto: IMessageOwner[],
+  ): Promise<{ success: boolean }> {
+    try {
+      this.logger.log(
+        { updateMessagesDto },
+        'start update messages > [service]',
+      )
+
+      const messagesIds: string[] = []
+
+      updateMessagesDto.forEach(item => {
+        messagesIds.push(item._id)
+      })
+
+      // Atualiza os documentos com os IDs presentes em notesIds
+      const result = await this.messageModel.updateMany(
+        { _id: { $in: messagesIds } },
+        { $set: { isRead: true } },
+      )
+
+      // Verifica se houve algum erro durante a atualização
+      if (result.modifiedCount !== messagesIds.length) {
+        throw new Error('Erro ao atualizar as mensagens')
+      }
+
+      return { success: true }
+    } catch (error) {
+      this.logger.error({
+        error: JSON.stringify(error),
+        exception: '> exception',
+      })
+      throw error
+    }
+  }
+
+  async deleteMessageById(
+    messageId: Schema.Types.ObjectId,
+  ): Promise<{ success: boolean }> {
+    try {
+      this.logger.log({ messageId }, 'start delete message by id > [service]')
+
+      const result = await this.messageModel.deleteOne({ _id: messageId })
+
+      if (result.deletedCount === 0) {
+        throw new Error('Documento não encontrado para deletar.')
+      }
+
+      return { success: true }
     } catch (error) {
       this.logger.error({
         error: JSON.stringify(error),
