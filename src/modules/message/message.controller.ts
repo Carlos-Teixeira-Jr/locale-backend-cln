@@ -2,8 +2,8 @@ import { Body, Controller, Post } from '@nestjs/common'
 import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import { LoggerService } from 'modules/logger/logger.service'
 import {
+  IMessagesByOwnerOut,
   IMessagesByPropIdOut,
-  IMessagesWithPagination,
   MessageService,
 } from './message.service'
 import { IMessageOwner } from 'common/schemas/Message_owner.schema'
@@ -35,7 +35,7 @@ export class MessageController {
   @Post('find-all-by-ownerId')
   async findAllByOwnerId(
     @Body() getAllByOwnerIdDto: GetAllByOwnerIdDto,
-  ): Promise<IMessagesWithPagination> {
+  ): Promise<IMessagesByOwnerOut> {
     this.logger.log({}, 'find all by owner id > [controller]')
 
     return await this.messageService.findAllByOwnerId(getAllByOwnerIdDto)

@@ -13,7 +13,7 @@ import { FindByPropertyIdDto } from './dto/find-by-prperty-id.dto'
 import { IProperty, PropertyModelName } from 'common/schemas/Property.schema'
 import { GetAllByOwnerIdDto } from './dto/get-all-by-owner-id.dto'
 
-export interface IMessagesWithPagination {
+export interface IMessagesByOwnerOut {
   docs: IMessageOwner[]
   properties: IProperty[]
   totalPages: number
@@ -22,7 +22,7 @@ export interface IMessagesWithPagination {
 
 export interface IMessagesByPropIdOut {
   messages: {
-    messagesDocs: IMessageOwner[]
+    docs: IMessageOwner[]
     count: number
     totalPages: number
   }
@@ -70,7 +70,7 @@ export class MessageService {
 
   async findAllByOwnerId(
     getAllByOwnerIdDto: GetAllByOwnerIdDto,
-  ): Promise<IMessagesWithPagination> {
+  ): Promise<IMessagesByOwnerOut> {
     try {
       this.logger.log({}, 'start findAll')
 
@@ -147,7 +147,7 @@ export class MessageService {
         )
       }
 
-      const messagesDocs = await this.messageModel
+      const docs = await this.messageModel
         .find({ propertyId: propertyId })
         .skip(skip)
         .limit(limit)
@@ -159,7 +159,7 @@ export class MessageService {
       const totalPages = Math.ceil(count / limit)
 
       const messages = {
-        messagesDocs,
+        docs,
         count,
         totalPages,
       }
