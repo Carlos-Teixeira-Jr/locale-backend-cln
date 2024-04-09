@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer'
 import {
+  IsEmail,
   IsNotEmpty,
   IsNumber,
   IsObject,
@@ -15,7 +16,7 @@ import { Schema } from 'mongoose'
 export class OwnerDto {
   @IsNotEmpty()
   @Validate(IDValidator)
-  id: Schema.Types.ObjectId
+  _id: Schema.Types.ObjectId
 
   @IsNotEmpty()
   @IsString()
@@ -55,6 +56,7 @@ export class UserDto {
 
   @IsNotEmpty()
   @IsString()
+  @IsEmail()
   email: string
 
   @IsNotEmpty()

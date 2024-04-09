@@ -20,6 +20,13 @@ import * as bcrypt from 'bcrypt'
 import { DeleteUserDto } from './dto/delete-user.dto'
 import { ITag, TagModelName } from 'common/schemas/Tag.schema'
 import { ILocation, LocationModelName } from 'common/schemas/Location.schema'
+import axios from 'axios'
+import { FindByUsernameDto } from './dto/find-by-username.dto'
+
+export type FindUserByOwnerOut = {
+  owner: IOwner
+  user: IUser
+}
 
 export type User = {
   userId: number
@@ -36,6 +43,22 @@ export interface IFavPropertiesReturn {
   docs: IProperty[]
   totalPages: number
   count: number
+}
+
+export type PartialUserData = {
+  _id: Schema.Types.ObjectId
+  email: string
+  username: string
+  picture: string
+  address: {
+    zipCode: string
+    city: string
+    uf: string
+    streetName: string
+    streetNumber: string
+    complement: string
+    neighborhood: string
+  }
 }
 
 @Injectable()
@@ -55,9 +78,9 @@ export class UsersService {
     private readonly locationModel: Model<ILocation>,
   ) {}
 
-  async findOne(_id: string) {
+  async findOne(_id: Schema.Types.ObjectId): Promise<PartialUserData> {
     try {
-      this.logger.log({ _id }, 'findOne')
+      this.logger.log({ _id }, 'start find user by id > [service]')
 
       const user = await this.userModel.findById(_id)
 
@@ -81,9 +104,9 @@ export class UsersService {
     }
   }
 
-  async findOneByUsername(username: string): Promise<IUser> {
+  async findOneByUsername(username: FindByUsernameDto): Promise<IUser> {
     try {
-      this.logger.log({ username }, 'findOneByUsername')
+      this.logger.log({ username }, 'start find user by username > [service]')
 
       const user = await this.userModel.findOne({ username: username })
 
@@ -160,11 +183,13 @@ export class UsersService {
     }
   }
 
-  async findUserByOwner(ownerId: Schema.Types.ObjectId) {
+  async findUserByOwner(
+    ownerId: Schema.Types.ObjectId,
+  ): Promise<FindUserByOwnerOut> {
     try {
       this.logger.log({}, 'find user by owner')
 
-      const owner = await this.ownerModel.findById(ownerId).lean()
+      const owner = await this.ownerModel.findById(ownerId)
 
       if (!owner)
         throw new NotFoundException(
@@ -173,12 +198,10 @@ export class UsersService {
 
       const { userId } = owner
 
-      const user = await this.userModel
-        .find({
-          _id: userId,
-          isActive: true,
-        })
-        .lean()
+      const user = await this.userModel.find({
+        _id: userId,
+        isActive: true,
+      })
 
       const ownerData = {
         owner,
@@ -197,7 +220,7 @@ export class UsersService {
 
   async editUser(body: EditUserDto) {
     try {
-      this.logger.log({ body }, 'start edit user / owner')
+      this.logger.log({ body }, 'start edit user > [service]')
 
       const {
         id: userId,
@@ -219,7 +242,7 @@ export class UsersService {
       //let profilePicture: string
 
       if (body.owner) {
-        ownerId = body.owner.id
+        ownerId = body.owner._id
         ownerName = body.owner.ownername
         user = body.owner.userId
         phone = body.owner.phone
@@ -340,7 +363,7 @@ export class UsersService {
     }
   }
 
-  async editCreditCard(body: EditCreditCardDto) {
+  async editCreditCard(body: EditCreditCardDto): Promise<{ success: boolean }> {
     try {
       this.logger.log({}, 'edit credit card')
 
@@ -654,7 +677,9 @@ export class UsersService {
     }
   }
 
-  async deleteUser(deleteUserDto: DeleteUserDto) {
+  async deleteUser(
+    deleteUserDto: DeleteUserDto,
+  ): Promise<{ success: boolean }> {
     const mongodbUri = `${process.env.DB_HOST}`
     const db = await mongoose.createConnection(mongodbUri).asPromise()
     const session = await db.startSession()
@@ -674,7 +699,10 @@ export class UsersService {
         )
       }
 
-      const deactivatedEmail = `${new Date().getTime()} - ${foundUser.email}`
+      // Cadastra no DB a data e hora em que o usuário desativou sua conta;
+      const deactivatedEmail = `${new Date().toLocaleString()} - ${
+        foundUser.email
+      }`
 
       await this.userModel.updateOne(
         { _id: userId },
@@ -755,18 +783,11 @@ export class UsersService {
         // Charges
         if (foundOwner.paymentData.subscriptionId) {
           const subscriptionId = foundOwner.paymentData.subscriptionId
-          const response = await fetch(
+          const response = await axios.delete(
             `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
-            {
-              method: 'DELETE',
-              headers: {
-                'Content-Type': 'application/json',
-                access_token: process.env.ASSAS_API_KEY || '',
-              },
-            },
           )
 
-          if (response.ok) {
+          if (response.status >= 200 && response.status < 300) {
             // Remover a propriedade na memória
             delete foundOwner.paymentData.subscriptionId
 
@@ -774,6 +795,7 @@ export class UsersService {
             await this.ownerModel.updateOne(
               { _id: foundOwner._id },
               { $unset: { subscriptionId: 1 } },
+              opt,
             )
           } else {
             throw new BadRequestException(
