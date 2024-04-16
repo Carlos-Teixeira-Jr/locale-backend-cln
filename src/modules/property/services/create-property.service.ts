@@ -87,7 +87,12 @@ export class CreateProperty_Service {
         user,
         selectedPlan,
         ownerPreviousPlan,
-      } = await this.getUserAndOwner(userData, isPlanFree, plan, session)
+      } = await this.getUserAndOwner(
+        userData, 
+        isPlanFree, 
+        plan, 
+        session
+      )
 
       await this.handleCustomer(
         isPlanFree,
@@ -106,6 +111,7 @@ export class CreateProperty_Service {
           creditCardData,
           cellPhone,
           ownerPreviousPlan,
+          session
         )
       }
 
@@ -338,6 +344,7 @@ export class CreateProperty_Service {
     creditCardData: CreditCardData,
     cellPhone: string,
     ownerPreviousPlan: string,
+    session: any
   ) {
     let cpfCnpj: string
     let expiry: string
@@ -478,41 +485,45 @@ export class CreateProperty_Service {
               const updatedSubscriptionId = responseData.id
 
               //Atualizar os créditos do usuário
-              await this.ownerModel.findByIdAndUpdate(owner._id, {
-                adCredits: selectedPlan.commonAd,
-                highlightCredits: selectedPlan.highlightAd,
-                plan: selectedPlan._id,
-                'paymentData.subscriptionId': updatedSubscriptionId,
-              })
+              await this.ownerModel.updateOne({_id: owner._id}, 
+                {
+                  set: {
+                    adCredits: selectedPlan.commonAd,
+                    highlightCredits: selectedPlan.highlightAd,
+                    plan: selectedPlan._id,
+                    'paymentData.subscriptionId': updatedSubscriptionId,
+                  }
+                }, { session }
+              )
             } else {
               throw new Error(
                 `O usuário não tem mais créditos disponíveis para anunciar.`,
               )
             }
             // Chamada pra api de pagamento "subscription" no caso de o usuário já ter seus dados de cartão salvos no banco;
-            // const response = await axios.post(
-            //   `${process.env.PAYMENT_URL}/payment/subscription`,
-            //   {
-            //     billingType: 'CREDIT_CARD',
-            //     cycle: 'MONTHLY',
-            //     customer: paymentData.customerId,
-            //     value: price,
-            //     nextDueDate: formattedDate,
-            //     creditCardToken: paymentData.creditCardInfo.creditCardToken,
-            //   },
-            //   {
-            //     headers: {
-            //       'Content-Type': 'application/json',
-            //       access_token: process.env.ASAAS_API_KEY || '',
-            //     },
-            //   },
-            // )
+            const response = await axios.post(
+              `${process.env.PAYMENT_URL}/payment/subscription`,
+              {
+                billingType: 'CREDIT_CARD',
+                cycle: 'MONTHLY',
+                customer: paymentData.customerId,
+                value: price,
+                nextDueDate: formattedDate,
+                creditCardToken: paymentData.creditCardInfo.creditCardToken,
+              },
+              {
+                headers: {
+                  'Content-Type': 'application/json',
+                  access_token: process.env.ASAAS_API_KEY || '',
+                },
+              },
+            )
 
-            // if (response.status <= 200 && response.status > 300) {
-            //   throw new Error(
-            //     `Falha ao gerar a cobrança: ${response.statusText}`,
-            //   )
-            // }
+            if (response.status <= 200 && response.status > 300) {
+              throw new Error(
+                `Falha ao gerar a cobrança: ${response.statusText}`,
+              )
+            }
           }
 
           // Decrementar o número de créditos disponíveis do usuário;
