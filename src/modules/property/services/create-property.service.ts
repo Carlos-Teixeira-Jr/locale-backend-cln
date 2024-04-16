@@ -136,7 +136,7 @@ export class CreateProperty_Service {
         error: JSON.stringify(error),
         exception: '> exception',
       })
-      throw error
+      return { message: error.message }
     } finally {
       session.endSession()
     }
@@ -170,6 +170,8 @@ export class CreateProperty_Service {
       wppNumber,
       profilePicture,
     } = userData
+
+    let selectedPlan: IPlan
 
     // Verificar se o usuário já está cadastrado
     if (userId) {
@@ -236,8 +238,6 @@ export class CreateProperty_Service {
       isActive: true,
     })
 
-    let selectedPlan: IPlan
-
     if (!ownerExists) {
       // Criar um novo proprietário
       const ownerData: IOwnerData = {
@@ -268,13 +268,19 @@ export class CreateProperty_Service {
       ownerPreviousPlan = ownerExists.plan
     }
 
+    selectedPlan = await this.planModel.findById(plan)
+
+    if (!selectedPlan) {
+      throw new Error(`Plano com o id: ${plan} não encontrado.`)
+    }
+
     return {
       owner,
       userAlreadyExists,
       user,
       selectedPlan,
       ownerPreviousPlan,
-      selectedPlanData: selectedPlan,
+      // selectedPlanData: selectedPlan,
     }
   }
 
@@ -352,7 +358,7 @@ export class CreateProperty_Service {
     }
 
     if (!isPlanFree) {
-      if (adCredits < 1) {
+      if (ownerActualPlan === planId && adCredits < 1) {
         throw new BadRequestException(
           `O usuário não tem mais créditos para criar um novo anúncio.`,
         )
@@ -422,7 +428,7 @@ export class CreateProperty_Service {
           throw new Error(`Falha ao gerar a cobrança: ${response.statusText}`)
         }
       } else {
-        //Buscr a assinatura do usuário para verificar a data de cobrança;
+        //Buscar a assinatura do usuário para verificar a data de cobrança;
         const subscriptionId = owner.paymentData.subscriptionId
         const response = await axios.get(
           `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
@@ -444,7 +450,7 @@ export class CreateProperty_Service {
               const subscriptionId = paymentData.subscriptionId
               const response = await axios.post(
                 //Atualiza o valor do plano;
-                `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
+                `${process.env.PAYMENT_URL}/payment/update-subscription/${subscriptionId}`,
                 {
                   billingType: 'CREDIT_CARD',
                   cycle: 'MONTHLY',
@@ -467,71 +473,46 @@ export class CreateProperty_Service {
                   `Falha ao atualizar a assinatura: ${response.statusText}`,
                 )
               }
+
+              const responseData = response.data
+              const updatedSubscriptionId = responseData.id
+
+              //Atualizar os créditos do usuário
+              await this.ownerModel.findByIdAndUpdate(owner._id, {
+                adCredits: selectedPlan.commonAd,
+                highlightCredits: selectedPlan.highlightAd,
+                plan: selectedPlan._id,
+                'paymentData.subscriptionId': updatedSubscriptionId,
+              })
+            } else {
+              throw new Error(
+                `O usuário não tem mais créditos disponíveis para anunciar.`,
+              )
             }
             // Chamada pra api de pagamento "subscription" no caso de o usuário já ter seus dados de cartão salvos no banco;
-            const response = await axios.post(
-              `${process.env.PAYMENT_URL}/payment/subscription`,
-              {
-                billingType: 'CREDIT_CARD',
-                cycle: 'MONTHLY',
-                customer: paymentData.customerId,
-                value: price,
-                nextDueDate: formattedDate,
-                creditCardToken: paymentData.creditCardInfo.creditCardToken,
-              },
-              {
-                headers: {
-                  'Content-Type': 'application/json',
-                  access_token: process.env.ASAAS_API_KEY || '',
-                },
-              },
-            )
+            // const response = await axios.post(
+            //   `${process.env.PAYMENT_URL}/payment/subscription`,
+            //   {
+            //     billingType: 'CREDIT_CARD',
+            //     cycle: 'MONTHLY',
+            //     customer: paymentData.customerId,
+            //     value: price,
+            //     nextDueDate: formattedDate,
+            //     creditCardToken: paymentData.creditCardInfo.creditCardToken,
+            //   },
+            //   {
+            //     headers: {
+            //       'Content-Type': 'application/json',
+            //       access_token: process.env.ASAAS_API_KEY || '',
+            //     },
+            //   },
+            // )
 
-            if (response.status <= 200 && response.status > 300) {
-              throw new Error(
-                `Falha ao gerar a cobrança: ${response.statusText}`,
-              )
-            }
-          } else if (planId !== ownerPreviousPlan) {
-            //Atualiza o valor do plano
-            const response = await axios.post(
-              `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
-              {
-                billingType: 'CREDIT_CARD',
-                cycle: 'MONTHLY',
-                customer: paymentData.customerId,
-                value: price,
-                nextDueDate: formattedDate,
-                updatePendingPayments: true,
-                creditCard: {
-                  holderName: cardName,
-                  number: cardNumber,
-                  expiryMonth,
-                  expiryYear,
-                  ccv,
-                },
-                creditCardHolderInfo: {
-                  name: cardName,
-                  email,
-                  phone: cellPhone,
-                  cpfCnpj,
-                  postalCode: address.zipCode,
-                  addressNumber: address.streetNumber,
-                },
-              },
-              {
-                headers: {
-                  'Content-Type': 'application/json',
-                  access_token: process.env.ASAAS_API_KEY || '',
-                },
-              },
-            )
-
-            if (response.status <= 200 && response.status > 300) {
-              throw new BadRequestException(
-                'Não foi possível atualizar a assinatura.',
-              )
-            }
+            // if (response.status <= 200 && response.status > 300) {
+            //   throw new Error(
+            //     `Falha ao gerar a cobrança: ${response.statusText}`,
+            //   )
+            // }
           }
 
           // Decrementar o número de créditos disponíveis do usuário;

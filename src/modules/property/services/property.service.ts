@@ -424,47 +424,6 @@ export class PropertyService {
     }
   }
 
-  // async uploadPropertyImages(
-  //   files: Array<Express.Multer.File>,
-  //   propertyId: Schema.Types.ObjectId,
-  // ) {
-  //   try {
-  //     this.logger.log({ propertyId }, 'start upload property images')
-
-  //     const storedImages = await this.propertyModel.findById(propertyId).lean()
-
-  //     const { images } = storedImages
-
-  //     if (images.length + files.length > 50) {
-  //       throw new BadRequestException(
-  //         `A requisição excede o limite de 50 imagens. Imagens salvas anteriormente: ${images.length} - Imagens adicionadas nesta requisição: ${files.length}.`,
-  //       )
-  //     }
-
-  //     const propertyFound = await this.propertyModel.findById(propertyId)
-
-  //     if (!propertyFound) {
-  //       throw new NotFoundException(
-  //         `O imóvel com o id "${propertyId}" não foi encontrado.`,
-  //       )
-  //     }
-  //     const uploadedImages = await uploadFile(files, 'images')
-
-  //     await this.propertyModel.updateOne(
-  //       { _id: propertyId },
-  //       { $push: { images: { $each: uploadedImages } } },
-  //     )
-
-  //     return { success: true }
-  //   } catch (error) {
-  //     this.logger.error({
-  //       error: JSON.stringify(error),
-  //       exception: '> exception',
-  //     })
-  //     throw error
-  //   }
-  // }
-
   async uploadPropertyImages(
     files: Array<Express.Multer.File>,
     propertyId: Schema.Types.ObjectId,

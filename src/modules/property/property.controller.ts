@@ -64,7 +64,9 @@ export class PropertyController {
   async createOne(
     @Body() createPropertyDto: CreatePropertyDto,
   ): Promise<IProperty> {
-    this.logger.log({}, 'createOne')
+    this.logger.log({}, 'createOne');
+
+    
     return this.propertyService.createOne(createPropertyDto)
   }
 

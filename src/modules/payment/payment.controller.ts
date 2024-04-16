@@ -4,6 +4,8 @@ import { PaymentService } from './payment.service'
 import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import { IPayment, OwnerParams } from 'common/schemas/Payment.schema'
 import { CreatePaymentDto } from './dto/createpayment.dto'
+import { IncreaseCreditsDto } from './dto/increase-credits.dto'
+import { Schema } from 'mongoose'
 
 @Controller('payment')
 export class PaymentController {
@@ -23,5 +25,17 @@ export class PaymentController {
     const owner_id = params.owner_id
 
     return this.paymentService.createOne(owner_id, createPaymentDto)
+  }
+
+  @Post('increase-credits/:id')
+  async increaseCredits(
+    @Param('id') ownerId: Schema.Types.ObjectId,
+    @Body() IncreaseCreditsDto: IncreaseCreditsDto
+  ): Promise<{ success: boolean }> {
+    this.logger.log({IncreaseCreditsDto, ownerId}, 'start increaseCredits > [controller]')
+
+    const success = await this.paymentService.increaseCredits(IncreaseCreditsDto, ownerId)
+
+    return success;
   }
 }
