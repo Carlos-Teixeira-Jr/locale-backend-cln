@@ -89,6 +89,7 @@ export class PaymentService {
           `O proprietário com o id: ${ownerId} não foi encontrado.`,
         )
 
+        // Atualiza a quantidade de créditos do usuário
       await this.ownerModel.updateOne(
         {
           _id: ownerId,
