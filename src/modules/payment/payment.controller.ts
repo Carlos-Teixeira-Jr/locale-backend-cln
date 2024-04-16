@@ -30,12 +30,18 @@ export class PaymentController {
   @Post('increase-credits/:id')
   async increaseCredits(
     @Param('id') ownerId: Schema.Types.ObjectId,
-    @Body() IncreaseCreditsDto: IncreaseCreditsDto
+    @Body() increaseCreditsDto: IncreaseCreditsDto,
   ): Promise<{ success: boolean }> {
-    this.logger.log({IncreaseCreditsDto, ownerId}, 'start increaseCredits > [controller]')
+    this.logger.log(
+      { increaseCreditsDto, ownerId },
+      'start increaseCredits > [controller]',
+    )
 
-    const success = await this.paymentService.increaseCredits(IncreaseCreditsDto, ownerId)
+    const success = await this.paymentService.increaseCredits(
+      increaseCreditsDto,
+      ownerId,
+    )
 
-    return success;
+    return success
   }
 }

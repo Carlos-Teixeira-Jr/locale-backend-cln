@@ -62,14 +62,17 @@ export class PaymentService {
     }
   }
 
-  async increaseCredits(increaseCreditsDto: IncreaseCreditsDto, ownerId: Schema.Types.ObjectId): Promise<{ success: boolean }> {
+  async increaseCredits(
+    increaseCreditsDto: IncreaseCreditsDto,
+    ownerId: Schema.Types.ObjectId,
+  ): Promise<{ success: boolean }> {
     try {
-      this.logger.log({}, 'start increaseCredits > [service]');
+      this.logger.log({}, 'start increaseCredits > [service]')
 
-      const { credits } = increaseCreditsDto;
+      const { credits } = increaseCreditsDto
 
-      let commonCredits = [];
-      let highlightCredits = [];
+      const commonCredits = []
+      const highlightCredits = []
 
       credits.forEach(element => {
         if (element.type === 'adCredits') {
@@ -77,20 +80,26 @@ export class PaymentService {
         } else if (element.type === 'highlightCredits') {
           highlightCredits.push(element)
         }
-      });
-
-      const owner = await this.ownerModel.findById(ownerId);
-
-      if (!owner) throw new Error(`O proprietário com o id: ${ownerId} não foi encontrado.`);
-
-      await this.ownerModel.updateOne({
-        _id: ownerId
-      }, {
-        adCredits: owner.adCredits + commonCredits[0].amount,
-        highlightCredits: owner.highlightCredits + highlightCredits[0].amount
       })
 
-      return {success: true}
+      const owner = await this.ownerModel.findById(ownerId)
+
+      if (!owner)
+        throw new Error(
+          `O proprietário com o id: ${ownerId} não foi encontrado.`,
+        )
+
+      await this.ownerModel.updateOne(
+        {
+          _id: ownerId,
+        },
+        {
+          adCredits: owner.adCredits + commonCredits[0].amount,
+          highlightCredits: owner.highlightCredits + highlightCredits[0].amount,
+        },
+      )
+
+      return { success: true }
     } catch (error) {
       this.logger.error({
         error: JSON.stringify(error),

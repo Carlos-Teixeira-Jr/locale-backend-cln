@@ -87,12 +87,7 @@ export class CreateProperty_Service {
         user,
         selectedPlan,
         ownerPreviousPlan,
-      } = await this.getUserAndOwner(
-        userData, 
-        isPlanFree, 
-        plan, 
-        session
-      )
+      } = await this.getUserAndOwner(userData, isPlanFree, plan, session)
 
       await this.handleCustomer(
         isPlanFree,
@@ -111,7 +106,7 @@ export class CreateProperty_Service {
           creditCardData,
           cellPhone,
           ownerPreviousPlan,
-          session
+          session,
         )
       }
 
@@ -344,7 +339,7 @@ export class CreateProperty_Service {
     creditCardData: CreditCardData,
     cellPhone: string,
     ownerPreviousPlan: string,
-    session: any
+    session: any,
   ) {
     let cpfCnpj: string
     let expiry: string
@@ -355,6 +350,7 @@ export class CreateProperty_Service {
     const { address, email } = userData
     const { paymentData, adCredits, plan: ownerActualPlan } = owner
     const { price, _id: planId } = selectedPlan
+    const previousPlanData = await this.planModel.findById(ownerPreviousPlan)
 
     if (creditCardData !== undefined) {
       cpfCnpj = creditCardData.cpfCnpj
@@ -485,50 +481,83 @@ export class CreateProperty_Service {
               const updatedSubscriptionId = responseData.id
 
               //Atualizar os créditos do usuário
-              await this.ownerModel.updateOne({_id: owner._id}, 
+              await this.ownerModel.updateOne(
+                { _id: owner._id },
                 {
                   set: {
                     adCredits: selectedPlan.commonAd,
                     highlightCredits: selectedPlan.highlightAd,
                     plan: selectedPlan._id,
                     'paymentData.subscriptionId': updatedSubscriptionId,
-                  }
-                }, { session }
+                  },
+                },
+                { session },
               )
             } else {
               throw new Error(
                 `O usuário não tem mais créditos disponíveis para anunciar.`,
               )
             }
-            // Chamada pra api de pagamento "subscription" no caso de o usuário já ter seus dados de cartão salvos no banco;
-            const response = await axios.post(
-              `${process.env.PAYMENT_URL}/payment/subscription`,
-              {
-                billingType: 'CREDIT_CARD',
-                cycle: 'MONTHLY',
-                customer: paymentData.customerId,
-                value: price,
-                nextDueDate: formattedDate,
-                creditCardToken: paymentData.creditCardInfo.creditCardToken,
-              },
-              {
-                headers: {
-                  'Content-Type': 'application/json',
-                  access_token: process.env.ASAAS_API_KEY || '',
-                },
-              },
-            )
+            // Chamada pra api de pagamento "subscription" para pagar a diferença de valor no caso de o usuário já ter seus dados de cartão salvos no banco;
 
-            if (response.status <= 200 && response.status > 300) {
-              throw new Error(
-                `Falha ao gerar a cobrança: ${response.statusText}`,
+            // To-do: Pra mostrar os dados do cartão na tela tem que usar SSL (HTTPS);
+
+            // To-do: Implementar timeout de 60s para evitar duplicidade e bloqueio do cartão
+
+            // To-do: Verificar a necessidade de passar o remoteIp do usuário na req;
+            if (selectedPlan.price !== previousPlanData.price) {
+              const priceDifference =
+                price > previousPlanData.price
+                  ? price - previousPlanData.price
+                  : price
+              const response = await axios.post(
+                `${process.env.PAYMENT_URL}/payment/subscription`,
+                {
+                  billingType: 'CREDIT_CARD',
+                  cycle: 'MONTHLY',
+                  customer: paymentData.customerId,
+                  value: priceDifference,
+                  dueDate: formattedDate,
+                  creditCardToken: paymentData.creditCardInfo.creditCardToken,
+                },
+                {
+                  headers: {
+                    'Content-Type': 'application/json',
+                    access_token: process.env.ASAAS_API_KEY || '',
+                  },
+                },
               )
+
+              if (response.status <= 200 && response.status > 300) {
+                throw new Error(
+                  `Falha ao gerar a cobrança: ${response.statusText}`,
+                )
+              }
             }
           }
 
           // Decrementar o número de créditos disponíveis do usuário;
           owner.adCredits = owner.adCredits - 1
-          await owner.save()
+          try {
+            const result = await this.ownerModel.updateOne(
+              { _id: owner._id },
+              {
+                adCredits: selectedPlan.commonAd - 1,
+                highlighCredits: selectedPlan.highlightAd,
+              },
+              { session },
+            )
+
+            if (result.modifiedCount < 0) {
+              throw new Error(
+                `Não foi possível atualizar os créditos do proprietário.`,
+              )
+            }
+          } catch (error) {
+            throw new Error(
+              `Não foi possível atualizar os créditos do proprietário.`,
+            )
+          }
         } else {
           throw new NotFoundException('Assinatura não encontrada.')
         }
