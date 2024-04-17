@@ -1,4 +1,4 @@
-import mongoose, { Model, Schema } from 'mongoose'
+import mongoose, { Model, ObjectId, Schema } from 'mongoose'
 import {
   BadRequestException,
   Injectable,
@@ -22,6 +22,7 @@ import { ITag, TagModelName } from 'common/schemas/Tag.schema'
 import { ILocation, LocationModelName } from 'common/schemas/Location.schema'
 import axios from 'axios'
 import { FindByUsernameDto } from './dto/find-by-username.dto'
+import { IPlan, PlanModelName } from 'common/schemas/Plan.schema'
 
 export type FindUserByOwnerOut = {
   owner: IOwner
@@ -76,6 +77,8 @@ export class UsersService {
     private readonly tagModel: Model<ITag>,
     @InjectModel(LocationModelName)
     private readonly locationModel: Model<ILocation>,
+    @InjectModel(PlanModelName)
+    private readonly planModel: Model<IPlan>,
   ) {}
 
   async findOne(_id: Schema.Types.ObjectId): Promise<PartialUserData> {
@@ -239,6 +242,7 @@ export class UsersService {
       let phone: string
       let cellPhone
       let adCredits: number
+      let plan: ObjectId
       //let profilePicture: string
 
       if (body.owner) {
@@ -248,6 +252,7 @@ export class UsersService {
         phone = body.owner.phone
         cellPhone = body.owner.cellPhone
         adCredits = body.owner.adCredits
+        plan = body.owner.plan
       }
 
       const userExists = await this.userModel.findOne({ _id: userId })
@@ -327,6 +332,70 @@ export class UsersService {
           throw new NotFoundException(
             `O usuário com o id: ${userId} não possui nenhum anúncio cadastrado.`,
           )
+        }
+
+        // Atualizar plano do owner;
+        if (plan !== owner.plan) {
+          const selectedPlanData = await this.planModel.findById(plan)
+          const { 
+            subscriptionId, 
+            customerId, 
+            creditCardInfo 
+          } = owner.paymentData;
+          const { creditCardToken } = creditCardInfo;
+          let nextDueDate;
+
+          //Buscar a assinatura do usuário para verificar a data de cobrança;
+          const subscriptionData = await axios.get(
+            `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                access_token: process.env.ASAAS_API_KEY || '',
+              },
+            },
+          )
+
+          if (subscriptionData.status >= 200 && subscriptionData.status < 300) {
+            nextDueDate = subscriptionData.data.nextDueDate;
+          } else {
+            // Cria a data de vencimento para o caso do cliente anteriormente estar usando a conta grátis ou não ter conta;
+            const currentDate = new Date()
+            const year = currentDate.getFullYear()
+            const month = (currentDate.getMonth() + 1).toString().padStart(2, '0')
+            const day = currentDate.getDate().toString().padStart(2, '0')
+            const formattedDate = `${year}-${month}-${day}`
+
+            nextDueDate = formattedDate;
+          }
+
+          if (selectedPlanData.name !== 'Free') {
+            const response = await axios.post(
+              //Atualiza o valor do plano;
+              `${process.env.PAYMENT_URL}/payment/update-subscription/${subscriptionId}`,
+              {
+                billingType: 'CREDIT_CARD',
+                cycle: 'MONTHLY',
+                customer: customerId,
+                value: selectedPlanData.price,
+                nextDueDate,
+                updatePendingPayments: true,
+                creditCardToken,
+              },
+              {
+                headers: {
+                  'Content-Type': 'application/json',
+                  access_token: process.env.ASAAS_API_KEY || '',
+                },
+              },
+            )
+
+            if (response.status <= 200 && response.status > 300) {
+              throw new Error(
+                `Falha ao atualizar a assinatura: ${response.statusText}`,
+              )
+            }
+          }
         }
 
         await this.ownerModel.updateOne(

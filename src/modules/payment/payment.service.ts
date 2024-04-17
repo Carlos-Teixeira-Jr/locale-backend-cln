@@ -14,6 +14,7 @@ import { ObjectId } from 'mongodb'
 import { CreditsDto, IncreaseCreditsDto } from './dto/increase-credits.dto'
 import axios, { AxiosResponse } from 'axios'
 import { env } from 'process'
+import { IPlan, PlanModelName } from 'common/schemas/Plan.schema'
 
 type HandleUpdateSubscription = {
   success: boolean,
@@ -30,6 +31,8 @@ export class PaymentService {
     private readonly paymentModel: Model<IPayment>,
     @InjectModel(OwnerModelName)
     private readonly ownerModel: Model<IOwner>,
+    @InjectModel(PlanModelName)
+    private readonly planModel: Model<IPlan>
   ) {}
 
   private async startSession() {
@@ -103,6 +106,14 @@ export class PaymentService {
       if (!owner) {
         throw new Error(
           `O proprietário com o id: ${ownerId} não foi encontrado.`,
+        )
+      }
+
+      const ownerPlan = await this.planModel.findById(owner.plan);
+
+      if (ownerPlan.name !== 'Locale Plus') {
+        throw new Error(
+          `O proprietário com o id: ${ownerId} não possui uma conta Locale Plus.`,
         )
       }
 
