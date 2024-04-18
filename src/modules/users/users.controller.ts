@@ -73,17 +73,17 @@ export class UsersController {
   ): Promise<FindUserByOwnerOut> {
     this.logger.log({ ownerId }, 'start find user by owner id > [controller]')
 
-    return this.usersService.findUserByOwner(ownerId)
+    return this.usersService.findUserByOwner(ownerId);
   }
 
   @ApiOperation({
-    summary: 'Update the user data.',
+    summary: 'Update the user and owner data.',
   })
   @Post('edit-user')
   async editUser(@Body() body: EditUserDto): Promise<{ success: boolean }> {
-    this.logger.log({ body }, 'start edit user > [controller]')
+    this.logger.log({ body }, 'start edit user > [controller]');
 
-    return this.usersService.editUser(body)
+    return this.usersService.editUser(body);
   }
 
   @ApiOperation({

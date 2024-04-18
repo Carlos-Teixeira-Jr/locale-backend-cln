@@ -62,6 +62,35 @@ export type PartialUserData = {
   }
 }
 
+export type CreditCard = {
+  cardNumber: string,
+  cardName: string,
+  ccv: string,
+  expiry: string,
+  cpfCnpj: string
+}
+
+export type CreditCardHolderInfo = {
+  name: string,
+  email: string,
+  phone: string,
+  cpfCnpj: string,
+  postalCode: string,
+  addressNumber: string
+}
+
+export type UpdateSubscriptionBody = {
+  billingType: string,
+  cycle: string,
+  customer: string,
+  value: number,
+  nextDueDate: string,
+  updatePendingPayments: boolean,
+  creditCardToken?: string,
+  creditCard?: CreditCard,
+  creditCardHolderInfo?: CreditCardHolderInfo
+}
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -80,6 +109,12 @@ export class UsersService {
     @InjectModel(PlanModelName)
     private readonly planModel: Model<IPlan>,
   ) {}
+
+  private async startSession() {
+    const mongodbUri = `${process.env.DB_HOST}`
+    const db = await mongoose.createConnection(mongodbUri).asPromise()
+    return db.startSession()
+  }
 
   async findOne(_id: Schema.Types.ObjectId): Promise<PartialUserData> {
     try {
@@ -222,8 +257,13 @@ export class UsersService {
   }
 
   async editUser(body: EditUserDto) {
+    const session = await this.startSession()
     try {
+      await session.startTransaction()
       this.logger.log({ body }, 'start edit user > [service]')
+
+      // To-do: implementar rollback nesta rota;
+      //To-do: implementar caso em que o usuário troca o cartão no momento da atualização;
 
       const {
         id: userId,
@@ -243,7 +283,20 @@ export class UsersService {
       let cellPhone
       let adCredits: number
       let plan: ObjectId
+      let selectedPlanData: IPlan
       //let profilePicture: string
+
+      let updatedOwner
+      let response
+
+      let cardName;
+      let cardNumber;
+      let expiry;
+      let ccv;
+      let cpfCnpj;
+
+      let password
+      let passwordConfirmattion
 
       if (body.owner) {
         ownerId = body.owner._id
@@ -255,14 +308,22 @@ export class UsersService {
         plan = body.owner.plan
       }
 
+      if (body.creditCard !== undefined) {
+        cardName = body.creditCard.cardName;
+        cardNumber = body.creditCard.cardNumber;
+        expiry = body.creditCard.expiry;
+        ccv = body.creditCard.ccv;
+        cpfCnpj = body.creditCard.cpfCnpj;
+      }
+
       const userExists = await this.userModel.findOne({ _id: userId })
 
       if (!userExists || !userExists.isActive) {
         throw new NotFoundException(
           `Usuário com o id: ${userId} não foi encontrado`,
         )
-        // esse else não existia antes, só coloquei pra confirmar que o problema era no password
       } else {
+        // To-do: verificar se está atualizando a foto do usuário mesmo quando não é alterada;
         await this.userModel.updateOne(
           { _id: userId },
           {
@@ -274,11 +335,9 @@ export class UsersService {
               pricture: profilePicture,
             },
           },
+          { session }
         )
       }
-
-      let password
-      let passwordConfirmattion
 
       //  Lida com a edição da senha caso o usuário tenha trocado;
       if (body.password) {
@@ -318,12 +377,10 @@ export class UsersService {
                 picture: profilePicture,
               },
             },
+            { session }
           )
         }
       }
-
-      let updatedOwner
-      let response
 
       if (ownerId) {
         const owner = await this.ownerModel.findById(ownerId)
@@ -336,7 +393,7 @@ export class UsersService {
 
         // Atualizar plano do owner;
         if (plan !== owner.plan) {
-          const selectedPlanData = await this.planModel.findById(plan)
+          selectedPlanData = await this.planModel.findById(plan)
           const { 
             subscriptionId, 
             customerId, 
@@ -369,19 +426,40 @@ export class UsersService {
             nextDueDate = formattedDate;
           }
 
-          if (selectedPlanData.name !== 'Free') {
+          if (
+            selectedPlanData.name !== 'Free' && 
+            selectedPlanData._id !== owner.plan
+          ) {
+
+            // Token ou info do cartão?
+            let paymentBody: UpdateSubscriptionBody = {
+              billingType: 'CREDIT_CARD',
+              cycle: 'MONTHLY',
+              customer: customerId,
+              value: selectedPlanData.price,
+              nextDueDate,
+              updatePendingPayments: true,
+            }
+
+            // Se passou dados do cartão usa esses dados, se não tenta usar o token salvo do cartão;
+            if (body.creditCard !== undefined) {
+              paymentBody.creditCard = {
+                cardName: cardName,
+                cardNumber,
+                ccv,
+                expiry,
+                cpfCnpj
+              }
+            } else if (owner.paymentData.creditCardInfo.creditCardToken !== undefined) {
+              paymentBody.creditCardToken = creditCardToken
+            } else {
+              throw new BadRequestException(`Os dados do cartão de crédito não foram informados e não estão acessíveis na conta do usuário.`)
+            }
+
             const response = await axios.post(
               //Atualiza o valor do plano;
               `${process.env.PAYMENT_URL}/payment/update-subscription/${subscriptionId}`,
-              {
-                billingType: 'CREDIT_CARD',
-                cycle: 'MONTHLY',
-                customer: customerId,
-                value: selectedPlanData.price,
-                nextDueDate,
-                updatePendingPayments: true,
-                creditCardToken,
-              },
+              body,
               {
                 headers: {
                   'Content-Type': 'application/json',
@@ -408,8 +486,10 @@ export class UsersService {
               userId: user,
               adCredits,
               picture: profilePicture,
+              plan: selectedPlanData._id
             },
           },
+          { session }
         )
 
         updatedOwner = await this.ownerModel.findById(ownerId).lean()
@@ -422,8 +502,11 @@ export class UsersService {
 
       response = { success: true }
 
+      await session.commitTransaction()
+
       return response
     } catch (error) {
+      await session.abortTransaction()
       this.logger.error({
         error: JSON.stringify(error),
         exception: '> exception',

@@ -29,7 +29,7 @@ export async function getPropertiesData(
   }
 
   const ownerProperties = await propertyModel
-    .find({ owner: owner._id, isActive: true })
+    .find({ owner: owner._id })
     .skip(skip)
     .limit(limit)
 

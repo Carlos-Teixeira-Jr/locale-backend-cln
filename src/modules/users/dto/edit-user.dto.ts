@@ -13,6 +13,31 @@ import { IDValidator } from 'common/validators/ID.validator'
 import { PropertyAddressDto } from 'modules/property/dto/property.dto'
 import { Schema } from 'mongoose'
 
+export class CreditCard {
+  @IsString()
+  cardNumber: string
+
+  @IsString()
+  cardName: string
+
+  @IsString()
+  ccv: string
+
+  @IsString()
+  expiry: string
+
+  @IsString()
+  cpfCnpj: string
+}
+
+export class PaymentData {
+  @IsOptional()
+  @IsObject()
+  @ValidateNested({ each: true })
+  @Type(() => CreditCard)
+  creditCard: CreditCard
+}
+
 export class OwnerDto {
   @IsNotEmpty()
   @Validate(IDValidator)
@@ -43,6 +68,12 @@ export class OwnerDto {
 
   @IsString()
   profilePicture: string
+
+  // @IsOptional()
+  // @IsObject()
+  // @ValidateNested({ each: true })
+  // @Type(() => PaymentData)
+  // paymentData: PaymentData
 }
 
 export class UserDto {
@@ -95,4 +126,10 @@ export class EditUserDto {
   @IsOptional()
   @Type(() => EditPasswordDto)
   password: EditPasswordDto
+
+  @IsOptional()
+  @IsObject()
+  @ValidateNested({ each: true })
+  @Type(() => CreditCard)
+  creditCard: CreditCard
 }
