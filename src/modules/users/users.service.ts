@@ -63,31 +63,31 @@ export type PartialUserData = {
 }
 
 export type CreditCard = {
-  cardNumber: string,
-  cardName: string,
-  ccv: string,
-  expiry: string,
+  cardNumber: string
+  cardName: string
+  ccv: string
+  expiry: string
   cpfCnpj: string
 }
 
 export type CreditCardHolderInfo = {
-  name: string,
-  email: string,
-  phone: string,
-  cpfCnpj: string,
-  postalCode: string,
+  name: string
+  email: string
+  phone: string
+  cpfCnpj: string
+  postalCode: string
   addressNumber: string
 }
 
 export type UpdateSubscriptionBody = {
-  billingType: string,
-  cycle: string,
-  customer: string,
-  value: number,
-  nextDueDate: string,
-  updatePendingPayments: boolean,
-  creditCardToken?: string,
-  creditCard?: CreditCard,
+  billingType: string
+  cycle: string
+  customer: string
+  value: number
+  nextDueDate: string
+  updatePendingPayments: boolean
+  creditCardToken?: string
+  creditCard?: CreditCard
   creditCardHolderInfo?: CreditCardHolderInfo
 }
 
@@ -205,7 +205,7 @@ export class UsersService {
       const owner = await this.ownerModel
         .findOne({ userId, isActive: true })
         .select(
-          'adCredits plan phone cellPhone customerId paymentData _id name picture',
+          'adCredits highlightCredits plan phone cellPhone customerId paymentData _id name picture',
         )
 
       return {
@@ -289,11 +289,11 @@ export class UsersService {
       let updatedOwner
       let response
 
-      let cardName;
-      let cardNumber;
-      let expiry;
-      let ccv;
-      let cpfCnpj;
+      let cardName
+      let cardNumber
+      let expiry
+      let ccv
+      let cpfCnpj
 
       let password
       let passwordConfirmattion
@@ -309,11 +309,11 @@ export class UsersService {
       }
 
       if (body.creditCard !== undefined) {
-        cardName = body.creditCard.cardName;
-        cardNumber = body.creditCard.cardNumber;
-        expiry = body.creditCard.expiry;
-        ccv = body.creditCard.ccv;
-        cpfCnpj = body.creditCard.cpfCnpj;
+        cardName = body.creditCard.cardName
+        cardNumber = body.creditCard.cardNumber
+        expiry = body.creditCard.expiry
+        ccv = body.creditCard.ccv
+        cpfCnpj = body.creditCard.cpfCnpj
       }
 
       const userExists = await this.userModel.findOne({ _id: userId })
@@ -335,7 +335,7 @@ export class UsersService {
               pricture: profilePicture,
             },
           },
-          { session }
+          { session },
         )
       }
 
@@ -377,7 +377,7 @@ export class UsersService {
                 picture: profilePicture,
               },
             },
-            { session }
+            { session },
           )
         }
       }
@@ -394,13 +394,10 @@ export class UsersService {
         // Atualizar plano do owner;
         if (plan !== owner.plan) {
           selectedPlanData = await this.planModel.findById(plan)
-          const { 
-            subscriptionId, 
-            customerId, 
-            creditCardInfo 
-          } = owner.paymentData;
-          const { creditCardToken } = creditCardInfo;
-          let nextDueDate;
+          const { subscriptionId, customerId, creditCardInfo } =
+            owner.paymentData
+          const { creditCardToken } = creditCardInfo
+          let nextDueDate
 
           //Buscar a assinatura do usuário para verificar a data de cobrança;
           const subscriptionData = await axios.get(
@@ -414,25 +411,26 @@ export class UsersService {
           )
 
           if (subscriptionData.status >= 200 && subscriptionData.status < 300) {
-            nextDueDate = subscriptionData.data.nextDueDate;
+            nextDueDate = subscriptionData.data.nextDueDate
           } else {
             // Cria a data de vencimento para o caso do cliente anteriormente estar usando a conta grátis ou não ter conta;
             const currentDate = new Date()
             const year = currentDate.getFullYear()
-            const month = (currentDate.getMonth() + 1).toString().padStart(2, '0')
+            const month = (currentDate.getMonth() + 1)
+              .toString()
+              .padStart(2, '0')
             const day = currentDate.getDate().toString().padStart(2, '0')
             const formattedDate = `${year}-${month}-${day}`
 
-            nextDueDate = formattedDate;
+            nextDueDate = formattedDate
           }
 
           if (
-            selectedPlanData.name !== 'Free' && 
+            selectedPlanData.name !== 'Free' &&
             selectedPlanData._id !== owner.plan
           ) {
-
             // Token ou info do cartão?
-            let paymentBody: UpdateSubscriptionBody = {
+            const paymentBody: UpdateSubscriptionBody = {
               billingType: 'CREDIT_CARD',
               cycle: 'MONTHLY',
               customer: customerId,
@@ -448,12 +446,16 @@ export class UsersService {
                 cardNumber,
                 ccv,
                 expiry,
-                cpfCnpj
+                cpfCnpj,
               }
-            } else if (owner.paymentData.creditCardInfo.creditCardToken !== undefined) {
+            } else if (
+              owner.paymentData.creditCardInfo.creditCardToken !== undefined
+            ) {
               paymentBody.creditCardToken = creditCardToken
             } else {
-              throw new BadRequestException(`Os dados do cartão de crédito não foram informados e não estão acessíveis na conta do usuário.`)
+              throw new BadRequestException(
+                `Os dados do cartão de crédito não foram informados e não estão acessíveis na conta do usuário.`,
+              )
             }
 
             const response = await axios.post(
@@ -486,10 +488,10 @@ export class UsersService {
               userId: user,
               adCredits,
               picture: profilePicture,
-              plan: selectedPlanData._id
+              plan: selectedPlanData._id,
             },
           },
-          { session }
+          { session },
         )
 
         updatedOwner = await this.ownerModel.findById(ownerId).lean()

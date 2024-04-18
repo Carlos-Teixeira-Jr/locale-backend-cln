@@ -57,7 +57,7 @@ export class UsersController {
   async findOwnerByUserId(
     @Body() userId: GetOwnerByUserId,
   ): Promise<User_Owner> {
-    this.logger.log({ userId }, 'start find owner by user id > [controller]');
+    this.logger.log({ userId }, 'start find owner by user id > [controller]')
 
     const owner = await this.usersService.findOwnerByUserId(userId)
 
@@ -73,7 +73,7 @@ export class UsersController {
   ): Promise<FindUserByOwnerOut> {
     this.logger.log({ ownerId }, 'start find user by owner id > [controller]')
 
-    return this.usersService.findUserByOwner(ownerId);
+    return this.usersService.findUserByOwner(ownerId)
   }
 
   @ApiOperation({
@@ -81,9 +81,9 @@ export class UsersController {
   })
   @Post('edit-user')
   async editUser(@Body() body: EditUserDto): Promise<{ success: boolean }> {
-    this.logger.log({ body }, 'start edit user > [controller]');
+    this.logger.log({ body }, 'start edit user > [controller]')
 
-    return this.usersService.editUser(body);
+    return this.usersService.editUser(body)
   }
 
   @ApiOperation({

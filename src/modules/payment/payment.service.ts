@@ -13,12 +13,11 @@ import { IOwner, OwnerModelName } from 'common/schemas/Owner.schema'
 import { ObjectId } from 'mongodb'
 import { CreditsDto, IncreaseCreditsDto } from './dto/increase-credits.dto'
 import axios, { AxiosResponse } from 'axios'
-import { env } from 'process'
 import { IPlan, PlanModelName } from 'common/schemas/Plan.schema'
 
 type HandleUpdateSubscription = {
-  success: boolean,
-  newCreditsPrice: number,
+  success: boolean
+  newCreditsPrice: number
   nextDueDate: Date
 }
 
@@ -32,7 +31,7 @@ export class PaymentService {
     @InjectModel(OwnerModelName)
     private readonly ownerModel: Model<IOwner>,
     @InjectModel(PlanModelName)
-    private readonly planModel: Model<IPlan>
+    private readonly planModel: Model<IPlan>,
   ) {}
 
   private async startSession() {
@@ -83,7 +82,7 @@ export class PaymentService {
     increaseCreditsDto: IncreaseCreditsDto,
     ownerId: Schema.Types.ObjectId,
   ): Promise<{ success: boolean }> {
-    const session = await this.startSession();
+    const session = await this.startSession()
     try {
       await session.startTransaction()
       this.logger.log({}, 'start increaseCredits > [service]')
@@ -91,7 +90,6 @@ export class PaymentService {
       const { credits } = increaseCreditsDto
       const commonCredits = []
       const highlightCredits = []
-      let paymentData
 
       credits.forEach(element => {
         if (element.type === 'adCredits') {
@@ -109,7 +107,7 @@ export class PaymentService {
         )
       }
 
-      const ownerPlan = await this.planModel.findById(owner.plan);
+      const ownerPlan = await this.planModel.findById(owner.plan)
 
       if (ownerPlan.name !== 'Locale Plus') {
         throw new Error(
@@ -117,7 +115,7 @@ export class PaymentService {
         )
       }
 
-      paymentData = owner.paymentData
+      const paymentData = owner.paymentData
 
       // Atualizar a subscription do usuário;
       const { success } = await this.handleUpdateSubscription(
@@ -125,15 +123,6 @@ export class PaymentService {
         commonCredits,
         highlightCredits,
       )
-
-      // Fazer a cobrança da compra de créditos;
-      // if (success) {
-      //   const { success: charged } = await this.chargeNewCredits(
-      //     newCreditsPrice,
-      //     nextDueDate,
-      //     paymentData
-      //   )
-      // }
 
       // Atualiza a quantidade de créditos do usuário
       if (success) {
@@ -143,20 +132,24 @@ export class PaymentService {
           },
           {
             adCredits: owner.adCredits + commonCredits[0].amount,
-            highlightCredits: owner.highlightCredits + highlightCredits[0].amount,
+            highlightCredits:
+              owner.highlightCredits + highlightCredits[0].amount,
           },
-          { session }
+          { session },
         )
 
-        if (updateCredits.modifiedCount < 0) {
+        if (updateCredits.modifiedCount <= 0) {
           throw new Error(
             `Não foi possível atualizar os créditos do proprietário.`,
           )
         }
       }
 
+      await session.commitTransaction()
+
       return { success: true }
     } catch (error) {
+      await session.abortTransaction()
       this.logger.error({
         error: JSON.stringify(error),
         exception: '> exception',
@@ -239,7 +232,7 @@ export class PaymentService {
       return {
         success: true,
         newCreditsPrice,
-        nextDueDate
+        nextDueDate,
       }
     } catch (error) {
       this.logger.error({

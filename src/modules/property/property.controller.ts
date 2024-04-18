@@ -87,6 +87,8 @@ export class PropertyController {
   async findByOwner(
     @Body() getPropertiesByOwnerDto: GetPropertiesByOwnerDto,
   ): Promise<IOwnerPropertiesReturn> {
+    this.logger.log({}, 'start findByOwner > [controller]')
+
     return this.propertyService.findByOwner(getPropertiesByOwnerDto)
   }
 
@@ -97,6 +99,7 @@ export class PropertyController {
   async propertyActivation(
     @Body() propertyActivationDto: PropertyActivationDto,
   ) {
+    this.logger.log({}, 'start propertyActivation > [controller]')
     return this.propertyService.propertyActivation(propertyActivationDto)
   }
 
