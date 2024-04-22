@@ -65,7 +65,6 @@ export class CreateProperty_Service {
 
   async createOne(createPropertyDto: CreatePropertyDto): Promise<any> {
     const session = await this.startSession()
-
     try {
       await session.startTransaction()
       this.logger.log({}, 'start createOne')
@@ -360,8 +359,11 @@ export class CreateProperty_Service {
       ccv = creditCardData.ccv
     }
 
-    if (!isPlanFree) {
-      if (ownerActualPlan === planId && adCredits < 1) {
+    const planIdString = planId.toString()
+    const ownerActualPlanString = ownerActualPlan.toString()
+
+    if (!isPlanFree && ownerActualPlanString !== planIdString) {
+      if (adCredits < 1) {
         throw new BadRequestException(
           `O usuário não tem mais créditos para criar um novo anúncio.`,
         )
@@ -416,9 +418,6 @@ export class CreateProperty_Service {
           // Atribuir os valores da resposta às variáveis
           const creditCardInfo = responseData.creditCard
           const subscriptionId = responseData.id
-
-          // Decrementar o número de créditos disponíveis do usuário
-          owner.adCredits = owner.adCredits - 1
 
           // Salvar o token do cartão de crédito no banco de dados
           owner.paymentData.creditCardInfo = creditCardInfo
@@ -484,7 +483,7 @@ export class CreateProperty_Service {
               await this.ownerModel.updateOne(
                 { _id: owner._id },
                 {
-                  set: {
+                  $set: {
                     adCredits: selectedPlan.commonAd,
                     highlightCredits: selectedPlan.highlightAd,
                     plan: selectedPlan._id,
@@ -544,6 +543,7 @@ export class CreateProperty_Service {
               {
                 adCredits: selectedPlan.commonAd - 1,
                 highlighCredits: selectedPlan.highlightAd,
+                plan: selectedPlan._id,
               },
               { session },
             )
@@ -560,6 +560,31 @@ export class CreateProperty_Service {
           }
         } else {
           throw new NotFoundException('Assinatura não encontrada.')
+        }
+      }
+    } else {
+      if (owner.adCredits > 0) {
+        // Decrementar o número de créditos disponíveis do usuário;
+        try {
+          const result = await this.ownerModel.updateOne(
+            { _id: owner._id },
+            {
+              $set: {
+                adCredits: owner.adCredits - 1,
+              },
+            },
+            { session },
+          )
+
+          if (result.modifiedCount < 0) {
+            throw new Error(
+              `Não foi possível atualizar os créditos do proprietário.`,
+            )
+          }
+        } catch (error) {
+          throw new Error(
+            `Não foi possível atualizar os créditos do proprietário.`,
+          )
         }
       }
     }
@@ -633,7 +658,7 @@ export class CreateProperty_Service {
     propertyData.owner = ownerId
 
     // Adds owner info object to the property doc;
-    propertyData.ownerInfo = ownerInfo
+    propertyData.ownerInfo = { ...ownerInfo, picture: '' }
 
     // Creates the prperty on DB;
     const createdProperty = await this.propertyModel.create(propertyData)

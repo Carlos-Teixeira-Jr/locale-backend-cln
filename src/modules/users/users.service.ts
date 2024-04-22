@@ -332,7 +332,7 @@ export class UsersService {
               email,
               cpf,
               address: userAddress,
-              pricture: profilePicture,
+              picture: profilePicture,
             },
           },
           { session },
@@ -906,7 +906,8 @@ export class UsersService {
           // Verifica se o amount é menor ou igual a 0 após a atualização
           if (updatedTag && updatedTag.amount <= 0) {
             // Exclui a tag se o amount for menor ou igual a 0
-            await this.tagModel.deleteOne({ name: tag }, opt)
+            const teste = await this.tagModel.deleteOne({ name: tag }, opt)
+            console.log('🚀 ~ UsersService ~ teste:', teste)
           }
         }
 
@@ -935,7 +936,7 @@ export class UsersService {
         }
 
         // Charges
-        if (foundOwner.paymentData.subscriptionId) {
+        if (foundOwner.paymentData !== undefined) {
           const subscriptionId = foundOwner.paymentData.subscriptionId
           const response = await axios.delete(
             `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,

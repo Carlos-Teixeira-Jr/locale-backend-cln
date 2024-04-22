@@ -196,7 +196,10 @@ export class PropertyService {
 
     try {
       await session.startTransaction()
-      this.logger.log({ propertyActivationDto }, 'start property activation')
+      this.logger.log(
+        { propertyActivationDto },
+        'start property activation > [service]',
+      )
 
       const { isActive, propertyId, userId } = propertyActivationDto
 
@@ -494,6 +497,7 @@ export class PropertyService {
     files: Array<Express.Multer.File>,
     userId: Schema.Types.ObjectId,
     type: string,
+    propertyId: Schema.Types.ObjectId,
   ) {
     try {
       this.logger.log({ userId }, 'start upload profile image')
@@ -543,6 +547,18 @@ export class PropertyService {
         await this.ownerModel.updateOne(
           { _id: userId },
           { $set: { picture: profilePicture } },
+        )
+      }
+
+      if (propertyId !== undefined) {
+        await this.propertyModel.updateOne(
+          { _id: propertyId },
+          {
+            $set: {
+              'ownerInfo.picture': profilePicture,
+            },
+          },
+          { upsert: true }, // Adiciona o documento se não existir
         )
       }
 

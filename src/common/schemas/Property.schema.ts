@@ -42,7 +42,7 @@ export interface IProperty extends BaseModel, Document {
     phones?: string[]
     wppNumber?: string
     creci: string
-    profilePicture: string
+    picture: string
     email: string
   }
   size: {
@@ -106,7 +106,7 @@ export const PropertySchema = new Schema<IProperty>(
       creci: {
         type: String,
       },
-      profilePicture: {
+      picture: {
         type: String,
       },
       email: {
