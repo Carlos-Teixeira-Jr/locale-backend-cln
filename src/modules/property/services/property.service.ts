@@ -123,13 +123,13 @@ export class PropertyService {
       this.logger.log(
         {},
         `start findByAnnouncementCode > [code]: ${announcementCode}`,
-      )
+      );
 
       const foundAnnouncementCode =
         await findActivePropertiesByAnnouncementCode(
           announcementCode,
           this.propertyModel,
-        )
+        );
 
       if (foundAnnouncementCode.length === 0) {
         throw new NotFoundException(
@@ -203,16 +203,6 @@ export class PropertyService {
 
       const { isActive, propertyId, userId } = propertyActivationDto
 
-      const property = await this.propertyModel
-        .find({ _id: propertyId, isActive: false })
-        .lean()
-
-      if (!property) {
-        throw new NotFoundException(
-          `Imóvel com o id: ${propertyId} não encontrado.`,
-        )
-      }
-
       const propertyOwner = await this.ownerModel
         .findOne({
           userId: userId,
@@ -226,9 +216,24 @@ export class PropertyService {
         )
       }
 
+      // Verifica se algum dos ids passados não é válido;
+      if (propertyId.length > 0) {
+        propertyId.forEach(async id => {
+          const property = await this.propertyModel
+            .find({ _id: id, isActive: false })
+            .lean()
+
+          if (!property) {
+            throw new NotFoundException(
+              `Imóvel com o id: ${propertyId} não encontrado.`,
+            )
+          }
+        })
+      }
+
       if (!isActive) {
-        await this.propertyModel.updateOne(
-          { _id: propertyId },
+        await this.propertyModel.updateMany(
+          { _id: { $in: propertyId } },
           { $set: { isActive: isActive } },
           opt,
         )
@@ -238,8 +243,8 @@ export class PropertyService {
             `O usuário com o id ${userId} não tem mais créditos para ativar esse anúncio.`,
           )
         } else {
-          await this.propertyModel.updateOne(
-            { _id: propertyId },
+          await this.propertyModel.updateMany(
+            { _id: { $in: propertyId }},
             { $set: { isActive: isActive } },
             opt,
           )

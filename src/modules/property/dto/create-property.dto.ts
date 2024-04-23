@@ -182,6 +182,11 @@ export class CreatePropertyDto {
   @IsOptional()
   @IsString()
   cellPhone: string
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  deactivateProperties: string[]
 }
 
 const generateCode = (): string => {

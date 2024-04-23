@@ -27,6 +27,8 @@ import {
 } from 'common/schemas/PropertyType.schema'
 import { TagModelName, ITag } from 'common/schemas/Tag.schema'
 import axios from 'axios'
+import { PropertyService } from './property.service'
+import { PropertyActivationDto } from '../dto/property-activation.dto'
 
 interface IOwnerData {
   name: string
@@ -76,6 +78,7 @@ export class CreateProperty_Service {
         isPlanFree,
         plan,
         cellPhone,
+        deactivateProperties
       } = createPropertyDto
 
       const { ownerInfo } = propertyData
@@ -107,6 +110,17 @@ export class CreateProperty_Service {
           ownerPreviousPlan,
           session,
         )
+      }
+
+      // Deactivates the properties that the user choose in case that he changes his plan to a minor one;
+      if (deactivateProperties !== undefined && deactivateProperties.length > 0) {
+        const deactivatepropertiesBody: PropertyActivationDto = {
+          propertyId: deactivateProperties,
+          userId: userData._id,
+          isActive: true,
+          session: session
+        }
+        await this.activateDeactivateProperties(deactivatepropertiesBody)
       }
 
       await this.handleLocationCreation(propertyData.address, session)
@@ -360,7 +374,7 @@ export class CreateProperty_Service {
     }
 
     const planIdString = planId.toString()
-    const ownerActualPlanString = ownerActualPlan.toString()
+    const ownerActualPlanString = ownerActualPlan.toString();
 
     if (!isPlanFree && ownerActualPlanString !== planIdString) {
       if (adCredits < 1) {
@@ -664,5 +678,67 @@ export class CreateProperty_Service {
     const createdProperty = await this.propertyModel.create(propertyData)
 
     return createdProperty
+  }
+
+  private async activateDeactivateProperties(propertyActivationDto: PropertyActivationDto) {
+    try {
+      const { isActive, propertyId, userId, session } = propertyActivationDto
+
+      const propertyOwner = await this.ownerModel
+        .findOne({
+          userId: userId,
+          isActive: true,
+        })
+        .lean()
+
+      if (!propertyOwner) {
+        throw new NotFoundException(
+          `O anunciante com o id ${userId} não foi encontrado.`,
+        )
+      }
+
+      // Verifica se algum dos ids passados não é válido;
+      if (propertyId.length > 0) {
+        propertyId.forEach(async id => {
+          const property = await this.propertyModel
+            .find({ _id: id, isActive: false })
+            .lean()
+
+          if (!property) {
+            throw new NotFoundException(
+              `Imóvel com o id: ${propertyId} não encontrado.`,
+            )
+          }
+        })
+      }
+
+      if (!isActive) {
+        await this.propertyModel.updateMany(
+          { _id: { $in: propertyId } },
+          { $set: { isActive: isActive } },
+          session,
+        )
+      } else {
+        if (!propertyOwner.adCredits || propertyOwner.adCredits <= 0) {
+          throw new BadRequestException(
+            `O usuário com o id ${userId} não tem mais créditos para ativar esse anúncio.`,
+          )
+        } else {
+          await this.propertyModel.updateMany(
+            { _id: { $in: propertyId }},
+            { $set: { isActive: isActive } },
+            session,
+          )
+
+          await this.ownerModel.updateOne(
+            { userId: userId },
+            { $set: { adCredits: propertyOwner.adCredits - 1 } },
+            session,
+          )
+        }
+      }
+    } catch (error) {
+      
+    }
   }
 }
