@@ -27,7 +27,6 @@ import {
 } from 'common/schemas/PropertyType.schema'
 import { TagModelName, ITag } from 'common/schemas/Tag.schema'
 import axios from 'axios'
-import { PropertyService } from './property.service'
 import { PropertyActivationDto } from '../dto/property-activation.dto'
 
 interface IOwnerData {
@@ -117,7 +116,7 @@ export class CreateProperty_Service {
         const deactivatepropertiesBody: PropertyActivationDto = {
           propertyId: deactivateProperties,
           userId: userData._id,
-          isActive: true,
+          isActive: false,
           session: session
         }
         await this.activateDeactivateProperties(deactivatepropertiesBody)
@@ -185,7 +184,8 @@ export class CreateProperty_Service {
       profilePicture,
     } = userData
 
-    let selectedPlan: IPlan
+    const selectedPlan = await this.planModel.findById(plan).lean();
+
 
     // Verificar se o usuário já está cadastrado
     if (userId) {
@@ -268,7 +268,10 @@ export class CreateProperty_Service {
       }
 
       if (!isPlanFree) {
-        selectedPlan = await this.planModel.findById(plan).lean()
+        if (!selectedPlan) {
+          throw new Error(`Plano com o id: ${plan} não encontrado.`)
+        }
+
         ownerData.adCredits = selectedPlan.commonAd
         ownerData.highlightCredits = selectedPlan.highlightAd
       }
@@ -280,12 +283,6 @@ export class CreateProperty_Service {
     } else {
       owner = ownerExists
       ownerPreviousPlan = ownerExists.plan
-    }
-
-    selectedPlan = await this.planModel.findById(plan)
-
-    if (!selectedPlan) {
-      throw new Error(`Plano com o id: ${plan} não encontrado.`)
     }
 
     return {
@@ -376,12 +373,13 @@ export class CreateProperty_Service {
     const planIdString = planId.toString()
     const ownerActualPlanString = ownerActualPlan.toString();
 
+    // Usuário mudou de plano pago;
     if (!isPlanFree && ownerActualPlanString !== planIdString) {
-      if (adCredits < 1) {
-        throw new BadRequestException(
-          `O usuário não tem mais créditos para criar um novo anúncio.`,
-        )
-      }
+      // if (adCredits < 1) {
+      //   throw new BadRequestException(
+      //     `O usuário não tem mais créditos para criar um novo anúncio.`,
+      //   )
+      // }
 
       const expiryYear = `20${expiry[2] + expiry[3]}`
       const expiryMonth = `${expiry[0] + expiry[1]}`
@@ -677,7 +675,7 @@ export class CreateProperty_Service {
     // Creates the prperty on DB;
     const createdProperty = await this.propertyModel.create(propertyData)
 
-    return createdProperty
+    return createdProperty;
   }
 
   private async activateDeactivateProperties(propertyActivationDto: PropertyActivationDto) {
@@ -712,6 +710,7 @@ export class CreateProperty_Service {
         })
       }
 
+      // Mudar os não selecionados para inativo?
       if (!isActive) {
         await this.propertyModel.updateMany(
           { _id: { $in: propertyId } },
@@ -738,7 +737,9 @@ export class CreateProperty_Service {
         }
       }
     } catch (error) {
-      
+      throw new Error(
+        `Não foi possível desativar os imóveis do usuário.`,
+      )
     }
   }
 }

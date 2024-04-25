@@ -936,7 +936,9 @@ export class UsersService {
         }
 
         // Charges
-        if (foundOwner.paymentData !== undefined) {
+        const plans = await this.planModel.find();
+        const freePlan = plans.find((plan) => plan.name === 'Free');
+        if (foundOwner.plan.toString() !== freePlan._id.toString()) {
           const subscriptionId = foundOwner.paymentData.subscriptionId
           const response = await axios.delete(
             `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,

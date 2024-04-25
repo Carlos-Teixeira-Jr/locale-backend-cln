@@ -66,6 +66,7 @@ export class PropertyController {
   ): Promise<IProperty> {
     this.logger.log({}, 'createOne')
 
+    
     return this.propertyService.createOne(createPropertyDto)
   }
 
