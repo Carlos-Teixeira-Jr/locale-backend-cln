@@ -77,7 +77,7 @@ export class UsersController {
   }
 
   @ApiOperation({
-    summary: 'Update the user data.',
+    summary: 'Update the user and owner data.',
   })
   @Post('edit-user')
   async editUser(@Body() body: EditUserDto): Promise<{ success: boolean }> {

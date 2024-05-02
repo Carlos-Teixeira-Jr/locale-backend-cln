@@ -22,7 +22,7 @@ export class PlanController {
 
   @Get()
   async findAll(): Promise<IPlan[]> {
-    this.logger.log({}, 'findAll')
+    this.logger.log({}, 'start findAll > [service]')
 
     return this.planService.findAll()
   }

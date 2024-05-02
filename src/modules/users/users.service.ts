@@ -1,4 +1,4 @@
-import mongoose, { Model, Schema } from 'mongoose'
+import mongoose, { Model, ObjectId, Schema } from 'mongoose'
 import {
   BadRequestException,
   Injectable,
@@ -22,6 +22,7 @@ import { ITag, TagModelName } from 'common/schemas/Tag.schema'
 import { ILocation, LocationModelName } from 'common/schemas/Location.schema'
 import axios from 'axios'
 import { FindByUsernameDto } from './dto/find-by-username.dto'
+import { IPlan, PlanModelName } from 'common/schemas/Plan.schema'
 
 export type FindUserByOwnerOut = {
   owner: IOwner
@@ -61,6 +62,35 @@ export type PartialUserData = {
   }
 }
 
+export type CreditCard = {
+  cardNumber: string
+  cardName: string
+  ccv: string
+  expiry: string
+  cpfCnpj: string
+}
+
+export type CreditCardHolderInfo = {
+  name: string
+  email: string
+  phone: string
+  cpfCnpj: string
+  postalCode: string
+  addressNumber: string
+}
+
+export type UpdateSubscriptionBody = {
+  billingType: string
+  cycle: string
+  customer: string
+  value: number
+  nextDueDate: string
+  updatePendingPayments: boolean
+  creditCardToken?: string
+  creditCard?: CreditCard
+  creditCardHolderInfo?: CreditCardHolderInfo
+}
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -76,7 +106,15 @@ export class UsersService {
     private readonly tagModel: Model<ITag>,
     @InjectModel(LocationModelName)
     private readonly locationModel: Model<ILocation>,
+    @InjectModel(PlanModelName)
+    private readonly planModel: Model<IPlan>,
   ) {}
+
+  private async startSession() {
+    const mongodbUri = `${process.env.DB_HOST}`
+    const db = await mongoose.createConnection(mongodbUri).asPromise()
+    return db.startSession()
+  }
 
   async findOne(_id: Schema.Types.ObjectId): Promise<PartialUserData> {
     try {
@@ -167,7 +205,7 @@ export class UsersService {
       const owner = await this.ownerModel
         .findOne({ userId, isActive: true })
         .select(
-          'adCredits plan phone cellPhone customerId paymentData _id name picture',
+          'adCredits highlightCredits plan phone cellPhone customerId paymentData _id name picture',
         )
 
       return {
@@ -219,8 +257,13 @@ export class UsersService {
   }
 
   async editUser(body: EditUserDto) {
+    const session = await this.startSession()
     try {
+      await session.startTransaction()
       this.logger.log({ body }, 'start edit user > [service]')
+
+      // To-do: implementar rollback nesta rota;
+      //To-do: implementar caso em que o usuário troca o cartão no momento da atualização;
 
       const {
         id: userId,
@@ -239,7 +282,21 @@ export class UsersService {
       let phone: string
       let cellPhone
       let adCredits: number
+      let plan: ObjectId
+      let selectedPlanData: IPlan
       //let profilePicture: string
+
+      let updatedOwner
+      let response
+
+      let cardName
+      let cardNumber
+      let expiry
+      let ccv
+      let cpfCnpj
+
+      let password
+      let passwordConfirmattion
 
       if (body.owner) {
         ownerId = body.owner._id
@@ -248,6 +305,15 @@ export class UsersService {
         phone = body.owner.phone
         cellPhone = body.owner.cellPhone
         adCredits = body.owner.adCredits
+        plan = body.owner.plan
+      }
+
+      if (body.creditCard !== undefined) {
+        cardName = body.creditCard.cardName
+        cardNumber = body.creditCard.cardNumber
+        expiry = body.creditCard.expiry
+        ccv = body.creditCard.ccv
+        cpfCnpj = body.creditCard.cpfCnpj
       }
 
       const userExists = await this.userModel.findOne({ _id: userId })
@@ -256,8 +322,8 @@ export class UsersService {
         throw new NotFoundException(
           `Usuário com o id: ${userId} não foi encontrado`,
         )
-        // esse else não existia antes, só coloquei pra confirmar que o problema era no password
       } else {
+        // To-do: verificar se está atualizando a foto do usuário mesmo quando não é alterada;
         await this.userModel.updateOne(
           { _id: userId },
           {
@@ -266,14 +332,12 @@ export class UsersService {
               email,
               cpf,
               address: userAddress,
-              pricture: profilePicture,
+              picture: profilePicture,
             },
           },
+          { session },
         )
       }
-
-      let password
-      let passwordConfirmattion
 
       //  Lida com a edição da senha caso o usuário tenha trocado;
       if (body.password) {
@@ -313,12 +377,10 @@ export class UsersService {
                 picture: profilePicture,
               },
             },
+            { session },
           )
         }
       }
-
-      let updatedOwner
-      let response
 
       if (ownerId) {
         const owner = await this.ownerModel.findById(ownerId)
@@ -327,6 +389,93 @@ export class UsersService {
           throw new NotFoundException(
             `O usuário com o id: ${userId} não possui nenhum anúncio cadastrado.`,
           )
+        }
+
+        // Atualizar plano do owner;
+        if (plan !== owner.plan) {
+          selectedPlanData = await this.planModel.findById(plan)
+          const { subscriptionId, customerId, creditCardInfo } =
+            owner.paymentData
+          const { creditCardToken } = creditCardInfo
+          let nextDueDate
+
+          //Buscar a assinatura do usuário para verificar a data de cobrança;
+          const subscriptionData = await axios.get(
+            `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                access_token: process.env.ASAAS_API_KEY || '',
+              },
+            },
+          )
+
+          if (subscriptionData.status >= 200 && subscriptionData.status < 300) {
+            nextDueDate = subscriptionData.data.nextDueDate
+          } else {
+            // Cria a data de vencimento para o caso do cliente anteriormente estar usando a conta grátis ou não ter conta;
+            const currentDate = new Date()
+            const year = currentDate.getFullYear()
+            const month = (currentDate.getMonth() + 1)
+              .toString()
+              .padStart(2, '0')
+            const day = currentDate.getDate().toString().padStart(2, '0')
+            const formattedDate = `${year}-${month}-${day}`
+
+            nextDueDate = formattedDate
+          }
+
+          if (
+            selectedPlanData.name !== 'Free' &&
+            selectedPlanData._id !== owner.plan
+          ) {
+            // Token ou info do cartão?
+            const paymentBody: UpdateSubscriptionBody = {
+              billingType: 'CREDIT_CARD',
+              cycle: 'MONTHLY',
+              customer: customerId,
+              value: selectedPlanData.price,
+              nextDueDate,
+              updatePendingPayments: true,
+            }
+
+            // Se passou dados do cartão usa esses dados, se não tenta usar o token salvo do cartão;
+            if (body.creditCard !== undefined) {
+              paymentBody.creditCard = {
+                cardName: cardName,
+                cardNumber,
+                ccv,
+                expiry,
+                cpfCnpj,
+              }
+            } else if (
+              owner.paymentData.creditCardInfo.creditCardToken !== undefined
+            ) {
+              paymentBody.creditCardToken = creditCardToken
+            } else {
+              throw new BadRequestException(
+                `Os dados do cartão de crédito não foram informados e não estão acessíveis na conta do usuário.`,
+              )
+            }
+
+            const response = await axios.post(
+              //Atualiza o valor do plano;
+              `${process.env.PAYMENT_URL}/payment/update-subscription/${subscriptionId}`,
+              body,
+              {
+                headers: {
+                  'Content-Type': 'application/json',
+                  access_token: process.env.ASAAS_API_KEY || '',
+                },
+              },
+            )
+
+            if (response.status <= 200 && response.status > 300) {
+              throw new Error(
+                `Falha ao atualizar a assinatura: ${response.statusText}`,
+              )
+            }
+          }
         }
 
         await this.ownerModel.updateOne(
@@ -339,8 +488,10 @@ export class UsersService {
               userId: user,
               adCredits,
               picture: profilePicture,
+              plan: selectedPlanData._id,
             },
           },
+          { session },
         )
 
         updatedOwner = await this.ownerModel.findById(ownerId).lean()
@@ -353,8 +504,11 @@ export class UsersService {
 
       response = { success: true }
 
+      await session.commitTransaction()
+
       return response
     } catch (error) {
+      await session.abortTransaction()
       this.logger.error({
         error: JSON.stringify(error),
         exception: '> exception',
@@ -752,7 +906,8 @@ export class UsersService {
           // Verifica se o amount é menor ou igual a 0 após a atualização
           if (updatedTag && updatedTag.amount <= 0) {
             // Exclui a tag se o amount for menor ou igual a 0
-            await this.tagModel.deleteOne({ name: tag }, opt)
+            const teste = await this.tagModel.deleteOne({ name: tag }, opt)
+            console.log('🚀 ~ UsersService ~ teste:', teste)
           }
         }
 
@@ -781,7 +936,9 @@ export class UsersService {
         }
 
         // Charges
-        if (foundOwner.paymentData.subscriptionId) {
+        const plans = await this.planModel.find();
+        const freePlan = plans.find((plan) => plan.name === 'Free');
+        if (foundOwner.plan.toString() !== freePlan._id.toString()) {
           const subscriptionId = foundOwner.paymentData.subscriptionId
           const response = await axios.delete(
             `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,

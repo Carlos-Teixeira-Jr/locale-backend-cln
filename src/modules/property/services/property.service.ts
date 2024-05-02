@@ -123,13 +123,13 @@ export class PropertyService {
       this.logger.log(
         {},
         `start findByAnnouncementCode > [code]: ${announcementCode}`,
-      )
+      );
 
       const foundAnnouncementCode =
         await findActivePropertiesByAnnouncementCode(
           announcementCode,
           this.propertyModel,
-        )
+        );
 
       if (foundAnnouncementCode.length === 0) {
         throw new NotFoundException(
@@ -196,19 +196,12 @@ export class PropertyService {
 
     try {
       await session.startTransaction()
-      this.logger.log({ propertyActivationDto }, 'start property activation')
+      this.logger.log(
+        { propertyActivationDto },
+        'start property activation > [service]',
+      )
 
       const { isActive, propertyId, userId } = propertyActivationDto
-
-      const property = await this.propertyModel
-        .find({ _id: propertyId, isActive: false })
-        .lean()
-
-      if (!property) {
-        throw new NotFoundException(
-          `Imóvel com o id: ${propertyId} não encontrado.`,
-        )
-      }
 
       const propertyOwner = await this.ownerModel
         .findOne({
@@ -223,9 +216,24 @@ export class PropertyService {
         )
       }
 
+      // Verifica se algum dos ids passados não é válido;
+      if (propertyId.length > 0) {
+        propertyId.forEach(async id => {
+          const property = await this.propertyModel
+            .find({ _id: id, isActive: false })
+            .lean()
+
+          if (!property) {
+            throw new NotFoundException(
+              `Imóvel com o id: ${propertyId} não encontrado.`,
+            )
+          }
+        })
+      }
+
       if (!isActive) {
-        await this.propertyModel.updateOne(
-          { _id: propertyId },
+        await this.propertyModel.updateMany(
+          { _id: { $in: propertyId } },
           { $set: { isActive: isActive } },
           opt,
         )
@@ -235,8 +243,8 @@ export class PropertyService {
             `O usuário com o id ${userId} não tem mais créditos para ativar esse anúncio.`,
           )
         } else {
-          await this.propertyModel.updateOne(
-            { _id: propertyId },
+          await this.propertyModel.updateMany(
+            { _id: { $in: propertyId }},
             { $set: { isActive: isActive } },
             opt,
           )
@@ -424,47 +432,6 @@ export class PropertyService {
     }
   }
 
-  // async uploadPropertyImages(
-  //   files: Array<Express.Multer.File>,
-  //   propertyId: Schema.Types.ObjectId,
-  // ) {
-  //   try {
-  //     this.logger.log({ propertyId }, 'start upload property images')
-
-  //     const storedImages = await this.propertyModel.findById(propertyId).lean()
-
-  //     const { images } = storedImages
-
-  //     if (images.length + files.length > 50) {
-  //       throw new BadRequestException(
-  //         `A requisição excede o limite de 50 imagens. Imagens salvas anteriormente: ${images.length} - Imagens adicionadas nesta requisição: ${files.length}.`,
-  //       )
-  //     }
-
-  //     const propertyFound = await this.propertyModel.findById(propertyId)
-
-  //     if (!propertyFound) {
-  //       throw new NotFoundException(
-  //         `O imóvel com o id "${propertyId}" não foi encontrado.`,
-  //       )
-  //     }
-  //     const uploadedImages = await uploadFile(files, 'images')
-
-  //     await this.propertyModel.updateOne(
-  //       { _id: propertyId },
-  //       { $push: { images: { $each: uploadedImages } } },
-  //     )
-
-  //     return { success: true }
-  //   } catch (error) {
-  //     this.logger.error({
-  //       error: JSON.stringify(error),
-  //       exception: '> exception',
-  //     })
-  //     throw error
-  //   }
-  // }
-
   async uploadPropertyImages(
     files: Array<Express.Multer.File>,
     propertyId: Schema.Types.ObjectId,
@@ -535,6 +502,7 @@ export class PropertyService {
     files: Array<Express.Multer.File>,
     userId: Schema.Types.ObjectId,
     type: string,
+    propertyId: Schema.Types.ObjectId,
   ) {
     try {
       this.logger.log({ userId }, 'start upload profile image')
@@ -584,6 +552,18 @@ export class PropertyService {
         await this.ownerModel.updateOne(
           { _id: userId },
           { $set: { picture: profilePicture } },
+        )
+      }
+
+      if (propertyId !== undefined) {
+        await this.propertyModel.updateOne(
+          { _id: propertyId },
+          {
+            $set: {
+              'ownerInfo.picture': profilePicture,
+            },
+          },
+          { upsert: true }, // Adiciona o documento se não existir
         )
       }
 

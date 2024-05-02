@@ -65,6 +65,8 @@ export class PropertyController {
     @Body() createPropertyDto: CreatePropertyDto,
   ): Promise<IProperty> {
     this.logger.log({}, 'createOne')
+
+    
     return this.propertyService.createOne(createPropertyDto)
   }
 
@@ -86,6 +88,8 @@ export class PropertyController {
   async findByOwner(
     @Body() getPropertiesByOwnerDto: GetPropertiesByOwnerDto,
   ): Promise<IOwnerPropertiesReturn> {
+    this.logger.log({}, 'start findByOwner > [controller]')
+
     return this.propertyService.findByOwner(getPropertiesByOwnerDto)
   }
 
@@ -96,6 +100,7 @@ export class PropertyController {
   async propertyActivation(
     @Body() propertyActivationDto: PropertyActivationDto,
   ) {
+    this.logger.log({}, 'start propertyActivation > [controller]')
     return this.propertyService.propertyActivation(propertyActivationDto)
   }
 
@@ -135,7 +140,7 @@ export class PropertyController {
     return await this.propertyService.uploadPropertyImages(files, propertyId)
   }
 
-  @Post('upload-profile-image/:type')
+  @Post('upload-profile-image/:type/:propertyId')
   @ApiOperation({
     summary: 'Upload user profile image based on his userId.',
   })
@@ -150,10 +155,16 @@ export class PropertyController {
     @UploadedFiles() files: Array<Express.Multer.File>,
     @Body('userId') userId: Schema.Types.ObjectId,
     @Param('type') type: string,
+    @Param('propertyId') propertyId: Schema.Types.ObjectId,
   ) {
     this.logger.info({}, 'uploadProfileImage > params')
 
-    return await this.propertyService.uploadProfileImage(files, userId, type)
+    return await this.propertyService.uploadProfileImage(
+      files,
+      userId,
+      type,
+      propertyId,
+    )
   }
 
   @Post('edit-property-images')

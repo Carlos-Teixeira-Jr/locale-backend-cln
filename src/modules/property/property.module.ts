@@ -80,6 +80,6 @@ const services = [
     JwtService,
     UsersService,
   ],
-  exports: [PropertyService],
+  exports: [PropertyService, CreateProperty_Service],
 })
 export class PropertyModule {}
