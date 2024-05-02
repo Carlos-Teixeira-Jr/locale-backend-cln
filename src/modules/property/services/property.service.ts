@@ -123,13 +123,13 @@ export class PropertyService {
       this.logger.log(
         {},
         `start findByAnnouncementCode > [code]: ${announcementCode}`,
-      );
+      )
 
       const foundAnnouncementCode =
         await findActivePropertiesByAnnouncementCode(
           announcementCode,
           this.propertyModel,
-        );
+        )
 
       if (foundAnnouncementCode.length === 0) {
         throw new NotFoundException(
@@ -244,7 +244,7 @@ export class PropertyService {
           )
         } else {
           await this.propertyModel.updateMany(
-            { _id: { $in: propertyId }},
+            { _id: { $in: propertyId } },
             { $set: { isActive: isActive } },
             opt,
           )
