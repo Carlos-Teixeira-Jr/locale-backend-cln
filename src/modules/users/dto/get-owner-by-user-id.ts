@@ -1,8 +1,9 @@
-import { IsNotEmpty, IsString } from 'class-validator'
+import { IsNotEmpty, Validate } from 'class-validator'
+import { IDValidator } from 'common/validators/ID.validator'
 import { Schema } from 'mongoose'
 
 export class GetOwnerByUserId {
-  @IsString()
   @IsNotEmpty()
+  @Validate(IDValidator)
   userId: Schema.Types.ObjectId
 }

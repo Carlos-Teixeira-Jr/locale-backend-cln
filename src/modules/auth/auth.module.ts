@@ -22,6 +22,7 @@ import {
   LocationModelName,
   LocationSchema,
 } from 'common/schemas/Location.schema'
+import { PlanModelName, PlanSchema } from 'common/schemas/Plan.schema'
 
 @Module({
   imports: [
@@ -49,6 +50,10 @@ import {
       {
         name: LocationModelName,
         schema: LocationSchema,
+      },
+      {
+        name: PlanModelName,
+        schema: PlanSchema,
       },
     ]),
     UsersModule,

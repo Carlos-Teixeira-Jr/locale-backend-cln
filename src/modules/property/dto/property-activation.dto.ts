@@ -1,11 +1,14 @@
-import { IsBoolean, IsNotEmpty, Validate } from 'class-validator'
+import { Type } from 'class-transformer'
+import { IsArray, IsBoolean, IsNotEmpty, IsOptional, Validate, ValidateNested } from 'class-validator'
 import { IDValidator } from 'common/validators/ID.validator'
 import { Schema } from 'mongoose'
 
 export class PropertyActivationDto {
   @IsNotEmpty()
-  @Validate(IDValidator)
-  propertyId: Schema.Types.ObjectId
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => String)
+  propertyId: string[]
 
   @IsNotEmpty()
   @Validate(IDValidator)
@@ -14,4 +17,7 @@ export class PropertyActivationDto {
   @IsNotEmpty()
   @IsBoolean()
   isActive: boolean
+
+  @IsOptional()
+  session: any
 }
