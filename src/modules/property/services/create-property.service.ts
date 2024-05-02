@@ -77,7 +77,7 @@ export class CreateProperty_Service {
         isPlanFree,
         plan,
         cellPhone,
-        deactivateProperties
+        deactivateProperties,
       } = createPropertyDto
 
       const { ownerInfo } = propertyData
@@ -112,12 +112,15 @@ export class CreateProperty_Service {
       }
 
       // Deactivates the properties that the user choose in case that he changes his plan to a minor one;
-      if (deactivateProperties !== undefined && deactivateProperties.length > 0) {
+      if (
+        deactivateProperties !== undefined &&
+        deactivateProperties.length > 0
+      ) {
         const deactivatepropertiesBody: PropertyActivationDto = {
           propertyId: deactivateProperties,
           userId: userData._id,
           isActive: false,
-          session: session
+          session: session,
         }
         await this.activateDeactivateProperties(deactivatepropertiesBody)
       }
@@ -184,8 +187,7 @@ export class CreateProperty_Service {
       profilePicture,
     } = userData
 
-    const selectedPlan = await this.planModel.findById(plan).lean();
-
+    const selectedPlan = await this.planModel.findById(plan).lean()
 
     // Verificar se o usuário já está cadastrado
     if (userId) {
@@ -371,16 +373,10 @@ export class CreateProperty_Service {
     }
 
     const planIdString = planId.toString()
-    const ownerActualPlanString = ownerActualPlan.toString();
+    const ownerActualPlanString = ownerActualPlan.toString()
 
     // Usuário mudou de plano pago;
     if (!isPlanFree && ownerActualPlanString !== planIdString) {
-      // if (adCredits < 1) {
-      //   throw new BadRequestException(
-      //     `O usuário não tem mais créditos para criar um novo anúncio.`,
-      //   )
-      // }
-
       const expiryYear = `20${expiry[2] + expiry[3]}`
       const expiryMonth = `${expiry[0] + expiry[1]}`
 
@@ -442,7 +438,7 @@ export class CreateProperty_Service {
           throw new Error(`Falha ao gerar a cobrança: ${response.statusText}`)
         }
       } else {
-        //Buscar a assinatura do usuário para verificar a data de cobrança;
+        //Buscar a assinatura do usuário para verificar a data de cobrança e usar o token;
         const subscriptionId = owner.paymentData.subscriptionId
         const response = await axios.get(
           `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
@@ -462,6 +458,11 @@ export class CreateProperty_Service {
             // Caso em que o usuário não tem mais créditos e selecionou outro plano
             if (planId !== ownerActualPlan) {
               const subscriptionId = paymentData.subscriptionId
+              const priceDifference =
+                price > previousPlanData.price
+                  ? price - previousPlanData.price
+                  : price
+
               const response = await axios.post(
                 //Atualiza o valor do plano;
                 `${process.env.PAYMENT_URL}/payment/update-subscription/${subscriptionId}`,
@@ -469,7 +470,7 @@ export class CreateProperty_Service {
                   billingType: 'CREDIT_CARD',
                   cycle: 'MONTHLY',
                   customer: paymentData.customerId,
-                  value: price,
+                  value: priceDifference,
                   nextDueDate,
                   updatePendingPayments: true,
                   creditCardToken: paymentData.creditCardInfo.creditCardToken,
@@ -490,14 +491,19 @@ export class CreateProperty_Service {
 
               const responseData = response.data
               const updatedSubscriptionId = responseData.id
+              const newAdcredits = owner.adCredits - 1 + selectedPlan.commonAd
+              const newHighlightCredits =
+                owner.highlightCredits > 0
+                  ? owner.highlightCredits - 1 + selectedPlan.highlightAd
+                  : owner.highlightCredits
 
               //Atualizar os créditos do usuário
               await this.ownerModel.updateOne(
                 { _id: owner._id },
                 {
                   $set: {
-                    adCredits: selectedPlan.commonAd,
-                    highlightCredits: selectedPlan.highlightAd,
+                    adCredits: newAdcredits,
+                    highlightCredits: newHighlightCredits,
                     plan: selectedPlan._id,
                     'paymentData.subscriptionId': updatedSubscriptionId,
                   },
@@ -516,7 +522,10 @@ export class CreateProperty_Service {
             // To-do: Implementar timeout de 60s para evitar duplicidade e bloqueio do cartão
 
             // To-do: Verificar a necessidade de passar o remoteIp do usuário na req;
-            if (selectedPlan.price !== previousPlanData.price) {
+            if (
+              selectedPlan.price > previousPlanData.price &&
+              previousPlanData.price > 0
+            ) {
               const priceDifference =
                 price > previousPlanData.price
                   ? price - previousPlanData.price
@@ -547,34 +556,68 @@ export class CreateProperty_Service {
             }
           }
 
-          // Decrementar o número de créditos disponíveis do usuário;
-          owner.adCredits = owner.adCredits - 1
           try {
-            const result = await this.ownerModel.updateOne(
-              { _id: owner._id },
+            // Fazer a atualização do plano
+            const response = await axios.post(
+              //Atualiza o valor do plano;
+              `${process.env.PAYMENT_URL}/payment/update-subscription/${subscriptionId}`,
               {
-                adCredits: selectedPlan.commonAd - 1,
-                highlighCredits: selectedPlan.highlightAd,
-                plan: selectedPlan._id,
+                billingType: 'CREDIT_CARD',
+                cycle: 'MONTHLY',
+                customer: paymentData.customerId,
+                value: price,
+                nextDueDate,
+                updatePendingPayments: true,
+                creditCardToken: paymentData.creditCardInfo.creditCardToken,
               },
-              { session },
+              {
+                headers: {
+                  'Content-Type': 'application/json',
+                  access_token: process.env.ASAAS_API_KEY || '',
+                },
+              },
             )
 
-            if (result.modifiedCount < 0) {
+            if (response.status <= 200 && response.status > 300) {
+              throw new Error(
+                `Falha ao atualizar a assinatura: ${response.statusText}`,
+              )
+            }
+
+            const newAdcredits = owner.adCredits - 1 + selectedPlan.commonAd
+            const newHighlightCredits =
+              owner.highlightCredits > 0
+                ? owner.highlightCredits - 1 + selectedPlan.highlightAd
+                : owner.highlightCredits
+
+            try {
+              const result = await this.ownerModel.updateOne(
+                { _id: owner._id },
+                {
+                  adCredits: newAdcredits,
+                  highlighCredits: newHighlightCredits,
+                  plan: selectedPlan._id,
+                },
+                { session },
+              )
+
+              if (result.modifiedCount < 0) {
+                throw new Error(
+                  `Não foi possível atualizar os créditos do proprietário.`,
+                )
+              }
+            } catch (error) {
               throw new Error(
                 `Não foi possível atualizar os créditos do proprietário.`,
               )
             }
-          } catch (error) {
-            throw new Error(
-              `Não foi possível atualizar os créditos do proprietário.`,
-            )
-          }
+          } catch (error) {}
         } else {
           throw new NotFoundException('Assinatura não encontrada.')
         }
       }
     } else {
+      // Usuário selecionou o plano grátis ou o mesmo plano que já tem;
       if (owner.adCredits > 0) {
         // Decrementar o número de créditos disponíveis do usuário;
         try {
@@ -675,10 +718,12 @@ export class CreateProperty_Service {
     // Creates the prperty on DB;
     const createdProperty = await this.propertyModel.create(propertyData)
 
-    return createdProperty;
+    return createdProperty
   }
 
-  private async activateDeactivateProperties(propertyActivationDto: PropertyActivationDto) {
+  private async activateDeactivateProperties(
+    propertyActivationDto: PropertyActivationDto,
+  ) {
     try {
       const { isActive, propertyId, userId, session } = propertyActivationDto
 
@@ -724,7 +769,7 @@ export class CreateProperty_Service {
           )
         } else {
           await this.propertyModel.updateMany(
-            { _id: { $in: propertyId }},
+            { _id: { $in: propertyId } },
             { $set: { isActive: isActive } },
             session,
           )
@@ -737,9 +782,7 @@ export class CreateProperty_Service {
         }
       }
     } catch (error) {
-      throw new Error(
-        `Não foi possível desativar os imóveis do usuário.`,
-      )
+      throw new Error(`Não foi possível desativar os imóveis do usuário.`)
     }
   }
 }

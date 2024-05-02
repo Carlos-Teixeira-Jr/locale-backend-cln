@@ -1,5 +1,12 @@
 import { Type } from 'class-transformer'
-import { IsArray, IsBoolean, IsNotEmpty, IsOptional, Validate, ValidateNested } from 'class-validator'
+import {
+  IsArray,
+  IsBoolean,
+  IsNotEmpty,
+  IsOptional,
+  Validate,
+  ValidateNested,
+} from 'class-validator'
 import { IDValidator } from 'common/validators/ID.validator'
 import { Schema } from 'mongoose'
 
