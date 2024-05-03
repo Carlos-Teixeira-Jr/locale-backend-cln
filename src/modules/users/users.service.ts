@@ -11,7 +11,7 @@ import { IUser, UserModelName } from 'common/schemas/User.schema'
 import { GetUserByEmailDto } from './dto/get-user-by-email-dto.sto'
 import { GetOwnerByUserId } from './dto/get-owner-by-user-id'
 import { IOwner, OwnerModelName } from 'common/schemas/Owner.schema'
-import { EditUserDto } from './dto/edit-user.dto'
+import { CreditCard, EditUserDto } from './dto/edit-user.dto'
 import { IProperty, PropertyModelName } from 'common/schemas/Property.schema'
 import { EditFavouriteDto } from './dto/edit-favourite.dto'
 import { GetFavouritesByUserDto } from './dto/favourite-property.dto'
@@ -575,8 +575,8 @@ export class UsersService {
             throw new NotFoundException(`Não foi possível encontrr o anunciante com o id: ${ownerId}`)
           }
 
+          // Esta trocando o plano de um pago para o grátis;
           if (selectedPlanData.name === 'Free' && ownerExists.plan !== selectedPlanData._id) {
-            // Esta trocando o plano de um pago para o grátis;
             // Cancelar a assinatura do customer;
             try {
               await axios.delete(`${paymentUrl}/payment/subscription/${ownerExists.paymentData.subscriptionId}`)
@@ -628,6 +628,41 @@ export class UsersService {
             }
           } else if (selectedPlanData._id !== plan && selectedPlanData.name !== 'Free') {
             // Está trocando o plano de um pago para outro pago
+            // Verificar se foi passado os dados do cartão de crédito;
+            if (body.creditCard !== undefined) {
+              const cardNumberToken = ownerExists.paymentData.creditCardInfo.creditCardNumber;
+              const cardLastNumbers = cardNumberToken.slice(-4);
+              // Verifica se mudou o cartão de crédito;
+              if (cardLastNumbers !== cardNumber.slice(-4)) {
+                // Novo cartão
+                const editCreditCardDto: EditCreditCardDto = {
+                  cardName,
+                  cardNumber,
+                  expiry,
+                  ccv,
+                  cpfCnpj,
+                  email,
+                  phone,
+                  plan: selectedPlanData,
+                  zipCode: userAddress.zipCode,
+                  streetNumber: userAddress.streetNumber,
+                  owner: ownerExists,
+                  customerId: ownerExists.paymentData.customerId
+                }
+                try {
+                  const updateCreditCard = await this.editCreditCard(editCreditCardDto);
+
+                  
+                } catch (error) {
+                  throw new BadRequestException(`Não foi possível atualizar o cartão de crédito do usuário junto ao serviço de pagamentos. Erro: ${error}`)
+                }
+              }
+            }
+            try {
+              const 
+            } catch (error) {
+              
+            }
           }
         }
 
