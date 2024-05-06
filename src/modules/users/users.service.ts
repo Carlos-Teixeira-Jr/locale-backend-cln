@@ -11,7 +11,7 @@ import { IUser, UserModelName } from 'common/schemas/User.schema'
 import { GetUserByEmailDto } from './dto/get-user-by-email-dto.sto'
 import { GetOwnerByUserId } from './dto/get-owner-by-user-id'
 import { IOwner, OwnerModelName } from 'common/schemas/Owner.schema'
-import { CreditCard, EditUserDto } from './dto/edit-user.dto'
+import { EditUserDto } from './dto/edit-user.dto'
 import { IProperty, PropertyModelName } from 'common/schemas/Property.schema'
 import { EditFavouriteDto } from './dto/edit-favourite.dto'
 import { GetFavouritesByUserDto } from './dto/favourite-property.dto'
@@ -413,7 +413,6 @@ export class UsersService {
         // Caso em que o usuário ainda não é um owner;
         if (!ownerId) {
           // Criar o objeto do owner;
-
           owner = {
             name: userName,
             phone,
@@ -429,7 +428,7 @@ export class UsersService {
             isActive: true,
           }
 
-          // Trocou o plano e selecionou o plano grátis;
+          // Trocou o plano e selecionou o plano grátis semser owner;
           if (selectedPlanData.name === 'Free') {
             owner.adCredits = adCredits
             owner.highlighCredits = highlightCredits
@@ -444,7 +443,7 @@ export class UsersService {
               )
             }
           } else {
-            // Trocou plano e selecionou plano pago
+            // Trocou plano e selecionou plano pago sem ser um owner;
 
             // Cadastrar o customer para este owner (novo owner);
             try {
@@ -518,10 +517,8 @@ export class UsersService {
                   },
                 )
 
-                // Se a resposta for bem-sucedida, manipule os dados da resposta
                 const responseData = response.data
 
-                // Atribuir os valores da resposta às variáveis
                 const creditCardInfo = responseData.creditCard
                 const subscriptionId = responseData.id
 
@@ -569,70 +566,62 @@ export class UsersService {
           return response
         } else {
           // Usuário já possui um owner cadastrado;
-          const ownerExists = await this.ownerModel.findById(ownerId);
+          const ownerExists = await this.ownerModel.findById(ownerId)
 
           if (!ownerExists) {
-            throw new NotFoundException(`Não foi possível encontrr o anunciante com o id: ${ownerId}`)
+            throw new NotFoundException(
+              `Não foi possível encontrr o anunciante com o id: ${ownerId}`,
+            )
           }
 
+          owner = ownerExists
+
           // Esta trocando o plano de um pago para o grátis;
-          if (selectedPlanData.name === 'Free' && ownerExists.plan !== selectedPlanData._id) {
+          if (
+            selectedPlanData.name === 'Free' &&
+            owner.plan !== selectedPlanData._id
+          ) {
             // Cancelar a assinatura do customer;
             try {
-              await axios.delete(`${paymentUrl}/payment/subscription/${ownerExists.paymentData.subscriptionId}`)
+              await axios.delete(
+                `${paymentUrl}/payment/subscription/${owner.paymentData.subscriptionId}`,
+              )
 
               // Deletar o subscriptionId;
-              delete owner.paymentData.subscriptionId;
+              delete owner.paymentData.subscriptionId
 
               // Atualizar os créditos;
               try {
                 await this.ownerModel.findByIdAndUpdate(
-                  { _id: ownerExists._id },
-                  { 
+                  { _id: owner._id },
+                  {
                     $unset: { subscriptionId: 1 },
-                    $set: { adCredits: 1, highlightCredits: 0 }
+                    $set: { adCredits: 1, highlightCredits: 0 },
                   },
-                  {session},
+                  { session },
                 )
-
-                // Desativar os anúncios do owner;
-                try {
-                  // Buscar os anúncios do owner;
-                  const ownerProperties = await this.propertyModel.find({
-                    owner: ownerId,
-                    isActive: true
-                  }).lean();
-
-                  let propertiesToDeactivate = [];
-
-                  // Inserir os ids dos anuncios ativos do owner no array;
-                  ownerProperties.forEach((prop) => {
-                    const propertyId = prop._id.toString();
-                    propertiesToDeactivate.push(propertyId)
-                  })
-
-                  // Desativar os anúncios dentro do array
-                  await this.propertyModel.updateMany(
-                    { _id: { $in: propertiesToDeactivate } },
-                    { $set: { isActive: false } },
-                    session,
-                  )
-                } catch (error) {
-                  throw new BadRequestException(`Não foi possível desativar os anúncios do anunciante. Erro: ${error}`);
-                }
               } catch (error) {
-                throw new BadRequestException(`Não foi posspivel atualizar o anunciante: Erro: ${error}`)
+                throw new BadRequestException(
+                  `Não foi posspivel atualizar o anunciante: Erro: ${error}`,
+                )
               }
             } catch (error) {
-              throw new BadRequestException(`Não foi possível cancelar a assinatura do owner. Erro: ${error}`)
+              throw new BadRequestException(
+                `Não foi possível cancelar a assinatura do owner. Erro: ${error}`,
+              )
             }
-          } else if (selectedPlanData._id !== plan && selectedPlanData.name !== 'Free') {
-            // Está trocando o plano de um pago para outro pago
+          } else if (
+            selectedPlanData._id !== plan &&
+            selectedPlanData.name !== 'Free'
+          ) {
+            // Está trocando o plano de um pago para outro pago;
             // Verificar se foi passado os dados do cartão de crédito;
             if (body.creditCard !== undefined) {
-              const cardNumberToken = ownerExists.paymentData.creditCardInfo.creditCardNumber;
-              const cardLastNumbers = cardNumberToken.slice(-4);
+              const cardNumberToken =
+                ownerExists.paymentData.creditCardInfo.creditCardNumber
+              const cardLastNumbers = cardNumberToken.slice(-4)
               // Verifica se mudou o cartão de crédito;
+
               if (cardLastNumbers !== cardNumber.slice(-4)) {
                 // Novo cartão
                 const editCreditCardDto: EditCreditCardDto = {
@@ -647,143 +636,143 @@ export class UsersService {
                   zipCode: userAddress.zipCode,
                   streetNumber: userAddress.streetNumber,
                   owner: ownerExists,
-                  customerId: ownerExists.paymentData.customerId
+                  customerId: ownerExists.paymentData.customerId,
                 }
                 try {
-                  const updateCreditCard = await this.editCreditCard(editCreditCardDto);
+                  // Atualizar cartão de crédito;
+                  const updateCreditCard = await this.editCreditCard(
+                    editCreditCardDto,
+                  )
 
-                  
+                  if (updateCreditCard.success) {
+                    const { updatedPaymentData } = updateCreditCard
+
+                    try {
+                      await this.ownerModel.findByIdAndUpdate(
+                        { _id: ownerExists._id },
+                        {
+                          $set: {
+                            plan,
+                            adCredits: selectedPlanData.commonAd,
+                            highlightCredits: selectedPlanData.highlightAd,
+                            paymentData: updatedPaymentData,
+                          },
+                        },
+                        { session },
+                      )
+
+                      // Atualizar a assinatura
+                      try {
+                        await axios.post(
+                          //Atualiza o valor do plano;
+                          `${process.env.PAYMENT_URL}/payment/update-subscription/${updatedPaymentData.subscriptionId}`,
+                          {
+                            headers: {
+                              'Content-Type': 'application/json',
+                              access_token: process.env.ASAAS_API_KEY || '',
+                            },
+                          },
+                        )
+                      } catch (error) {
+                        throw new BadRequestException(
+                          `Não foi possível atualizar a assinatura do anunciante junto ao serviço de pagamentos. Erro: ${error}`,
+                        )
+                      }
+                    } catch (error) {
+                      throw new BadRequestException(
+                        `Não foi possível atualizar os dados depagamento do anunciante. Erro: ${error}`,
+                      )
+                    }
+                  }
                 } catch (error) {
-                  throw new BadRequestException(`Não foi possível atualizar o cartão de crédito do usuário junto ao serviço de pagamentos. Erro: ${error}`)
+                  throw new BadRequestException(
+                    `Não foi possível atualizar o cartão de crédito do usuário junto ao serviço de pagamentos. Erro: ${error}`,
+                  )
                 }
               }
-            }
-            try {
-              const 
-            } catch (error) {
-              
-            }
-          }
-        }
-
-        // Caso em que o usuário já é um owner;
-        const ownerExists = await this.ownerModel.findById(ownerId)
-
-        if (!ownerExists || !ownerExists.isActive) {
-          throw new NotFoundException(
-            `O usuário com o id: ${userId} não possui nenhum anúncio cadastrado.`,
-          )
-        }
-
-        // Atualizar plano do owner;
-        if (plan !== ownerExists.plan) {
-          const selectedPlanData = await this.planModel.findById(plan)
-          const { subscriptionId, customerId, creditCardInfo } =
-            owner.paymentData
-          const { creditCardToken } = creditCardInfo
-          let nextDueDate
-
-          //Buscar a assinatura do usuário para verificar a data de cobrança;
-          const subscriptionData = await axios.get(
-            `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
-            {
-              headers: {
-                'Content-Type': 'application/json',
-                access_token: process.env.ASAAS_API_KEY || '',
-              },
-            },
-          )
-
-          if (subscriptionData.status >= 200 && subscriptionData.status < 300) {
-            nextDueDate = subscriptionData.data.nextDueDate
-          } else {
-            // Cria a data de vencimento para o caso do cliente anteriormente estar usando a conta grátis ou não ter conta;
-            const currentDate = new Date()
-            const year = currentDate.getFullYear()
-            const month = (currentDate.getMonth() + 1)
-              .toString()
-              .padStart(2, '0')
-            const day = currentDate.getDate().toString().padStart(2, '0')
-            const formattedDate = `${year}-${month}-${day}`
-
-            nextDueDate = formattedDate
-          }
-
-          if (
-            selectedPlanData.name !== 'Free' &&
-            selectedPlanData._id !== owner.plan
-          ) {
-            // Cria um body condicinal que usa o token do cartão caso este já esteja salvo, se não, usa os dados do cartão passados na requisição;
-            const paymentBody: UpdateSubscriptionBody = {
-              billingType: 'CREDIT_CARD',
-              cycle: 'MONTHLY',
-              customer: customerId,
-              value: selectedPlanData.price,
-              nextDueDate,
-              updatePendingPayments: true,
-            }
-
-            // Se passou dados do cartão usa esses dados, se não tenta usar o token salvo do cartão;
-            if (body.creditCard !== undefined) {
-              paymentBody.creditCard = {
-                cardName: cardName,
-                cardNumber,
-                ccv,
-                expiry,
-                cpfCnpj,
-              }
-            } else if (
-              owner.paymentData.creditCardInfo.creditCardToken !== undefined
-            ) {
-              paymentBody.creditCardToken = creditCardToken
             } else {
-              throw new BadRequestException(
-                `Os dados do cartão de crédito não foram informados e não estão acessíveis na conta do usuário.`,
-              )
-            }
+              // Os dados de cartão não foram alterados pelo usuário;
+              try {
+                //Atualiza o valor do plano;
+                await axios.post(
+                  `${process.env.PAYMENT_URL}/payment/update-subscription/${owner.paymentData.subscriptionId}`,
+                  {
+                    headers: {
+                      'Content-Type': 'application/json',
+                      access_token: process.env.ASAAS_API_KEY || '',
+                    },
+                  },
+                )
 
-            const response = await axios.post(
-              //Atualiza o valor do plano;
-              `${process.env.PAYMENT_URL}/payment/update-subscription/${subscriptionId}`,
-              body,
-              {
-                headers: {
-                  'Content-Type': 'application/json',
-                  access_token: process.env.ASAAS_API_KEY || '',
-                },
-              },
-            )
+                owner = {
+                  ...owner,
+                  adCredits,
+                  highlightCredits,
+                  plan,
+                }
 
-            if (response.status <= 200 && response.status > 300) {
-              throw new Error(
-                `Falha ao atualizar a assinatura: ${response.statusText}`,
-              )
+                // Atualiza o owner;
+                try {
+                  await this.ownerModel.findByIdAndUpdate(
+                    { _id: owner._id },
+                    {
+                      $set: {
+                        owner,
+                      },
+                    },
+                    { session },
+                  )
+                } catch (error) {
+                  throw new BadRequestException(
+                    `Não foi possível atualizar os dados do anunciante. Erro: ${error}`,
+                  )
+                }
+              } catch (error) {
+                throw new BadRequestException(
+                  `Não foi possível atualizar a assinatura do anunciante junto ao serviço de pagamentos. Erro: ${error}`,
+                )
+              }
             }
           }
         }
+      }
 
-        await this.ownerModel.updateOne(
-          { _id: ownerId },
-          {
-            $set: {
-              name: ownerName,
-              phone,
-              cellPhone,
-              userId: user,
-              adCredits,
-              picture: profilePicture,
-              plan: selectedPlanData._id,
-            },
-          },
-          { session },
+      try {
+        await this.ownerModel.findByIdAndUpdate([{ owner }], { session })
+      } catch (error) {
+        throw new BadRequestException(
+          `Não foi possível atualizar os dados do anunciante. Erro: ${error}`,
         )
+      }
 
-        updatedOwner = await this.ownerModel.findById(ownerId).lean()
+      // Desativar os anúncios do owner;
+      try {
+        // Buscar os anúncios do owner;
+        const ownerProperties = await this.propertyModel
+          .find({
+            owner: ownerId,
+            isActive: true,
+          })
+          .lean()
 
-        response = {
-          success: true,
-          updatedOwner,
-        }
+        let propertiesToDeactivate = []
+
+        // Inserir os ids dos anuncios ativos do owner no array;
+        ownerProperties.forEach(prop => {
+          const propertyId = prop._id.toString()
+          propertiesToDeactivate.push(propertyId)
+        })
+
+        // Desativar os anúncios dentro do array
+        await this.propertyModel.updateMany(
+          { _id: { $in: propertiesToDeactivate } },
+          { $set: { isActive: false } },
+          session,
+        )
+      } catch (error) {
+        throw new BadRequestException(
+          `Não foi possível desativar os anúncios do anunciante. Erro: ${error}`,
+        )
       }
 
       response = { success: true }
@@ -798,10 +787,12 @@ export class UsersService {
         exception: '> exception',
       })
       throw error
+    } finally {
+      session.endSession();
     }
   }
 
-  async editCreditCard(body: EditCreditCardDto): Promise<{ success: boolean }> {
+  async editCreditCard(body: EditCreditCardDto): Promise<any> {
     try {
       this.logger.log({}, 'edit credit card')
 
@@ -819,6 +810,9 @@ export class UsersService {
         owner,
         customerId,
       } = body
+
+      let creditCardInfo
+      let newSubscriptionData
 
       // Cadastrar os dados do novo cartão de crédito no owner do usuário;
       const ownerExists = await this.ownerModel.findById(owner)
@@ -993,12 +987,12 @@ export class UsersService {
         if (!response.ok)
           throw new Error('Não foi possível criar a nova assinatura')
 
-        const newSubscriptionData = await newSubscription.json()
+        newSubscriptionData = await newSubscription.json()
 
         if (newSubscriptionData.statusCode === 400)
           throw new Error('Não foi possível criar a nova assinatura')
 
-        const creditCardInfo = newSubscriptionData.creditCard
+        creditCardInfo = newSubscriptionData.creditCard
 
         await this.ownerModel.updateOne(
           { _id: ownerExists._id },
@@ -1017,7 +1011,15 @@ export class UsersService {
         )
       }
 
-      return { success: true }
+      return {
+        success: true,
+        updatedPaymentData: {
+          creditCardInfo,
+          subscriptionId: newSubscriptionData.id,
+          customerId: ownerExists.paymentData.customerId,
+          cpfCnpj,
+        },
+      }
     } catch (error) {
       this.logger.error({
         error: JSON.stringify(error),
