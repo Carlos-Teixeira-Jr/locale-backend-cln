@@ -308,6 +308,9 @@ export class UsersService {
       let password
       let passwordConfirmattion
 
+      let expiryYear
+      let expiryMonth
+
       const currentDate = new Date()
       const year = currentDate.getFullYear()
       const month = (currentDate.getMonth() + 1).toString().padStart(2, '0')
@@ -336,10 +339,10 @@ export class UsersService {
         expiry = body.creditCard.expiry
         ccv = body.creditCard.ccv
         cpfCnpj = body.creditCard.cpfCnpj
-      }
 
-      const expiryYear = `20${expiry[2] + expiry[3]}`
-      const expiryMonth = `${expiry[0] + expiry[1]}`
+        expiryYear = `20${expiry[2] + expiry[3]}`
+        expiryMonth = `${expiry[0] + expiry[1]}`
+      }
 
       const userExists = await this.userModel.findOne({ _id: userId })
 
@@ -431,11 +434,12 @@ export class UsersService {
           // Trocou o plano e selecionou o plano grátis semser owner;
           if (selectedPlanData.name === 'Free') {
             owner.adCredits = adCredits
-            owner.highlighCredits = highlightCredits
+            owner.highlightCredits = highlightCredits
             try {
               const createdOwner = await this.ownerModel.create([owner], {
                 session,
               })
+              console.log("🚀 ~ UsersService ~ editUser ~ createdOwner:", createdOwner)
               owner = createdOwner[0]
             } catch (error) {
               throw new BadRequestException(
@@ -552,7 +556,7 @@ export class UsersService {
             }
           }
 
-          updatedOwner = await this.ownerModel.findById(ownerId).lean()
+          updatedOwner = await this.ownerModel.findById(owner._id).lean()
 
           response = {
             success: true,
@@ -566,7 +570,7 @@ export class UsersService {
           return response
         } else {
           // Usuário já possui um owner cadastrado;
-          const ownerExists = await this.ownerModel.findById(ownerId)
+          const ownerExists = await this.ownerModel.findById(ownerId).lean();
 
           if (!ownerExists) {
             throw new NotFoundException(
@@ -610,10 +614,151 @@ export class UsersService {
                 `Não foi possível cancelar a assinatura do owner. Erro: ${error}`,
               )
             }
+
           } else if (
-            selectedPlanData._id !== plan &&
-            selectedPlanData.name !== 'Free'
+            owner.plan !== plan &&
+            selectedPlanData.name !== 'Free' &&
+            owner?.paymentData?.creditCardInfo?.creditCardToken === undefined
           ) {
+            // Caso em que o usuário trocou de um plano grátis para um plano pago e não tem o token de pagamento;
+            if (body.creditCard === undefined) {
+              throw new BadRequestException(
+                `Os dados de pagamento do cartão de rédito não foram passados.`,
+              )
+            }
+
+            // Criar o customer para esse owner
+            try {
+              const response = await axios.post(
+                `${paymentUrl}/customer`,
+                {
+                  name: owner.name,
+                  email,
+                  phone: cellPhone,
+                  postalCode: userAddress.zipCode,
+                  description: 'Confirmação de criação de id de cliente',
+                  cpfCnpj,
+                  addressNumber: userAddress.streetNumber,
+                },
+                {
+                  headers: {
+                    'Content-Type': 'application/json',
+                    access_token: process.env.ASAAS_API_KEY || '',
+                  },
+                },
+              )
+
+              const customerData = response.data
+
+              owner = {
+                ...owner,
+                paymentData: {
+                  customerId: customerData.id,
+                },
+              }
+
+              // Gerar token do cartão de crédito;
+              try {
+                const response = await axios.post(
+                  `${process.env.PAYMENT_URL}/payment/tokenize`,
+                  {
+                    billingType: 'CREDIT_CARD',
+                    cycle: 'MONTHLY',
+                    customer: owner.paymentData.customerId,
+                    value: selectedPlanData.price,
+                    nextDueDate: formattedDate,
+                    creditCard: {
+                      holderName: cardName,
+                      number: cardNumber,
+                      expiryMonth,
+                      expiryYear,
+                      ccv,
+                    },
+                    creditCardHolderInfo: {
+                      name: cardName,
+                      email,
+                      phone: cellPhone,
+                      cpfCnpj,
+                      postalCode: userAddress.zipCode,
+                      addressNumber: userAddress.streetNumber,
+                    },
+                  },
+                  {
+                    headers: {
+                      'Content-Type': 'application/json',
+                      access_token: process.env.ASAAS_API_KEY || '',
+                    },
+                  },
+                )
+
+                const responseData = response.data;
+                const creditCardInfo = responseData
+
+                // Atualiza os dados de pagamento do usuário com o token;
+                owner = {
+                  ...owner,
+                  paymentData: {
+                    ...owner.paymentData,
+                    creditCardInfo,
+                  },
+                }
+
+                // Cria a assinatura;
+                try {
+                  if (owner.paymentData.creditCardInfo.creditCardToken) {
+                    const newSubscription = await axios.post(
+                      `${process.env.PAYMENT_URL}/payment/subscription`,
+                      {
+                        customer: owner.paymentData.customerId,
+                        value: selectedPlanData.price,
+                        nextDueDate: formattedDate,
+                        billingType: 'CREDIT_CARD',
+                        cycle: 'MONTHLY',
+                        creditCardToken:
+                          owner.paymentData.creditCardInfo.creditCardToken,
+                      },
+                      {
+                        headers: {
+                          'Content-Type': 'application/json',
+                          access_token: process.env.ASAAS_API_KEY || '',
+                        },
+                      },
+                    )
+
+                    const subscriptionData = newSubscription.data
+                    const subscriptionId = subscriptionData.id
+
+                    // Atualiza o owner;
+                    owner = {
+                      ...owner,
+                      plan: selectedPlanData._id,
+                      adCredits: selectedPlanData.commonAd,
+                      highlightCredits: selectedPlanData.highlightAd,
+                      paymentData: {
+                        ...owner.paymentData,
+                        subscriptionId,
+                        cpfCnpj,
+                      },
+                    }
+                  } else {
+                    // Cria assinatura com dados do cartão;
+                  }
+                } catch (error) {
+                  throw new BadRequestException(
+                    `Não foi possível criar uma assinatura junto ao serviço de pagamentos. Erro: ${error}`,
+                  )
+                }
+              } catch (error) {
+                throw new Error(
+                  'Não foi possível gerar um token dos dados do cartão',
+                )
+              }
+            } catch (error) {
+              throw new BadRequestException(
+                `Não foi possível criar um cliente junto ao serviço de pagamentos. Erro: ${error}`,
+              )
+            }
+          } else if (owner.plan !== plan && selectedPlanData.name !== 'Free') {
             // Está trocando o plano de um pago para outro pago;
             // Verificar se foi passado os dados do cartão de crédito;
             if (body.creditCard !== undefined) {
@@ -635,7 +780,7 @@ export class UsersService {
                   plan: selectedPlanData,
                   zipCode: userAddress.zipCode,
                   streetNumber: userAddress.streetNumber,
-                  owner: ownerExists,
+                  owner,
                   customerId: ownerExists.paymentData.customerId,
                 }
                 try {
@@ -706,8 +851,8 @@ export class UsersService {
 
                 owner = {
                   ...owner,
-                  adCredits,
-                  highlightCredits,
+                  adCredits: selectedPlanData.commonAd,
+                  highlightCredits: selectedPlanData.highlightAd,
                   plan,
                 }
 
@@ -738,7 +883,13 @@ export class UsersService {
       }
 
       try {
-        await this.ownerModel.findByIdAndUpdate([{ owner }], { session })
+        await this.ownerModel.updateOne(
+          { _id: owner._id }, 
+          {
+            $set: owner
+          },
+          { session }
+        )
       } catch (error) {
         throw new BadRequestException(
           `Não foi possível atualizar os dados do anunciante. Erro: ${error}`,
@@ -788,7 +939,7 @@ export class UsersService {
       })
       throw error
     } finally {
-      session.endSession();
+      session.endSession()
     }
   }
 
