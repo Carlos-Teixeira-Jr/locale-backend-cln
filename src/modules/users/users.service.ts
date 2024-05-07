@@ -439,7 +439,10 @@ export class UsersService {
               const createdOwner = await this.ownerModel.create([owner], {
                 session,
               })
-              console.log("🚀 ~ UsersService ~ editUser ~ createdOwner:", createdOwner)
+              console.log(
+                '🚀 ~ UsersService ~ editUser ~ createdOwner:',
+                createdOwner,
+              )
               owner = createdOwner[0]
             } catch (error) {
               throw new BadRequestException(
@@ -570,7 +573,7 @@ export class UsersService {
           return response
         } else {
           // Usuário já possui um owner cadastrado;
-          const ownerExists = await this.ownerModel.findById(ownerId).lean();
+          const ownerExists = await this.ownerModel.findById(ownerId).lean()
 
           if (!ownerExists) {
             throw new NotFoundException(
@@ -614,7 +617,6 @@ export class UsersService {
                 `Não foi possível cancelar a assinatura do owner. Erro: ${error}`,
               )
             }
-
           } else if (
             owner.plan !== plan &&
             selectedPlanData.name !== 'Free' &&
@@ -691,7 +693,7 @@ export class UsersService {
                   },
                 )
 
-                const responseData = response.data;
+                const responseData = response.data
                 const creditCardInfo = responseData
 
                 // Atualiza os dados de pagamento do usuário com o token;
@@ -759,15 +761,13 @@ export class UsersService {
               )
             }
           } else if (owner.plan !== plan && selectedPlanData.name !== 'Free') {
-            // Está trocando o plano de um pago para outro pago;
+            // Está trocando o plano de um pago para outro pago e tem token;
             // Verificar se foi passado os dados do cartão de crédito;
+            const cardNumberToken = ownerExists.paymentData.creditCardInfo.creditCardNumber
+            const cardLastNumbers = cardNumber.slice(-4)
             if (body.creditCard !== undefined) {
-              const cardNumberToken =
-                ownerExists.paymentData.creditCardInfo.creditCardNumber
-              const cardLastNumbers = cardNumberToken.slice(-4)
               // Verifica se mudou o cartão de crédito;
-
-              if (cardLastNumbers !== cardNumber.slice(-4)) {
+              if (cardLastNumbers !== cardNumberToken) {
                 // Novo cartão
                 const editCreditCardDto: EditCreditCardDto = {
                   cardName,
@@ -834,9 +834,32 @@ export class UsersService {
                     `Não foi possível atualizar o cartão de crédito do usuário junto ao serviço de pagamentos. Erro: ${error}`,
                   )
                 }
+              } else {
+                // Usuário não mudou o cartão de crédito
+                // Atualizar assinatura;
+                try {
+                  await axios.post(
+                    `${process.env.PAYMENT_URL}/payment/update-subscription/${owner.paymentData.subscriptionId}`,
+                    {
+                      headers: {
+                        'Content-Type': 'application/json',
+                        access_token: process.env.ASAAS_API_KEY || '',
+                      },
+                    },
+                  )
+
+                  owner.creditCard = selectedPlanData.commonAd;
+                  owner.highlighCredits = selectedPlanData.highlightAd;
+                  owner.plan = selectedPlanData._id;
+                } catch (error) {
+                  throw new BadRequestException(
+                    `Não foi possível atualizar a assinatura do anunciante junto ao serviço de pagamentos. Erro: ${error}`,
+                  )
+                }
               }
             } else {
               // Os dados de cartão não foram alterados pelo usuário;
+              // Atualizar assinatura;
               try {
                 //Atualiza o valor do plano;
                 await axios.post(
@@ -884,11 +907,11 @@ export class UsersService {
 
       try {
         await this.ownerModel.updateOne(
-          { _id: owner._id }, 
+          { _id: owner._id },
           {
-            $set: owner
+            $set: owner,
           },
-          { session }
+          { session },
         )
       } catch (error) {
         throw new BadRequestException(
