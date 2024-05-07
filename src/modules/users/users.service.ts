@@ -533,7 +533,7 @@ export class UsersService {
                 owner.paymentData.creditCardInfo = creditCardInfo
                 owner.paymentData.subscriptionId = subscriptionId
                 owner.adCredits = adCredits
-                owner.highlighCredits = highlightCredits
+                owner.highlightCredits = highlightCredits
 
                 try {
                   // Cadastra o owner com dados de pagamento;
@@ -581,41 +581,35 @@ export class UsersService {
             )
           }
 
-          owner = ownerExists
+          owner = ownerExists;
 
           // Esta trocando o plano de um pago para o grátis;
           if (
             selectedPlanData.name === 'Free' &&
-            owner.plan !== selectedPlanData._id
+            owner.plan.toString() !== selectedPlanData._id.toString()
           ) {
-            // Cancelar a assinatura do customer;
-            try {
-              await axios.delete(
-                `${paymentUrl}/payment/subscription/${owner.paymentData.subscriptionId}`,
-              )
-
-              // Deletar o subscriptionId;
-              delete owner.paymentData.subscriptionId
-
-              // Atualizar os créditos;
+            if (owner.paymentData !== undefined) {
+              // Caso em que o owner já possui dados de pagamento salvos;
               try {
-                await this.ownerModel.findByIdAndUpdate(
-                  { _id: owner._id },
-                  {
-                    $unset: { subscriptionId: 1 },
-                    $set: { adCredits: 1, highlightCredits: 0 },
-                  },
-                  { session },
+                // Cancela a assinatura
+                await axios.delete(
+                  `${paymentUrl}/payment/subscription/${owner.paymentData.subscriptionId}`,
                 )
+  
+                // Cancelar o customer;
+                await axios.delete(`${paymentUrl}/customer/${owner.paymentData.customerId}`)
+  
+                // Deletar os dados de pagamento;
+                delete owner.paymentData
+                owner.adCredits = selectedPlanData.commonAd
+                owner.highlightCredits = selectedPlanData.highlightAd
+                owner.plan = selectedPlanData._id
+  
               } catch (error) {
                 throw new BadRequestException(
-                  `Não foi posspivel atualizar o anunciante: Erro: ${error}`,
+                  `Não foi possível cancelar a assinatura do owner. Erro: ${error}`,
                 )
               }
-            } catch (error) {
-              throw new BadRequestException(
-                `Não foi possível cancelar a assinatura do owner. Erro: ${error}`,
-              )
             }
           } else if (
             owner.plan !== plan &&
@@ -841,6 +835,11 @@ export class UsersService {
                   await axios.post(
                     `${process.env.PAYMENT_URL}/payment/update-subscription/${owner.paymentData.subscriptionId}`,
                     {
+                      value: selectedPlanData.price,
+                      updatePendingPayments: true,
+                      description: `Assinatura do plano ${selectedPlanData.name}`
+                    },
+                    {
                       headers: {
                         'Content-Type': 'application/json',
                         access_token: process.env.ASAAS_API_KEY || '',
@@ -848,8 +847,8 @@ export class UsersService {
                     },
                   )
 
-                  owner.creditCard = selectedPlanData.commonAd;
-                  owner.highlighCredits = selectedPlanData.highlightAd;
+                  owner.adCredits = selectedPlanData.commonAd;
+                  owner.highlightCredits = selectedPlanData.highlightAd;
                   owner.plan = selectedPlanData._id;
                 } catch (error) {
                   throw new BadRequestException(
@@ -878,23 +877,6 @@ export class UsersService {
                   highlightCredits: selectedPlanData.highlightAd,
                   plan,
                 }
-
-                // Atualiza o owner;
-                try {
-                  await this.ownerModel.findByIdAndUpdate(
-                    { _id: owner._id },
-                    {
-                      $set: {
-                        owner,
-                      },
-                    },
-                    { session },
-                  )
-                } catch (error) {
-                  throw new BadRequestException(
-                    `Não foi possível atualizar os dados do anunciante. Erro: ${error}`,
-                  )
-                }
               } catch (error) {
                 throw new BadRequestException(
                   `Não foi possível atualizar a assinatura do anunciante junto ao serviço de pagamentos. Erro: ${error}`,
@@ -910,6 +892,7 @@ export class UsersService {
           { _id: owner._id },
           {
             $set: owner,
+            $unset: { paymentData: 1 }
           },
           { session },
         )
@@ -1395,10 +1378,13 @@ export class UsersService {
           }
         }
 
-        // Charges
+        // Assinatura
         const plans = await this.planModel.find()
         const freePlan = plans.find(plan => plan.name === 'Free')
-        if (foundOwner.plan.toString() !== freePlan._id.toString()) {
+        if (
+          foundOwner.plan.toString() !== freePlan._id.toString()
+          && foundOwner.paymentData.subscriptionId !== undefined
+        ) {
           const subscriptionId = foundOwner.paymentData.subscriptionId
           const response = await axios.delete(
             `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
