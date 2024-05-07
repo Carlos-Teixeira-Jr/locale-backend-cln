@@ -7,7 +7,7 @@ import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import { LoggerService } from 'modules/logger/logger.service'
 import { InjectModel } from '@nestjs/mongoose'
 import { IProperty, PropertyModelName } from 'common/schemas/Property.schema'
-import mongoose, { Model, Schema } from 'mongoose'
+import mongoose, { Model, Mongoose, Schema } from 'mongoose'
 import { CommonQueryFilter } from 'common/utils/query.filter'
 import { CreatePropertyDto } from '../dto/create-property.dto'
 import { IOwner, OwnerModelName } from 'common/schemas/Owner.schema'
@@ -511,7 +511,7 @@ export class PropertyService {
       let uploadedImages: string | string[]
       let profilePicture: string | string[]
       let userFound
-      let ownerFound
+      let ownerFound;
 
       if (type === 'user') {
         isUser = true
@@ -555,7 +555,7 @@ export class PropertyService {
         )
       }
 
-      if (propertyId !== undefined) {
+      if (propertyId !== null) {
         await this.propertyModel.updateOne(
           { _id: propertyId },
           {
@@ -563,7 +563,7 @@ export class PropertyService {
               'ownerInfo.picture': profilePicture,
             },
           },
-          { upsert: true }, // Adiciona o documento se não existir
+          { upsert: true },
         )
       }
 
