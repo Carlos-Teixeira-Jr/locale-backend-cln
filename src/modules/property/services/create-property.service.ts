@@ -125,6 +125,7 @@ export class CreateProperty_Service {
         await this.activateDeactivateProperties(deactivatepropertiesBody)
       }
 
+      
       await this.handleLocationCreation(propertyData.address, session)
       await this.handlePropertyTypeCreation(propertyData.propertyType, session)
       await this.handleTagsCreation(propertyData.tags)
@@ -558,17 +559,12 @@ export class CreateProperty_Service {
 
           try {
             // Fazer a atualização do plano
-            const response = await axios.post(
-              //Atualiza o valor do plano;
+            await axios.post(
               `${process.env.PAYMENT_URL}/payment/update-subscription/${subscriptionId}`,
               {
-                billingType: 'CREDIT_CARD',
-                cycle: 'MONTHLY',
-                customer: paymentData.customerId,
-                value: price,
-                nextDueDate,
+                value: selectedPlan.price,
                 updatePendingPayments: true,
-                creditCardToken: paymentData.creditCardInfo.creditCardToken,
+                description: `Assinatura do plano ${selectedPlan.name}`,
               },
               {
                 headers: {
@@ -577,12 +573,6 @@ export class CreateProperty_Service {
                 },
               },
             )
-
-            if (response.status <= 200 && response.status > 300) {
-              throw new Error(
-                `Falha ao atualizar a assinatura: ${response.statusText}`,
-              )
-            }
 
             const newAdcredits = owner.adCredits - 1 + selectedPlan.commonAd
             const newHighlightCredits =
