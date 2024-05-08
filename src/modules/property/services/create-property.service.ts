@@ -90,7 +90,7 @@ export class CreateProperty_Service {
         ownerPreviousPlan,
       } = await this.getUserAndOwner(userData, isPlanFree, plan, session)
 
-      await this.handleCustomer(
+      const { updatedOwner } = await this.handleCustomer(
         isPlanFree,
         owner,
         userData,
@@ -102,7 +102,7 @@ export class CreateProperty_Service {
         await this.handlePayment(
           isPlanFree,
           selectedPlan,
-          owner,
+          updatedOwner,
           userData,
           creditCardData,
           cellPhone,
@@ -173,7 +173,7 @@ export class CreateProperty_Service {
   ): Promise<any> {
     let userAlreadyExists: boolean
     let user: IUser | null = null
-    let owner: IOwner | null = null
+    let owner: any = null
     let ownerPreviousPlan
 
     const {
@@ -253,7 +253,7 @@ export class CreateProperty_Service {
     const ownerExists = await this.ownerModel.findOne({
       userId: user._id,
       isActive: true,
-    })
+    }).lean()
 
     if (!ownerExists) {
       // Criar um novo proprietário
@@ -288,6 +288,7 @@ export class CreateProperty_Service {
       ownerPreviousPlan = ownerExists.plan
     }
 
+
     return {
       owner,
       userAlreadyExists,
@@ -306,10 +307,11 @@ export class CreateProperty_Service {
     creditCardData: any,
   ) {
     let cpfCnpj: string
+    let updatedOwner;
     const { address, email } = userData
     const { paymentData, name } = owner
 
-    if (!isPlanFree && !paymentData.customerId) {
+    if (!isPlanFree && !paymentData) {
       cpfCnpj = creditCardData.cpfCnpj
       // Cadastrar customer no payment api;
       const response = await axios.post(
@@ -334,14 +336,33 @@ export class CreateProperty_Service {
       if (response.status >= 200 && response.status < 300) {
         const customer = response.data
 
-        // Atualiza o 'customerId' no 'owner' e salva no banco de dados
-        paymentData.customerId = customer.id
-        paymentData.cpfCnpj = cpfCnpj
-        await owner.save()
+        updatedOwner = {
+          ...owner,
+          paymentData: {
+            ...owner.paymentData,
+            customerId: customer.id,
+            cpfCnpj
+          }
+        }
+        
+        try {
+          await this.ownerModel.updateOne(
+            { _id: owner._id },
+            { $set: updatedOwner }
+          )
+
+          return updatedOwner
+        } catch (error) {
+          throw new Error(`Falha ao atualizar o anunciante: ${response.statusText}`)
+        }
       } else {
         throw new Error(`Falha ao criar o cliente: ${response.statusText}`)
       }
     }
+
+    updatedOwner = owner;
+
+    return { updatedOwner };
   }
 
   private async handlePayment(
@@ -360,10 +381,15 @@ export class CreateProperty_Service {
     let cardNumber: string
     let ccv: string
 
+    let updatedOwner;
+
     const { address, email } = userData
     const { paymentData, adCredits, plan: ownerActualPlan } = owner
     const { price, _id: planId } = selectedPlan
     const previousPlanData = await this.planModel.findById(ownerPreviousPlan)
+
+    let newAdCredits;
+    let newHighlightCredits;
 
     if (creditCardData !== undefined) {
       cpfCnpj = creditCardData.cpfCnpj
@@ -387,7 +413,7 @@ export class CreateProperty_Service {
       const day = currentDate.getDate().toString().padStart(2, '0')
       const formattedDate = `${year}-${month}-${day}`
 
-      if (!paymentData.creditCardInfo.creditCardToken) {
+      if (!paymentData?.creditCardInfo?.creditCardToken) {
         const response = await axios.post(
           `${process.env.PAYMENT_URL}/payment/subscription`,
           {
@@ -405,7 +431,7 @@ export class CreateProperty_Service {
             },
             creditCardHolderInfo: {
               name: cardName,
-              email: email,
+              email,
               phone: cellPhone,
               cpfCnpj,
               postalCode: address.zipCode,
@@ -428,14 +454,31 @@ export class CreateProperty_Service {
           const creditCardInfo = responseData.creditCard
           const subscriptionId = responseData.id
 
-          // Salvar o token do cartão de crédito no banco de dados
-          owner.paymentData.creditCardInfo = creditCardInfo
-          owner.paymentData.subscriptionId = subscriptionId
+          newAdCredits = selectedPlan.price > previousPlanData.price ? previousPlanData.commonAd + selectedPlan.commonAd : previousPlanData.commonAd - selectedPlan.commonAd;
 
-          // Salvar as alterações no banco de dados
-          await owner.save()
+          newHighlightCredits = selectedPlan.price > previousPlanData.price ? previousPlanData.highlightAd + selectedPlan.highlightAd : previousPlanData.highlightAd - selectedPlan.highlightAd;
+
+          updatedOwner = {
+            ...owner,
+            plan: selectedPlan._id,
+            adCredits: newAdCredits,
+            highlightCredits: newHighlightCredits,
+            paymentData: {
+              ...owner.paymentData,
+              creditCardInfo,
+              subscriptionId
+            }
+          }
+
+          try {
+            await this.ownerModel.updateOne(
+              { _id: updatedOwner._id },
+              { $set: updatedOwner }
+            )
+          } catch (error) {
+            throw new Error(`Falha ao atualizar o anunciante: ${response.statusText}`)
+          }
         } else {
-          // Se a resposta não for bem-sucedida, lançar um erro
           throw new Error(`Falha ao gerar a cobrança: ${response.statusText}`)
         }
       } else {
