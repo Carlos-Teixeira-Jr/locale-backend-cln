@@ -13,8 +13,6 @@ import { Schema } from 'mongoose'
 export class PropertyActivationDto {
   @IsNotEmpty()
   @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => String)
   propertyId: string[]
 
   @IsNotEmpty()
