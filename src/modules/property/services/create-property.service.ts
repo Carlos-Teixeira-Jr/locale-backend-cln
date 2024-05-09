@@ -375,11 +375,11 @@ export class CreateProperty_Service {
     ownerPreviousPlan: string,
     session: any,
   ) {
-    let cpfCnpj: string
-    let expiry: string
-    let cardName: string
-    let cardNumber: string
-    let ccv: string
+    let cpfCnpj: string;
+    let expiry: string;
+    let cardName: string;
+    let cardNumber: string;
+    let ccv: string;
 
     let updatedOwner;
 
@@ -454,9 +454,9 @@ export class CreateProperty_Service {
           const creditCardInfo = responseData.creditCard
           const subscriptionId = responseData.id
 
-          newAdCredits = selectedPlan.price > previousPlanData.price ? previousPlanData.commonAd + selectedPlan.commonAd : previousPlanData.commonAd - selectedPlan.commonAd;
+          newAdCredits = selectedPlan.price > previousPlanData.price ? owner.adCredits + selectedPlan.commonAd : owner.adCredits - selectedPlan.commonAd;
 
-          newHighlightCredits = selectedPlan.price > previousPlanData.price ? previousPlanData.highlightAd + selectedPlan.highlightAd : previousPlanData.highlightAd - selectedPlan.highlightAd;
+          newHighlightCredits = selectedPlan.price > previousPlanData.price ? owner.highlightCredits + selectedPlan.highlightAd : owner.highlightCredits - selectedPlan.highlightAd;
 
           updatedOwner = {
             ...owner,
@@ -617,17 +617,21 @@ export class CreateProperty_Service {
               },
             )
 
-            const newAdcredits = owner.adCredits - 1 + selectedPlan.commonAd
-            const newHighlightCredits =
-              owner.highlightCredits > 0
-                ? owner.highlightCredits - 1 + selectedPlan.highlightAd
-                : owner.highlightCredits
+            // const newAdcredits = owner.adCredits - 1 + selectedPlan.commonAd
+            // const newHighlightCredits =
+            //   owner.highlightCredits > 0
+            //     ? owner.highlightCredits - 1 + selectedPlan.highlightAd
+            //     : owner.highlightCredits
+
+            newAdCredits = selectedPlan.price > previousPlanData.price ? owner.adCredits + selectedPlan.commonAd : selectedPlan.commonAd - 1;
+
+            newHighlightCredits = selectedPlan.price > previousPlanData.price ? owner.highlightCredits + selectedPlan.highlightAd : selectedPlan.highlightAd;
 
             try {
               const result = await this.ownerModel.updateOne(
                 { _id: owner._id },
                 {
-                  adCredits: newAdcredits,
+                  adCredits: newAdCredits,
                   highlighCredits: newHighlightCredits,
                   plan: selectedPlan._id,
                 },

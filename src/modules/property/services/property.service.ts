@@ -102,7 +102,7 @@ export class PropertyService {
 
       await incrementViews(property, isEdit, this.propertyModel)
 
-      return property
+      return property;
     } catch (error) {
       this.logger.error({
         error: JSON.stringify(error),
