@@ -317,7 +317,8 @@ export class UsersService {
       const day = currentDate.getDate().toString().padStart(2, '0')
       const formattedDate = `${year}-${month}-${day}`
 
-      if (body.owner) {
+      // To-do: fazer com que o owner não seja criado quando não for necessário;
+      if (body.owner && body.creditCard !== undefined) {
         ownerId = body.owner._id
         ownerName = body.owner.ownername
         user = body.owner.userId
@@ -327,7 +328,7 @@ export class UsersService {
         plan = body.owner.plan
       }
 
-      if (body.owner.plan !== undefined) {
+      if (body.owner.plan.toString() !== '') {
         selectedPlanData = await this.planModel.findById(body.owner.plan)
         adCredits = selectedPlanData.commonAd
         highlightCredits = selectedPlanData.highlightAd
@@ -889,7 +890,7 @@ export class UsersService {
         }
       }
 
-      if (owner.paymentData !== undefined) {
+      if (owner?.paymentData !== undefined) {
         try {
           await this.ownerModel.updateOne(
             { _id: owner._id },
@@ -903,7 +904,7 @@ export class UsersService {
             `Não foi possível atualizar os dados do anunciante. Erro: ${error}`,
           )
         }
-      } else {
+      } else if (owner?.paymentData) {
         try {
           await this.ownerModel.updateOne(
             { _id: owner._id },
@@ -921,33 +922,35 @@ export class UsersService {
       }
 
       // Desativar os anúncios do owner;
-      try {
-        // Buscar os anúncios do owner;
-        const ownerProperties = await this.propertyModel
-          .find({
-            owner: ownerId,
-            isActive: true,
+      if (owner) {
+        try {
+          // Buscar os anúncios do owner;
+          const ownerProperties = await this.propertyModel
+            .find({
+              owner: ownerId,
+              isActive: true,
+            })
+            .lean()
+  
+          let propertiesToDeactivate = []
+  
+          // Inserir os ids dos anuncios ativos do owner no array;
+          ownerProperties.forEach(prop => {
+            const propertyId = prop._id.toString()
+            propertiesToDeactivate.push(propertyId)
           })
-          .lean()
-
-        let propertiesToDeactivate = []
-
-        // Inserir os ids dos anuncios ativos do owner no array;
-        ownerProperties.forEach(prop => {
-          const propertyId = prop._id.toString()
-          propertiesToDeactivate.push(propertyId)
-        })
-
-        // Desativar os anúncios dentro do array
-        await this.propertyModel.updateMany(
-          { _id: { $in: propertiesToDeactivate } },
-          { $set: { isActive: false } },
-          session,
-        )
-      } catch (error) {
-        throw new BadRequestException(
-          `Não foi possível desativar os anúncios do anunciante. Erro: ${error}`,
-        )
+  
+          // Desativar os anúncios dentro do array
+          await this.propertyModel.updateMany(
+            { _id: { $in: propertiesToDeactivate } },
+            { $set: { isActive: false } },
+            session,
+          )
+        } catch (error) {
+          throw new BadRequestException(
+            `Não foi possível desativar os anúncios do anunciante. Erro: ${error}`,
+          )
+        }
       }
 
       response = { success: true }

@@ -140,8 +140,8 @@ export class CreateProperty_Service {
 
       return {
         createdProperty,
-        creditCardBrand: owner.paymentData.creditCardInfo
-          ? owner.paymentData.creditCardInfo.creditCardBrand
+        creditCardBrand: owner?.paymentData?.creditCardInfo
+          ? owner?.paymentData?.creditCardInfo?.creditCardBrand
           : null,
         paymentValue: null,
         userAlreadyExists,
@@ -351,7 +351,7 @@ export class CreateProperty_Service {
             { $set: updatedOwner }
           )
 
-          return updatedOwner
+          return { updatedOwner }
         } catch (error) {
           throw new Error(`Falha ao atualizar o anunciante: ${response.statusText}`)
         }
