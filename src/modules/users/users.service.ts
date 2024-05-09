@@ -91,6 +91,7 @@ export type UpdateSubscriptionBody = {
   creditCardHolderInfo?: CreditCardHolderInfo
 }
 
+const paymentUrl = process.env.PAYMENT_URL
 @Injectable()
 export class UsersService {
   constructor(
@@ -414,6 +415,7 @@ export class UsersService {
 
       // Caso em que o usuário quer mudar o plano;
       if (selectedPlanData) {
+        ownerId = body.owner._id
         // Caso em que o usuário ainda não é um owner;
         if (!ownerId) {
           // Criar o objeto do owner;
@@ -440,10 +442,6 @@ export class UsersService {
               const createdOwner = await this.ownerModel.create([owner], {
                 session,
               })
-              console.log(
-                '🚀 ~ UsersService ~ editUser ~ createdOwner:',
-                createdOwner,
-              )
               owner = createdOwner[0]
             } catch (error) {
               throw new BadRequestException(
@@ -603,10 +601,12 @@ export class UsersService {
                 )
 
                 // Deletar os dados de pagamento;
-                delete owner.paymentData
                 owner.adCredits = selectedPlanData.commonAd
                 owner.highlightCredits = selectedPlanData.highlightAd
                 owner.plan = selectedPlanData._id
+                // Remover a propriedade paymentData
+                const { paymentData, ...newOwner } = owner
+                owner = newOwner
               } catch (error) {
                 throw new BadRequestException(
                   `Não foi possível cancelar a assinatura do owner. Erro: ${error}`,
@@ -919,6 +919,14 @@ export class UsersService {
             `Não foi possível atualizar os dados do anunciante. Erro: ${error}`,
           )
         }
+      } else if (owner?.paymentData === undefined) {
+        await this.ownerModel.updateOne(
+          { _id: owner._id },
+          {
+            $set: owner,
+          },
+          { session },
+        )
       }
 
       // Desativar os anúncios do owner;
@@ -931,15 +939,15 @@ export class UsersService {
               isActive: true,
             })
             .lean()
-  
+
           let propertiesToDeactivate = []
-  
+
           // Inserir os ids dos anuncios ativos do owner no array;
           ownerProperties.forEach(prop => {
             const propertyId = prop._id.toString()
             propertiesToDeactivate.push(propertyId)
           })
-  
+
           // Desativar os anúncios dentro do array
           await this.propertyModel.updateMany(
             { _id: { $in: propertiesToDeactivate } },
@@ -1188,7 +1196,6 @@ export class UsersService {
           throw new Error('Não foi possível criar a nova assinatura')
         }
       }
-      
 
       return {
         success: true,
@@ -1405,14 +1412,25 @@ export class UsersService {
         const freePlan = plans.find(plan => plan.name === 'Free')
         if (
           foundOwner.plan.toString() !== freePlan._id.toString() &&
-          foundOwner.paymentData.subscriptionId !== undefined
+          foundOwner?.paymentData?.subscriptionId !== undefined
         ) {
-          const subscriptionId = foundOwner.paymentData.subscriptionId
+          const subscriptionId = foundOwner?.paymentData?.subscriptionId
           const response = await axios.delete(
             `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
           )
 
           if (response.status >= 200 && response.status < 300) {
+            // Deletar o customer;
+            try {
+              await axios.delete(
+                `${paymentUrl}/customer/${foundOwner.paymentData.customerId}`,
+              )
+            } catch (error) {
+              throw new BadRequestException(
+                `Não foi possível deletar o cliente junto ao serviço de pagamentos. Erro: ${error}`,
+              )
+            }
+
             // Remover a propriedade na memória
             delete foundOwner.paymentData.subscriptionId
 
