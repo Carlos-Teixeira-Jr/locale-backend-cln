@@ -310,7 +310,7 @@ export class PropertyService {
         propertyOwner.highlightCredits <= 0
       ) {
         throw new BadRequestException(
-          `O proprietário ${propertyOwner.name} não possúi mais créditos de destaque para destacar este anúncio!`,
+          `O proprietário ${propertyOwner.name} não possui mais créditos de destaque para destacar este anúncio!`,
         )
       }
 
@@ -555,7 +555,7 @@ export class PropertyService {
         )
       }
 
-      if (propertyId !== undefined) {
+      if (propertyId !== null) {
         await this.propertyModel.updateOne(
           { _id: propertyId },
           {
@@ -563,7 +563,7 @@ export class PropertyService {
               'ownerInfo.picture': profilePicture,
             },
           },
-          { upsert: true }, // Adiciona o documento se não existir
+          { upsert: true },
         )
       }
 
