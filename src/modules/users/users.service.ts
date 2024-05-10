@@ -1,3 +1,4 @@
+// @typescript-eslint/no-unused-vars
 import mongoose, { Model, ObjectId, Schema } from 'mongoose'
 import {
   BadRequestException,
@@ -280,8 +281,6 @@ export class UsersService {
       //const { password, passwordConfirmattion } = body.password
 
       let ownerId
-      let ownerName: string
-      let user
       let phone: string
       let cellPhone
       let plan: ObjectId
@@ -321,8 +320,6 @@ export class UsersService {
       // To-do: fazer com que o owner não seja criado quando não for necessário;
       if (body.owner && body.creditCard !== undefined) {
         ownerId = body.owner._id
-        ownerName = body.owner.ownername
-        user = body.owner.userId
         phone = body.owner.phone
         cellPhone = body.owner.cellPhone
         adCredits = body.owner.adCredits
@@ -606,6 +603,10 @@ export class UsersService {
                 owner.plan = selectedPlanData._id
                 // Remover a propriedade paymentData
                 const { paymentData, ...newOwner } = owner
+                console.log(
+                  '🚀 ~ UsersService ~ editUser ~ paymentData:',
+                  paymentData,
+                )
                 owner = newOwner
               } catch (error) {
                 throw new BadRequestException(
@@ -940,7 +941,7 @@ export class UsersService {
             })
             .lean()
 
-          let propertiesToDeactivate = []
+          const propertiesToDeactivate = []
 
           // Inserir os ids dos anuncios ativos do owner no array;
           ownerProperties.forEach(prop => {

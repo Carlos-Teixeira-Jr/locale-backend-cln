@@ -64,7 +64,7 @@ export class PropertyController {
   async createOne(
     @Body() createPropertyDto: CreatePropertyDto,
   ): Promise<IProperty> {
-    this.logger.log({}, 'createOne');
+    this.logger.log({}, 'createOne')
 
     return this.propertyService.createOne(createPropertyDto)
   }
@@ -108,6 +108,8 @@ export class PropertyController {
     summary: 'Highlight a property based on his propertyId.',
   })
   async highlightProperty(@Body() highlightPropertyDto: HighlightPropertyDto) {
+    this.logger.log({}, 'start highlightProperty > [controller]')
+
     return this.propertyService.highlightProperty(highlightPropertyDto)
   }
 

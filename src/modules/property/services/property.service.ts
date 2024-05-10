@@ -7,7 +7,7 @@ import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import { LoggerService } from 'modules/logger/logger.service'
 import { InjectModel } from '@nestjs/mongoose'
 import { IProperty, PropertyModelName } from 'common/schemas/Property.schema'
-import mongoose, { Model, Mongoose, Schema } from 'mongoose'
+import mongoose, { Model, Schema } from 'mongoose'
 import { CommonQueryFilter } from 'common/utils/query.filter'
 import { CreatePropertyDto } from '../dto/create-property.dto'
 import { IOwner, OwnerModelName } from 'common/schemas/Owner.schema'
@@ -102,7 +102,7 @@ export class PropertyService {
 
       await incrementViews(property, isEdit, this.propertyModel)
 
-      return property;
+      return property
     } catch (error) {
       this.logger.error({
         error: JSON.stringify(error),
@@ -310,7 +310,7 @@ export class PropertyService {
         propertyOwner.highlightCredits <= 0
       ) {
         throw new BadRequestException(
-          `O proprietário ${propertyOwner.name} não possúi mais créditos de destaque para destacar este anúncio!`,
+          `O proprietário ${propertyOwner.name} não possui mais créditos de destaque para destacar este anúncio!`,
         )
       }
 
@@ -511,7 +511,7 @@ export class PropertyService {
       let uploadedImages: string | string[]
       let profilePicture: string | string[]
       let userFound
-      let ownerFound;
+      let ownerFound
 
       if (type === 'user') {
         isUser = true

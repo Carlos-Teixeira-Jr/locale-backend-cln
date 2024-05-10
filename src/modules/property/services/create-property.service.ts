@@ -125,7 +125,6 @@ export class CreateProperty_Service {
         await this.activateDeactivateProperties(deactivatepropertiesBody)
       }
 
-      
       await this.handleLocationCreation(propertyData.address, session)
       await this.handlePropertyTypeCreation(propertyData.propertyType, session)
       await this.handleTagsCreation(propertyData.tags)
@@ -250,10 +249,12 @@ export class CreateProperty_Service {
     }
 
     // Verificar se o usuário já é proprietário
-    const ownerExists = await this.ownerModel.findOne({
-      userId: user._id,
-      isActive: true,
-    }).lean()
+    const ownerExists = await this.ownerModel
+      .findOne({
+        userId: user._id,
+        isActive: true,
+      })
+      .lean()
 
     if (!ownerExists) {
       // Criar um novo proprietário
@@ -306,7 +307,7 @@ export class CreateProperty_Service {
     creditCardData: any,
   ) {
     let cpfCnpj: string
-    let updatedOwner;
+    let updatedOwner
     const { address, email } = userData
     const { paymentData, name } = owner
 
@@ -340,28 +341,30 @@ export class CreateProperty_Service {
           paymentData: {
             ...owner.paymentData,
             customerId: customer.id,
-            cpfCnpj
-          }
+            cpfCnpj,
+          },
         }
-        
+
         try {
           await this.ownerModel.updateOne(
             { _id: owner._id },
-            { $set: updatedOwner }
+            { $set: updatedOwner },
           )
 
           return { updatedOwner }
         } catch (error) {
-          throw new Error(`Falha ao atualizar o anunciante: ${response.statusText}`)
+          throw new Error(
+            `Falha ao atualizar o anunciante: ${response.statusText}`,
+          )
         }
       } else {
         throw new Error(`Falha ao criar o cliente: ${response.statusText}`)
       }
     }
 
-    updatedOwner = owner;
+    updatedOwner = owner
 
-    return { updatedOwner };
+    return { updatedOwner }
   }
 
   private async handlePayment(
@@ -374,21 +377,21 @@ export class CreateProperty_Service {
     ownerPreviousPlan: string,
     session: any,
   ) {
-    let cpfCnpj: string;
-    let expiry: string;
-    let cardName: string;
-    let cardNumber: string;
-    let ccv: string;
+    let cpfCnpj: string
+    let expiry: string
+    let cardName: string
+    let cardNumber: string
+    let ccv: string
 
-    let updatedOwner;
+    let updatedOwner
 
     const { address, email } = userData
     const { paymentData, adCredits, plan: ownerActualPlan } = owner
     const { price, _id: planId } = selectedPlan
     const previousPlanData = await this.planModel.findById(ownerPreviousPlan)
 
-    let newAdCredits;
-    let newHighlightCredits;
+    let newAdCredits
+    let newHighlightCredits
 
     if (creditCardData !== undefined) {
       cpfCnpj = creditCardData.cpfCnpj
@@ -411,7 +414,6 @@ export class CreateProperty_Service {
 
     // Usuário mudou de plano pago;
     if (!isPlanFree && ownerActualPlanString !== planIdString) {
-
       if (!paymentData?.creditCardInfo?.creditCardToken) {
         const response = await axios.post(
           `${process.env.PAYMENT_URL}/payment/subscription`,
@@ -453,9 +455,15 @@ export class CreateProperty_Service {
           const creditCardInfo = responseData.creditCard
           const subscriptionId = responseData.id
 
-          newAdCredits = selectedPlan.price > previousPlanData.price ? owner.adCredits + selectedPlan.commonAd : owner.adCredits - selectedPlan.commonAd;
+          newAdCredits =
+            selectedPlan.price > previousPlanData.price
+              ? owner.adCredits + selectedPlan.commonAd
+              : owner.adCredits - selectedPlan.commonAd
 
-          newHighlightCredits = selectedPlan.price > previousPlanData.price ? owner.highlightCredits + selectedPlan.highlightAd : owner.highlightCredits - selectedPlan.highlightAd;
+          newHighlightCredits =
+            selectedPlan.price > previousPlanData.price
+              ? owner.highlightCredits + selectedPlan.highlightAd
+              : owner.highlightCredits - selectedPlan.highlightAd
 
           updatedOwner = {
             ...owner,
@@ -465,17 +473,19 @@ export class CreateProperty_Service {
             paymentData: {
               ...owner.paymentData,
               creditCardInfo,
-              subscriptionId
-            }
+              subscriptionId,
+            },
           }
 
           try {
             await this.ownerModel.updateOne(
               { _id: updatedOwner._id },
-              { $set: updatedOwner }
+              { $set: updatedOwner },
             )
           } catch (error) {
-            throw new Error(`Falha ao atualizar o anunciante: ${response.statusText}`)
+            throw new Error(
+              `Falha ao atualizar o anunciante: ${response.statusText}`,
+            )
           }
         } else {
           throw new Error(`Falha ao gerar a cobrança: ${response.statusText}`)
@@ -616,9 +626,15 @@ export class CreateProperty_Service {
               },
             )
 
-            newAdCredits = selectedPlan.price > previousPlanData.price ? owner.adCredits + selectedPlan.commonAd : selectedPlan.commonAd - 1;
+            newAdCredits =
+              selectedPlan.price > previousPlanData.price
+                ? owner.adCredits + selectedPlan.commonAd
+                : selectedPlan.commonAd
 
-            newHighlightCredits = selectedPlan.price > previousPlanData.price ? owner.highlightCredits + selectedPlan.highlightAd : selectedPlan.highlightAd;
+            newHighlightCredits =
+              selectedPlan.price > previousPlanData.price
+                ? owner.highlightCredits + selectedPlan.highlightAd
+                : selectedPlan.highlightAd
 
             try {
               const result = await this.ownerModel.updateOne(
@@ -693,12 +709,18 @@ export class CreateProperty_Service {
 
             // Condicional dos créditos para casos em que já havia um plano anterior ou não;
             if (!previousPlanData) {
-              newAdCredits = selectedPlan.commonAd;
-              newHighlightCredits = selectedPlan.highlightAd;
+              newAdCredits = selectedPlan.commonAd
+              newHighlightCredits = selectedPlan.highlightAd
             } else {
-              newAdCredits = selectedPlan.price > previousPlanData.price ? owner.adCredits + selectedPlan.commonAd : owner.adCredits - selectedPlan.commonAd;
+              newAdCredits =
+                selectedPlan.price > previousPlanData.price
+                  ? owner.adCredits + selectedPlan.commonAd
+                  : owner.adCredits - selectedPlan.commonAd
 
-              newHighlightCredits = selectedPlan.price > previousPlanData.price ? owner.highlightCredits + selectedPlan.highlightAd : owner.highlightCredits - selectedPlan.highlightAd;
+              newHighlightCredits =
+                selectedPlan.price > previousPlanData.price
+                  ? owner.highlightCredits + selectedPlan.highlightAd
+                  : owner.highlightCredits - selectedPlan.highlightAd
             }
 
             updatedOwner = {
@@ -709,15 +731,15 @@ export class CreateProperty_Service {
               paymentData: {
                 ...owner.paymentData,
                 creditCardInfo,
-                subscriptionId
-              }
+                subscriptionId,
+              },
             }
 
             // Atualiza o owner;
             await this.ownerModel.updateOne(
               { _id: updatedOwner._id },
               { $set: updatedOwner },
-              { session }
+              { session },
             )
           }
         } catch (error) {
@@ -726,11 +748,13 @@ export class CreateProperty_Service {
           )
         }
       } else {
-        throw new BadRequestException(`Não há mais créditos para fazer anúncios`);
+        throw new BadRequestException(
+          `Não há mais créditos para fazer anúncios`,
+        )
       }
     }
   }
-  
+
   private async handleLocationCreation(address: any, session: any) {
     await this.createOrUpdateLocation('city', address.city, session)
     await this.createOrUpdateLocation('uf', address.uf, session)
