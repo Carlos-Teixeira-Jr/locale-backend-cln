@@ -108,6 +108,8 @@ export class PropertyController {
     summary: 'Highlight a property based on his propertyId.',
   })
   async highlightProperty(@Body() highlightPropertyDto: HighlightPropertyDto) {
+    this.logger.log({}, 'start highlightProperty > [controller]')
+
     return this.propertyService.highlightProperty(highlightPropertyDto)
   }
 
@@ -139,7 +141,7 @@ export class PropertyController {
     return await this.propertyService.uploadPropertyImages(files, propertyId)
   }
 
-  @Post('upload-profile-image/:type/:propertyId')
+  @Post('upload-profile-image/:type/:propertyId?')
   @ApiOperation({
     summary: 'Upload user profile image based on his userId.',
   })
@@ -154,7 +156,7 @@ export class PropertyController {
     @UploadedFiles() files: Array<Express.Multer.File>,
     @Body('userId') userId: Schema.Types.ObjectId,
     @Param('type') type: string,
-    @Param('propertyId') propertyId: Schema.Types.ObjectId,
+    @Param('propertyId') propertyId: Schema.Types.ObjectId = null,
   ) {
     this.logger.info({}, 'uploadProfileImage > params')
 

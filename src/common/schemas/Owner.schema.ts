@@ -18,17 +18,17 @@ export interface IOwner extends BaseModel, Document {
   userId: Schema.Types.ObjectId
   highlightCredits: number
   adCredits: number
-  paymentData: {
+  paymentData?: {
     customerId: string
     subscriptionId: string
     cpfCnpj: string
-    creditCardInfo: {
+    creditCardInfo?: {
       creditCardNumber: string
       creditCardBrand: string
       creditCardToken: string
     }
   }
-  isNewCreditCard: boolean
+  isNewCreditCard?: boolean
   newPlan: boolean
   isActive: boolean
 }
