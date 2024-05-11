@@ -8,6 +8,7 @@ export const UserSchema = new Schema(
     email: { type: String },
     password: { type: String },
     picture: { type: String },
+    phone: { type: String },
     address: {
       zipCode: { type: String },
       city: { type: String },
@@ -48,6 +49,7 @@ export interface IUser extends Document {
   email: string
   password?: string
   picture: string
+  phone: string
   address: {
     zipCode: string
     city: string
