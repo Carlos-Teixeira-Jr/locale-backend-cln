@@ -196,7 +196,7 @@ export class UsersService {
 
       const user = await this.userModel
         .findOne({ _id: userId, isActive: true })
-        .select('username email address cpf picture')
+        .select('username email address cpf picture phone')
 
       if (!user) {
         throw new NotFoundException(
@@ -273,19 +273,15 @@ export class UsersService {
         email,
         cpf,
         address: userAddress,
-        profilePicture,
       } = body.user
 
       const paymentUrl = process.env.PAYMENT_URL
-
-      //const { password, passwordConfirmattion } = body.password
 
       let ownerId
       let phone: string
       let cellPhone
       let plan: ObjectId
       let selectedPlanData: IPlan
-      //let profilePicture: string
       let owner
       let paymentData = {
         customerId: '',
@@ -359,7 +355,7 @@ export class UsersService {
               email,
               cpf,
               address: userAddress,
-              picture: profilePicture ? profilePicture : '',
+              phone: cellPhone,
             },
           },
           { session },
@@ -387,7 +383,7 @@ export class UsersService {
                   cpf,
                   address: userAddress,
                   password: encryptedPassword,
-                  picture: profilePicture,
+                  phone: cellPhone,
                 },
               },
               { session },
@@ -402,7 +398,7 @@ export class UsersService {
                 email,
                 cpf,
                 address: userAddress,
-                picture: profilePicture,
+                phone: cellPhone,
               },
             },
             { session },
@@ -411,7 +407,7 @@ export class UsersService {
       }
 
       // Caso em que o usuário quer mudar o plano;
-      if (selectedPlanData) {
+      if (selectedPlanData._id.toString() !== plan) {
         ownerId = body.owner._id
         // Caso em que o usuário ainda não é um owner;
         if (!ownerId) {
@@ -921,17 +917,21 @@ export class UsersService {
           )
         }
       } else if (owner?.paymentData === undefined) {
-        await this.ownerModel.updateOne(
-          { _id: owner._id },
-          {
-            $set: owner,
-          },
-          { session },
-        )
+        try {
+          const ownerData = await this.ownerModel.findById(ownerId).lean()
+          console.log('🚀 ~ UsersService ~ editUser ~ ownerData:', ownerData)
+
+          owner = ownerData
+          console.log('🚀 ~ UsersService ~ editUser ~ owner:', owner)
+        } catch (error) {
+          throw new NotFoundException(
+            `Anuncioante não foi encontrado. Erro: ${error}`,
+          )
+        }
       }
 
-      // Desativar os anúncios do owner;
-      if (owner) {
+      // Desativar os anúncios do owner quando este troca de plano;
+      if (owner && selectedPlanData._id.toString() !== plan) {
         try {
           // Buscar os anúncios do owner;
           const ownerProperties = await this.propertyModel
