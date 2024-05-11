@@ -555,7 +555,9 @@ export class PropertyService {
         )
       }
 
-      if (propertyId !== null) {
+      console.log('🚀 ~ PropertyService ~ propertyId:', typeof propertyId)
+
+      if (typeof propertyId !== 'object') {
         await this.propertyModel.updateOne(
           { _id: propertyId },
           {
