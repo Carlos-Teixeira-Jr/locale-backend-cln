@@ -14,7 +14,7 @@ export interface IOwner extends BaseModel, Document {
     notification_id: Schema.Types.ObjectId
     isRead: boolean
   }[]
-  plan: Schema.Types.ObjectId
+  plan: Schema.Types.ObjectId | null
   userId: Schema.Types.ObjectId
   highlightCredits: number
   adCredits: number
@@ -47,7 +47,7 @@ export const OwnerSchema = new Schema(
         isRead: { type: Boolean, default: false },
       },
     ],
-    plan: { type: Schema.Types.ObjectId, ref: 'plan' },
+    plan: { type: Schema.Types.ObjectId, ref: 'plan', default: null },
     userId: { type: Schema.Types.ObjectId },
     adCredits: { type: Number },
     highlightCredits: { type: Number },

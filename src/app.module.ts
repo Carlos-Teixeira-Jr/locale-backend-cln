@@ -28,6 +28,7 @@ import { PropertyTypeModule } from './modules/property-type/property-type.module
 import { AuthService } from 'modules/auth/auth.service'
 import { JwtService } from '@nestjs/jwt'
 import { UserModelName, UserSchema } from 'common/schemas/User.schema'
+import { CouponModule } from './modules/coupon/coupon.module'
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { UserModelName, UserSchema } from 'common/schemas/User.schema'
     PlanModule,
     LocationModule,
     PropertyTypeModule,
+    CouponModule,
   ],
   controllers: [AppController, PaymentController, PlanController],
   providers: [

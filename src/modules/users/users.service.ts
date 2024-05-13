@@ -24,6 +24,7 @@ import { ILocation, LocationModelName } from 'common/schemas/Location.schema'
 import axios from 'axios'
 import { FindByUsernameDto } from './dto/find-by-username.dto'
 import { IPlan, PlanModelName } from 'common/schemas/Plan.schema'
+import { CouponModelName, ICoupon } from 'common/schemas/Coupon.schema'
 
 export type FindUserByOwnerOut = {
   owner: IOwner
@@ -110,6 +111,8 @@ export class UsersService {
     private readonly locationModel: Model<ILocation>,
     @InjectModel(PlanModelName)
     private readonly planModel: Model<IPlan>,
+    @InjectModel(CouponModelName)
+    private readonly couponModel: Model<ICoupon>,
   ) {}
 
   private async startSession() {
@@ -292,7 +295,6 @@ export class UsersService {
       let adCredits: number
       let highlightCredits: number
 
-      let updatedOwner
       let response
 
       let cardName
@@ -307,11 +309,18 @@ export class UsersService {
       let expiryYear
       let expiryMonth
 
+      let coupon
+
       const currentDate = new Date()
       const year = currentDate.getFullYear()
       const month = (currentDate.getMonth() + 1).toString().padStart(2, '0')
       const day = currentDate.getDate().toString().padStart(2, '0')
       const formattedDate = `${year}-${month}-${day}`
+
+      const plans = await this.planModel.find()
+      const plusPlan = plans
+        .find(plan => plan.name === 'Locale Plus')
+        .toObject()
 
       // To-do: fazer com que o owner não seja criado quando não for necessário;
       if (body.owner && body.creditCard !== undefined) {
@@ -322,8 +331,8 @@ export class UsersService {
         plan = body.owner.plan
       }
 
-      if (body.owner.plan.toString() !== '') {
-        selectedPlanData = await this.planModel.findById(body.owner.plan)
+      if (body.owner.plan?.toString() !== '' && body.owner.plan !== null) {
+        selectedPlanData = plans.find(plan => plan._id === body.owner.plan)
         adCredits = selectedPlanData.commonAd
         highlightCredits = selectedPlanData.highlightAd
       }
@@ -340,6 +349,23 @@ export class UsersService {
       }
 
       const userExists = await this.userModel.findOne({ _id: userId })
+      if (body.coupon) coupon = body.coupon
+
+      // Verifica a validade do coupon
+      // To-do: usar o modulo de cupons ao invés de usar diretamente o model aqui;
+      if (coupon !== undefined) {
+        const couponData = await this.couponModel.findOne({ coupon })
+
+        if (!couponData || !couponData.isActive) {
+          throw new BadRequestException(`Cupom de desconto inválido.`)
+        }
+
+        await this.couponModel.updateOne(
+          { _id: couponData._id },
+          { $set: { isActive: false } },
+          { session },
+        )
+      }
 
       if (!userExists || !userExists.isActive) {
         throw new NotFoundException(
@@ -407,7 +433,10 @@ export class UsersService {
       }
 
       // Caso em que o usuário quer mudar o plano;
-      if (selectedPlanData._id.toString() !== plan) {
+      if (
+        selectedPlanData?._id.toString() !== plan &&
+        selectedPlanData === undefined
+      ) {
         ownerId = body.owner._id
         // Caso em que o usuário ainda não é um owner;
         if (!ownerId) {
@@ -420,22 +449,26 @@ export class UsersService {
             picture: '',
             creci: '',
             notifications: [],
-            plan,
+            plan: null,
             userId,
             highlightCredits: 0,
             adCredits: 0,
             isActive: true,
           }
 
+          if (coupon) {
+            owner.adCredits = plusPlan.commonAd
+            owner.highlightCredits = plusPlan.highlightAd
+            owner.plan = plusPlan._id
+          }
+
           // Trocou o plano e selecionou o plano grátis semser owner;
-          if (selectedPlanData.name === 'Free') {
-            owner.adCredits = adCredits
-            owner.highlightCredits = highlightCredits
+          if (!selectedPlanData || selectedPlanData?.name === 'Free') {
             try {
               const createdOwner = await this.ownerModel.create([owner], {
                 session,
               })
-              owner = createdOwner[0]
+              owner = createdOwner[0].toObject()
             } catch (error) {
               throw new BadRequestException(
                 `Não foi possível criar o anunciante. Error: ${error}`,
@@ -484,48 +517,54 @@ export class UsersService {
 
               // Criar a assinatura
               try {
-                const response = await axios.post(
-                  `${process.env.PAYMENT_URL}/payment/subscription`,
-                  {
-                    billingType: 'CREDIT_CARD',
-                    cycle: 'MONTHLY',
-                    customer: paymentData.customerId,
-                    value: selectedPlanData.price,
-                    nextDueDate: formattedDate,
-                    creditCard: {
-                      holderName: cardName,
-                      number: cardNumber,
-                      expiryMonth,
-                      expiryYear,
-                      ccv,
+                if (!coupon) {
+                  const response = await axios.post(
+                    `${process.env.PAYMENT_URL}/payment/subscription`,
+                    {
+                      billingType: 'CREDIT_CARD',
+                      cycle: 'MONTHLY',
+                      customer: paymentData.customerId,
+                      value: selectedPlanData.price,
+                      nextDueDate: formattedDate,
+                      creditCard: {
+                        holderName: cardName,
+                        number: cardNumber,
+                        expiryMonth,
+                        expiryYear,
+                        ccv,
+                      },
+                      creditCardHolderInfo: {
+                        name: cardName,
+                        email: email,
+                        phone: cellPhone,
+                        cpfCnpj,
+                        postalCode: userAddress.zipCode,
+                        addressNumber: userAddress.streetNumber,
+                      },
                     },
-                    creditCardHolderInfo: {
-                      name: cardName,
-                      email: email,
-                      phone: cellPhone,
-                      cpfCnpj,
-                      postalCode: userAddress.zipCode,
-                      addressNumber: userAddress.streetNumber,
+                    {
+                      headers: {
+                        'Content-Type': 'application/json',
+                        access_token: process.env.ASAAS_API_KEY || '',
+                      },
                     },
-                  },
-                  {
-                    headers: {
-                      'Content-Type': 'application/json',
-                      access_token: process.env.ASAAS_API_KEY || '',
-                    },
-                  },
-                )
+                  )
 
-                const responseData = response.data
+                  const responseData = response.data
 
-                const creditCardInfo = responseData.creditCard
-                const subscriptionId = responseData.id
+                  const creditCardInfo = responseData.creditCard
+                  const subscriptionId = responseData.id
 
-                // Salvar o token do cartão de crédito no banco de dados
-                owner.paymentData.creditCardInfo = creditCardInfo
-                owner.paymentData.subscriptionId = subscriptionId
-                owner.adCredits = adCredits
-                owner.highlightCredits = highlightCredits
+                  // Salvar o token do cartão de crédito no banco de dados
+                  owner.paymentData.creditCardInfo = creditCardInfo
+                  owner.paymentData.subscriptionId = subscriptionId
+                  owner.adCredits = adCredits
+                  owner.highlightCredits = highlightCredits
+                } else {
+                  owner.adCredits = plusPlan.commonAd
+                  owner.highlightCredits = plusPlan.highlightAd
+                  owner.plan = plusPlan
+                }
 
                 try {
                   // Cadastra o owner com dados de pagamento;
@@ -551,11 +590,9 @@ export class UsersService {
             }
           }
 
-          updatedOwner = await this.ownerModel.findById(owner._id).lean()
-
           response = {
             success: true,
-            updatedOwner,
+            owner,
           }
 
           response = { success: true }
@@ -919,10 +956,24 @@ export class UsersService {
       } else if (owner?.paymentData === undefined) {
         try {
           const ownerData = await this.ownerModel.findById(ownerId).lean()
-          console.log('🚀 ~ UsersService ~ editUser ~ ownerData:', ownerData)
 
-          owner = ownerData
-          console.log('🚀 ~ UsersService ~ editUser ~ owner:', owner)
+          if (coupon) {
+            owner = {
+              ...ownerData,
+              adCredits: plusPlan.commonAd,
+              highlightCredits: plusPlan.highlightAd,
+              plan: plusPlan._id,
+            }
+          } else {
+            owner = ownerData
+          }
+
+          // Atualiza o owner;
+          await this.ownerModel.updateOne(
+            { _id: owner._id },
+            { $set: owner },
+            { session },
+          )
         } catch (error) {
           throw new NotFoundException(
             `Anuncioante não foi encontrado. Erro: ${error}`,
@@ -931,7 +982,7 @@ export class UsersService {
       }
 
       // Desativar os anúncios do owner quando este troca de plano;
-      if (owner && selectedPlanData._id.toString() !== plan) {
+      if (owner && selectedPlanData?._id?.toString() !== plan) {
         try {
           // Buscar os anúncios do owner;
           const ownerProperties = await this.propertyModel
@@ -978,6 +1029,120 @@ export class UsersService {
       session.endSession()
     }
   }
+
+  // async editUserWithCoupon(body: EditUserCouponDto): Promise<{ success: boolean }> {
+  //   const session = await this.startSession()
+  //   try {
+  //     await session.startTransaction()
+  //     this.logger.log({ body }, 'start edit user > [service]');
+
+  //     const {
+  //       id: userId,
+  //       username: userName,
+  //       email,
+  //       cpf,
+  //       address: userAddress,
+  //     } = body.user
+
+  //     const paymentUrl = process.env.PAYMENT_URL
+
+  //     let ownerId
+  //     let phone: string
+  //     let cellPhone
+  //     let plan: ObjectId
+  //     let plans;
+  //     let selectedPlanData: IPlan
+  //     let owner;
+  //     let paymentData = {
+  //       customerId: '',
+  //       cpfCnpj: '',
+  //       subscriptionId: '',
+  //     }
+
+  //     let adCredits: number
+  //     let highlightCredits: number
+
+  //     let updatedOwner
+  //     let response
+
+  //     let cardName
+  //     let cardNumber
+  //     let expiry
+  //     let ccv
+  //     let cpfCnpj
+
+  //     let password
+  //     let passwordConfirmattion
+
+  //     let expiryYear
+  //     let expiryMonth
+
+  //     const currentDate = new Date()
+  //     const year = currentDate.getFullYear()
+  //     const month = (currentDate.getMonth() + 1).toString().padStart(2, '0')
+  //     const day = currentDate.getDate().toString().padStart(2, '0')
+  //     const formattedDate = `${year}-${month}-${day}`
+
+  //     if (body.owner && body.creditCard !== undefined) {
+  //       ownerId = body.owner._id
+  //       phone = body.owner.phone
+  //       cellPhone = body.owner.cellPhone
+  //       adCredits = body.owner.adCredits
+  //       plan = body.owner.plan
+  //     }
+
+  //     if (body.owner.plan.toString() !== '') {
+  //       selectedPlanData = plans.find((plan) => plan._id === body.owner.plan);
+  //       adCredits = selectedPlanData.commonAd
+  //       highlightCredits = selectedPlanData.highlightAd
+  //     }
+
+  //     if (body.creditCard !== undefined) {
+  //       cardName = body.creditCard.cardName
+  //       cardNumber = body.creditCard.cardNumber
+  //       expiry = body.creditCard.expiry
+  //       ccv = body.creditCard.ccv
+  //       cpfCnpj = body.creditCard.cpfCnpj
+
+  //       expiryYear = `20${expiry[2] + expiry[3]}`
+  //       expiryMonth = `${expiry[0] + expiry[1]}`
+  //     }
+
+  //     const userExists = await this.userModel.findOne({ _id: userId })
+
+  //     if (!userExists || !userExists.isActive) {
+  //       throw new NotFoundException(
+  //         `Usuário com o id: ${userId} não foi encontrado`,
+  //       )
+  //     } else {
+  //       // To-do: verificar se está atualizando a foto do usuário mesmo quando não é alterada;
+  //       await this.userModel.updateOne(
+  //         { _id: userId },
+  //         {
+  //           $set: {
+  //             username: userName,
+  //             email,
+  //             cpf,
+  //             address: userAddress,
+  //             phone: cellPhone,
+  //           },
+  //         },
+  //         { session },
+  //       )
+  //     }
+
+  //     return { success: true }
+  //   } catch (error) {
+  //     await session.abortTransaction()
+  //     this.logger.error({
+  //       error: JSON.stringify(error),
+  //       exception: '> exception',
+  //     })
+  //     throw error
+  //   } finally {
+  //     session.endSession()
+  //   }
+  // }
 
   async editCreditCard(body: EditCreditCardDto): Promise<any> {
     try {
