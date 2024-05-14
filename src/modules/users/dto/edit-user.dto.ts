@@ -59,6 +59,10 @@ export class OwnerDto {
   @IsString()
   cellPhone: string
 
+  @IsOptional()
+  @IsString()
+  wwpNumber: string
+
   @IsNumber()
   adCredits: number
 

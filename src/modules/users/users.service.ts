@@ -283,9 +283,11 @@ export class UsersService {
       let ownerId
       let phone: string
       let cellPhone
+      let wwpNumber
       let plan: ObjectId
       let selectedPlanData: IPlan
       let owner
+      let ownerData
       let paymentData = {
         customerId: '',
         cpfCnpj: '',
@@ -329,6 +331,7 @@ export class UsersService {
         cellPhone = body.owner.cellPhone
         adCredits = body.owner.adCredits
         plan = body.owner.plan
+        wwpNumber = body.owner.wwpNumber
       }
 
       if (body.owner.plan?.toString() !== '' && body.owner.plan !== null) {
@@ -435,7 +438,7 @@ export class UsersService {
       // Caso em que o usuário quer mudar o plano;
       if (
         selectedPlanData?._id.toString() !== plan &&
-        selectedPlanData === undefined
+        selectedPlanData !== undefined
       ) {
         ownerId = body.owner._id
         // Caso em que o usuário ainda não é um owner;
@@ -465,9 +468,7 @@ export class UsersService {
           // Trocou o plano e selecionou o plano grátis semser owner;
           if (!selectedPlanData || selectedPlanData?.name === 'Free') {
             try {
-              const createdOwner = await this.ownerModel.create([owner], {
-                session,
-              })
+              const createdOwner = await this.ownerModel.create([owner], {session})
               owner = createdOwner[0].toObject()
             } catch (error) {
               throw new BadRequestException(
@@ -955,34 +956,58 @@ export class UsersService {
         }
       } else if (owner?.paymentData === undefined) {
         try {
-          const ownerData = await this.ownerModel.findById(ownerId).lean()
+          if (ownerId !== undefined && ownerId !== '') {
+            ownerData = await this.ownerModel.findById(ownerId).lean()
 
-          if (coupon) {
+            if (coupon) {
+              owner = {
+                ...ownerData,
+                adCredits: plusPlan.commonAd,
+                highlightCredits: plusPlan.highlightAd,
+                plan: plusPlan._id,
+              }
+            } else {
+              owner = ownerData
+            }
+
+            // Atualiza o owner;
+            await this.ownerModel.updateOne(
+              { _id: owner._id },
+              { $set: owner },
+              { session },
+            )
+          } else {
             owner = {
-              ...ownerData,
+              ...owner,
+              name: userName,
+              phone,
+              cellPhone,
+              wwpNumber,
+              picture: '',
+              creci: '',
+              notification: [],
+              userId,
+              isActive: true,
               adCredits: plusPlan.commonAd,
               highlightCredits: plusPlan.highlightAd,
               plan: plusPlan._id,
             }
-          } else {
-            owner = ownerData
-          }
 
-          // Atualiza o owner;
-          await this.ownerModel.updateOne(
-            { _id: owner._id },
-            { $set: owner },
-            { session },
-          )
+            ownerData = await this.ownerModel.create([owner], { session })
+          }
         } catch (error) {
           throw new NotFoundException(
-            `Anuncioante não foi encontrado. Erro: ${error}`,
+            `Anunciante não foi encontrado. Erro: ${error}`,
           )
         }
       }
 
       // Desativar os anúncios do owner quando este troca de plano;
-      if (owner && selectedPlanData?._id?.toString() !== plan) {
+      if (
+        owner &&
+        selectedPlanData?._id?.toString() !== plan &&
+        selectedPlanData?._id !== undefined
+      ) {
         try {
           // Buscar os anúncios do owner;
           const ownerProperties = await this.propertyModel

@@ -59,7 +59,7 @@ export class PropertyController {
 
   @Post()
   @ApiOperation({
-    summary: 'Create a new property and save al relative data on database.',
+    summary: 'Create a new property and save all the relative data on database.',
   })
   async createOne(
     @Body() createPropertyDto: CreatePropertyDto,
