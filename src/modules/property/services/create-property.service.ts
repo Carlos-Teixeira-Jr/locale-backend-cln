@@ -81,10 +81,10 @@ export class CreateProperty_Service {
         plan,
         cellPhone,
         deactivateProperties,
-      } = createPropertyDto;
+      } = createPropertyDto
 
-      let coupon;
-      let updatedOwner;
+      let coupon
+      let updatedOwner
 
       if (createPropertyDto?.coupon) {
         coupon = createPropertyDto?.coupon
@@ -98,7 +98,13 @@ export class CreateProperty_Service {
         user,
         selectedPlan,
         ownerPreviousPlan,
-      } = await this.getUserAndOwner(userData, isPlanFree, plan, session, coupon)
+      } = await this.getUserAndOwner(
+        userData,
+        isPlanFree,
+        plan,
+        session,
+        coupon,
+      )
 
       if (!coupon) {
         const { updatedOwner: tempUpdatedOwner } = await this.handleCustomer(
@@ -108,7 +114,7 @@ export class CreateProperty_Service {
           cellPhone,
           creditCardData,
         )
-        updatedOwner = tempUpdatedOwner;
+        updatedOwner = tempUpdatedOwner
       }
 
       if (!isPlanFree) {
@@ -184,7 +190,7 @@ export class CreateProperty_Service {
     isPlanFree: boolean,
     plan: any,
     session: any,
-    coupon?: string
+    coupon?: string,
   ): Promise<any> {
     let userAlreadyExists: boolean
     let user: IUser | null = null
@@ -204,9 +210,9 @@ export class CreateProperty_Service {
       profilePicture,
     } = userData
 
-    const plans = await this.planModel.find().lean();
-    const plusPlan = plans.find((e) => e.name === 'Locale Plus');
-    const selectedPlan = plans.find((e) => e._id === plan);
+    const plans = await this.planModel.find().lean()
+    const plusPlan = plans.find(e => e.name === 'Locale Plus')
+    const selectedPlan = plans.find(e => e._id === plan)
 
     // Verificar se o usuário já está cadastrado
     if (userId) {
@@ -317,13 +323,13 @@ export class CreateProperty_Service {
       const createdOwner = await this.ownerModel.create([ownerData], {
         session,
       })
-      owner = createdOwner[0].toObject();
+      owner = createdOwner[0].toObject()
 
       if (coupon) {
         await this.couponModel.updateOne(
           { coupon },
-          { $set: { isActive: false }},
-          { session }
+          { $set: { isActive: false } },
+          { session },
         )
       }
     } else {

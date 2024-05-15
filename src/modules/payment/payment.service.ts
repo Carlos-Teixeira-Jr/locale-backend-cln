@@ -125,16 +125,15 @@ export class PaymentService {
             commonCredits,
             highlightCredits,
           )
-          console.log("🚀 ~ PaymentService ~ response:", response)
+          console.log('🚀 ~ PaymentService ~ response:', response)
 
           // Converte o documento Mongoose em objeto simples
           const plainOwner = response.updatedOwner
 
-          await this.ownerModel.updateOne(
-            { _id: owner._id },
-            plainOwner,
-            { session, upsert: true },
-          )
+          await this.ownerModel.updateOne({ _id: owner._id }, plainOwner, {
+            session,
+            upsert: true,
+          })
         } catch (error) {
           throw new BadRequestException(
             `Não foi possível criar a assinatura do anunciante. Erro: ${error}`,

@@ -468,7 +468,9 @@ export class UsersService {
           // Trocou o plano e selecionou o plano grátis semser owner;
           if (!selectedPlanData || selectedPlanData?.name === 'Free') {
             try {
-              const createdOwner = await this.ownerModel.create([owner], {session})
+              const createdOwner = await this.ownerModel.create([owner], {
+                session,
+              })
               owner = createdOwner[0].toObject()
             } catch (error) {
               throw new BadRequestException(
@@ -977,20 +979,54 @@ export class UsersService {
               { session },
             )
           } else {
-            owner = {
-              ...owner,
-              name: userName,
-              phone,
-              cellPhone,
-              wwpNumber,
-              picture: '',
-              creci: '',
-              notification: [],
-              userId,
-              isActive: true,
-              adCredits: plusPlan.commonAd,
-              highlightCredits: plusPlan.highlightAd,
-              plan: plusPlan._id,
+            if (coupon) {
+              owner = {
+                ...owner,
+                name: userName,
+                phone,
+                cellPhone,
+                wwpNumber,
+                picture: '',
+                creci: '',
+                notification: [],
+                userId,
+                isActive: true,
+                adCredits: plusPlan.commonAd,
+                highlightCredits: plusPlan.highlightAd,
+                plan: plusPlan._id,
+              }
+            } else if (!coupon && selectedPlanData) {
+              owner = {
+                ...owner,
+                name: userName,
+                phone,
+                cellPhone,
+                wwpNumber,
+                picture: '',
+                creci: '',
+                notification: [],
+                userId,
+                isActive: true,
+                adCredits: selectedPlanData?.commonAd,
+                highlightCredits: selectedPlanData?.highlightAd,
+                plan: selectedPlanData?._id,
+              }
+            } else if (!coupon && !selectedPlanData) {
+              owner = {
+                ...owner,
+                name: userName,
+                phone,
+                cellPhone,
+                wwpNumber,
+                picture: '',
+                creci: '',
+                notification: [],
+                userId,
+                isActive: true,
+                adCredits: 0,
+                highlightCredits: 0,
+                plan: null,
+              }
             }
 
             ownerData = await this.ownerModel.create([owner], { session })
@@ -1075,7 +1111,6 @@ export class UsersService {
       } = body
 
       let creditCardInfo
-      let newSubscriptionData
 
       // Cadastrar os dados do novo cartão de crédito no owner do usuário;
       const ownerExists = await this.ownerModel.findById(owner)
@@ -1202,11 +1237,11 @@ export class UsersService {
                 },
               },
             )
-  
+
             const responseData = response.data
-  
+
             const success = responseData.deleted
-  
+
             if (!success) {
               throw new Error('Não foi possível remover a assinatura')
             }
