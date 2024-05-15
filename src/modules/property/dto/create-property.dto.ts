@@ -187,6 +187,10 @@ export class CreatePropertyDto {
   @IsArray()
   @IsString({ each: true })
   deactivateProperties: string[]
+
+  @IsOptional()
+  @IsString()
+  coupon: string
 }
 
 const generateCode = (): string => {

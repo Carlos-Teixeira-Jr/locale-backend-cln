@@ -28,6 +28,7 @@ import {
 import { TagModelName, ITag } from 'common/schemas/Tag.schema'
 import axios from 'axios'
 import { PropertyActivationDto } from '../dto/property-activation.dto'
+import { CouponModelName, ICoupon } from 'common/schemas/Coupon.schema'
 
 interface IOwnerData {
   name: string
@@ -61,6 +62,8 @@ export class CreateProperty_Service {
     private readonly propertyTypeModel: Model<IPropertyType>,
     @InjectModel(TagModelName)
     private readonly tagModel: Model<ITag>,
+    @InjectModel(CouponModelName)
+    private readonly couponModel: Model<ICoupon>,
     private readonly authService: AuthService,
   ) {}
 
@@ -80,6 +83,13 @@ export class CreateProperty_Service {
         deactivateProperties,
       } = createPropertyDto
 
+      let coupon
+      let updatedOwner
+
+      if (createPropertyDto?.coupon) {
+        coupon = createPropertyDto?.coupon
+      }
+
       const { ownerInfo } = propertyData
 
       const {
@@ -88,27 +98,38 @@ export class CreateProperty_Service {
         user,
         selectedPlan,
         ownerPreviousPlan,
-      } = await this.getUserAndOwner(userData, isPlanFree, plan, session)
-
-      const { updatedOwner } = await this.handleCustomer(
-        isPlanFree,
-        owner,
+      } = await this.getUserAndOwner(
         userData,
-        cellPhone,
-        creditCardData,
+        isPlanFree,
+        plan,
+        session,
+        coupon,
       )
 
-      if (!isPlanFree) {
-        await this.handlePayment(
+      if (!coupon) {
+        const { updatedOwner: tempUpdatedOwner } = await this.handleCustomer(
           isPlanFree,
-          selectedPlan,
-          updatedOwner,
+          owner,
           userData,
-          creditCardData,
           cellPhone,
-          ownerPreviousPlan,
-          session,
+          creditCardData,
         )
+        updatedOwner = tempUpdatedOwner
+      }
+
+      if (!isPlanFree) {
+        if (!coupon) {
+          await this.handlePayment(
+            isPlanFree,
+            selectedPlan,
+            updatedOwner,
+            userData,
+            creditCardData,
+            cellPhone,
+            ownerPreviousPlan,
+            session,
+          )
+        }
       }
 
       // Deactivates the properties that the user choose in case that he changes his plan to a minor one;
@@ -169,11 +190,13 @@ export class CreateProperty_Service {
     isPlanFree: boolean,
     plan: any,
     session: any,
+    coupon?: string,
   ): Promise<any> {
     let userAlreadyExists: boolean
     let user: IUser | null = null
     let owner: any = null
     let ownerPreviousPlan
+    let ownerData: IOwnerData
 
     const {
       _id: userId,
@@ -187,7 +210,9 @@ export class CreateProperty_Service {
       profilePicture,
     } = userData
 
-    const selectedPlan = await this.planModel.findById(plan).lean()
+    const plans = await this.planModel.find().lean()
+    const plusPlan = plans.find(e => e.name === 'Locale Plus')
+    const selectedPlan = plans.find(e => e._id === plan)
 
     // Verificar se o usuário já está cadastrado
     if (userId) {
@@ -248,7 +273,7 @@ export class CreateProperty_Service {
       userAlreadyExists = false
     }
 
-    // Verificar se o usuário já é proprietário
+    // Verificar se o usuário já é anunciante;
     const ownerExists = await this.ownerModel
       .findOne({
         userId: user._id,
@@ -258,20 +283,35 @@ export class CreateProperty_Service {
 
     if (!ownerExists) {
       // Criar um novo proprietário
-      const ownerData: IOwnerData = {
-        name: username,
-        phone,
-        cellPhone,
-        wppNumber,
-        plan,
-        picture: profilePicture,
-        userId: user._id,
-        email,
-        adCredits: 0,
-        highlightCredits: 0,
+      if (!coupon) {
+        ownerData = {
+          name: username,
+          phone,
+          cellPhone,
+          wppNumber,
+          plan,
+          picture: profilePicture,
+          userId: user._id,
+          email,
+          adCredits: 0,
+          highlightCredits: 0,
+        }
+      } else {
+        ownerData = {
+          name: username,
+          phone,
+          cellPhone,
+          wppNumber,
+          plan: plusPlan._id,
+          picture: profilePicture,
+          userId: user._id,
+          email,
+          adCredits: plusPlan.commonAd,
+          highlightCredits: plusPlan.highlightAd,
+        }
       }
 
-      if (!isPlanFree) {
+      if (!isPlanFree && !coupon) {
         if (!selectedPlan) {
           throw new Error(`Plano com o id: ${plan} não encontrado.`)
         }
@@ -284,6 +324,14 @@ export class CreateProperty_Service {
         session,
       })
       owner = createdOwner[0].toObject()
+
+      if (coupon) {
+        await this.couponModel.updateOne(
+          { coupon },
+          { $set: { isActive: false } },
+          { session },
+        )
+      }
     } else {
       owner = ownerExists
       ownerPreviousPlan = ownerExists.plan
@@ -295,7 +343,6 @@ export class CreateProperty_Service {
       user,
       selectedPlan,
       ownerPreviousPlan,
-      // selectedPlanData: selectedPlan,
     }
   }
 

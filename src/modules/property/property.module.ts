@@ -28,6 +28,7 @@ import { UsersService } from 'modules/users/users.service'
 import { TagModelName, TagSchema } from 'common/schemas/Tag.schema'
 import { PropertyFilter_Service } from './services/property-filter.service'
 import { CreateProperty_Service } from './services/create-property.service'
+import { CouponModelName, CouponSchema } from 'common/schemas/Coupon.schema'
 
 const services = [
   PropertyService,
@@ -69,6 +70,10 @@ const services = [
       {
         name: TagModelName,
         schema: TagSchema,
+      },
+      {
+        name: CouponModelName,
+        schema: CouponSchema,
       },
     ]),
   ],
