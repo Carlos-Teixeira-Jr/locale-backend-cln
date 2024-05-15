@@ -59,6 +59,10 @@ export class OwnerDto {
   @IsString()
   cellPhone: string
 
+  @IsOptional()
+  @IsString()
+  wwpNumber: string
+
   @IsNumber()
   adCredits: number
 
@@ -132,4 +136,8 @@ export class EditUserDto {
   @ValidateNested({ each: true })
   @Type(() => CreditCard)
   creditCard: CreditCard
+
+  @IsOptional()
+  @IsString()
+  coupon: string
 }
