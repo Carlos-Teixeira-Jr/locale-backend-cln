@@ -435,36 +435,44 @@ export class UsersService {
         }
       }
 
+      // OWNER
+      if (!ownerId) {
+        // Criar o objeto do owner;
+        owner = {
+          name: userName,
+          phone,
+          cellPhone,
+          wwpNumber: '',
+          picture: '',
+          creci: '',
+          notifications: [],
+          plan: null,
+          userId,
+          highlightCredits: 0,
+          adCredits: 0,
+          isActive: true,
+        }
+
+        if (coupon) {
+          owner.adCredits = plusPlan.commonAd
+          owner.highlightCredits = plusPlan.highlightAd
+          owner.plan = plusPlan._id
+        }
+      } else {
+        const ownerExists = await this.ownerModel
+          .findOne({ _id: ownerId })
+          .lean()
+
+        owner = ownerExists
+      }
+
       // Caso em que o usuário quer mudar o plano;
       if (
-        selectedPlanData?._id.toString() !== plan &&
+        selectedPlanData?._id.toString() !== owner.plan &&
         selectedPlanData !== undefined
       ) {
-        ownerId = body.owner._id
         // Caso em que o usuário ainda não é um owner;
         if (!ownerId) {
-          // Criar o objeto do owner;
-          owner = {
-            name: userName,
-            phone,
-            cellPhone,
-            wwpNumber: '',
-            picture: '',
-            creci: '',
-            notifications: [],
-            plan: null,
-            userId,
-            highlightCredits: 0,
-            adCredits: 0,
-            isActive: true,
-          }
-
-          if (coupon) {
-            owner.adCredits = plusPlan.commonAd
-            owner.highlightCredits = plusPlan.highlightAd
-            owner.plan = plusPlan._id
-          }
-
           // Trocou o plano e selecionou o plano grátis semser owner;
           if (!selectedPlanData || selectedPlanData?.name === 'Free') {
             try {
@@ -605,15 +613,11 @@ export class UsersService {
           return response
         } else {
           // Usuário já possui um owner cadastrado;
-          const ownerExists = await this.ownerModel.findById(ownerId).lean()
-
-          if (!ownerExists) {
+          if (owner._id === undefined) {
             throw new NotFoundException(
               `Não foi possível encontrr o anunciante com o id: ${ownerId}`,
             )
           }
-
-          owner = ownerExists
 
           // Esta trocando o plano de um pago para o grátis;
           if (
@@ -797,7 +801,7 @@ export class UsersService {
             // Está trocando o plano de um pago para outro pago e tem token;
             // Verificar se foi passado os dados do cartão de crédito;
             const cardNumberToken =
-              ownerExists.paymentData.creditCardInfo.creditCardNumber
+              owner.paymentData.creditCardInfo.creditCardNumber
             const cardLastNumbers = cardNumber.slice(-4)
             if (body.creditCard !== undefined) {
               // Verifica se mudou o cartão de crédito;
@@ -815,7 +819,7 @@ export class UsersService {
                   zipCode: userAddress.zipCode,
                   streetNumber: userAddress.streetNumber,
                   owner,
-                  customerId: ownerExists.paymentData.customerId,
+                  customerId: owner.paymentData.customerId,
                 }
                 try {
                   // Atualizar cartão de crédito;
@@ -828,7 +832,7 @@ export class UsersService {
 
                     try {
                       await this.ownerModel.findByIdAndUpdate(
-                        { _id: ownerExists._id },
+                        { _id: owner._id },
                         {
                           $set: {
                             plan,
@@ -999,7 +1003,7 @@ export class UsersService {
                       access_token: process.env.ASAAS_API_KEY || '',
                     },
                   },
-                );
+                )
 
                 const customerData = response.data
 
@@ -1007,7 +1011,7 @@ export class UsersService {
                   ...owner,
                   paymentData: {
                     customerId: customerData.id,
-                    cpfCnpj
+                    cpfCnpj,
                   },
                 }
 
@@ -1135,8 +1139,17 @@ export class UsersService {
                   owner.adCredits = adCredits
                   owner.highlightCredits = highlightCredits
                 }
+
+                // Atualiza o owner;
+                await this.ownerModel.updateOne(
+                  { _id: owner._id },
+                  { $set: owner },
+                  { session },
+                )
               } catch (error) {
-                throw new BadRequestException(`Não foi possível gerar o pagamento do plano. Erro: ${error}`)
+                throw new BadRequestException(
+                  `Não foi possível gerar o pagamento do plano. Erro: ${error}`,
+                )
               }
             }
           } else {

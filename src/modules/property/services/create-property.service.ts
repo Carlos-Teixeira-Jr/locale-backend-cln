@@ -430,12 +430,22 @@ export class CreateProperty_Service {
     let cardNumber: string
     let ccv: string
 
+    let price
+    let selectedPlanId
+
     let updatedOwner
 
     const { address, email } = userData
     const { paymentData, adCredits, plan: ownerActualPlan } = owner
-    const { price, _id: planId } = selectedPlan
     const previousPlanData = await this.planModel.findById(ownerPreviousPlan)
+
+    if (selectedPlan) {
+      price = selectedPlan.price
+      selectedPlanId = selectedPlan._id
+    } else {
+      price = previousPlanData?.price
+      selectedPlanId = previousPlanData?._id
+    }
 
     let newAdCredits
     let newHighlightCredits
@@ -448,7 +458,7 @@ export class CreateProperty_Service {
       ccv = creditCardData.ccv
     }
 
-    const planIdString = planId.toString()
+    const planIdString = selectedPlanId.toString()
     const ownerActualPlanString = ownerActualPlan.toString()
 
     const currentDate = new Date()
@@ -556,7 +566,7 @@ export class CreateProperty_Service {
 
           if (adCredits < 1) {
             // Caso em que o usuário não tem mais créditos e selecionou outro plano
-            if (planId !== ownerActualPlan) {
+            if (selectedPlanId !== ownerActualPlan) {
               const subscriptionId = paymentData.subscriptionId
               const priceDifference =
                 price > previousPlanData.price
@@ -713,7 +723,7 @@ export class CreateProperty_Service {
       // Usuário selecionou o plano grátis ou o mesmo plano que já tem;
       if (owner.adCredits > 0) {
         // Fazer a assinatura caso ainda não tenha;
-        try {
+        if (!owner?.paymentData?.subscriptionId) {
           const response = await axios.post(
             `${process.env.PAYMENT_URL}/payment/subscription`,
             {
@@ -788,10 +798,30 @@ export class CreateProperty_Service {
               { $set: updatedOwner },
               { session },
             )
+          } else {
+            updatedOwner = {
+              ...owner,
+              adCredits: owner.adCredits - 1,
+            }
+
+            // Atualiza o owner;
+            await this.ownerModel.updateOne(
+              { _id: updatedOwner._id },
+              { $set: updatedOwner },
+              { session },
+            )
           }
-        } catch (error) {
-          throw new Error(
-            `Não foi possível atualizar os créditos do proprietário.`,
+        } else {
+          updatedOwner = {
+            ...owner,
+            adCredits: owner.adCredits - 1,
+          }
+
+          // Atualiza o owner;
+          await this.ownerModel.updateOne(
+            { _id: updatedOwner._id },
+            { $set: updatedOwner },
+            { session },
           )
         }
       } else {
