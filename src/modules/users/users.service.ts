@@ -285,7 +285,7 @@ export class UsersService {
       let cellPhone
       let wwpNumber
       let plan: ObjectId
-      let selectedPlanData: IPlan
+      let selectedPlanData
       let owner
       let ownerData
       let paymentData = {
@@ -319,10 +319,10 @@ export class UsersService {
       const day = currentDate.getDate().toString().padStart(2, '0')
       const formattedDate = `${year}-${month}-${day}`
 
-      const plans = await this.planModel.find()
-      const plusPlan = plans
-        .find(plan => plan.name === 'Locale Plus')
-        .toObject()
+      const plans = await this.planModel.find().lean()
+      const plusPlan = plans.find(plan => plan.name === 'Locale Plus')
+
+      plan = body.owner.plan
 
       // To-do: fazer com que o owner não seja criado quando não for necessário;
       if (body.owner && body.creditCard !== undefined) {
@@ -335,7 +335,7 @@ export class UsersService {
       }
 
       if (body.owner.plan?.toString() !== '' && body.owner.plan !== null) {
-        selectedPlanData = plans.find(plan => plan._id === body.owner.plan)
+        selectedPlanData = plans.find(e => e._id.toString() === plan.toString())
         adCredits = selectedPlanData.commonAd
         highlightCredits = selectedPlanData.highlightAd
       }
@@ -972,12 +972,173 @@ export class UsersService {
               owner = ownerData
             }
 
-            // Atualiza o owner;
-            await this.ownerModel.updateOne(
-              { _id: owner._id },
-              { $set: owner },
-              { session },
-            )
+            // Owner selecionou plano free;
+            if (selectedPlanData?.name === 'Free') {
+              // Atualiza o owner;
+              await this.ownerModel.updateOne(
+                { _id: owner._id },
+                { $set: owner },
+                { session },
+              )
+            } else {
+              try {
+                const response = await axios.post(
+                  `${paymentUrl}/customer`,
+                  {
+                    name: owner.name,
+                    email,
+                    phone: cellPhone,
+                    postalCode: userAddress.zipCode,
+                    description: 'Confirmação de criação de id de cliente',
+                    cpfCnpj,
+                    addressNumber: userAddress.streetNumber,
+                  },
+                  {
+                    headers: {
+                      'Content-Type': 'application/json',
+                      access_token: process.env.ASAAS_API_KEY || '',
+                    },
+                  },
+                );
+
+                const customerData = response.data
+
+                owner = {
+                  ...owner,
+                  paymentData: {
+                    customerId: customerData.id,
+                    cpfCnpj
+                  },
+                }
+
+                const subscription = await axios.post(
+                  `${process.env.PAYMENT_URL}/payment/tokenize`,
+                  {
+                    billingType: 'CREDIT_CARD',
+                    cycle: 'MONTHLY',
+                    customer: owner.paymentData.customerId,
+                    value: selectedPlanData.price,
+                    nextDueDate: formattedDate,
+                    creditCard: {
+                      holderName: cardName,
+                      number: cardNumber,
+                      expiryMonth,
+                      expiryYear,
+                      ccv,
+                    },
+                    creditCardHolderInfo: {
+                      name: cardName,
+                      email,
+                      phone: cellPhone,
+                      cpfCnpj,
+                      postalCode: userAddress.zipCode,
+                      addressNumber: userAddress.streetNumber,
+                    },
+                  },
+                  {
+                    headers: {
+                      'Content-Type': 'application/json',
+                      access_token: process.env.ASAAS_API_KEY || '',
+                    },
+                  },
+                )
+
+                const responseData = subscription.data
+                const creditCardInfo = responseData
+
+                // Atualiza os dados de pagamento do usuário com o token;
+                owner = {
+                  ...owner,
+                  paymentData: {
+                    ...owner.paymentData,
+                    creditCardInfo,
+                  },
+                }
+
+                if (owner.paymentData.creditCardInfo.creditCardToken) {
+                  const newSubscription = await axios.post(
+                    `${process.env.PAYMENT_URL}/payment/subscription`,
+                    {
+                      customer: owner.paymentData.customerId,
+                      value: selectedPlanData.price,
+                      nextDueDate: formattedDate,
+                      billingType: 'CREDIT_CARD',
+                      cycle: 'MONTHLY',
+                      creditCardToken:
+                        owner.paymentData.creditCardInfo.creditCardToken,
+                    },
+                    {
+                      headers: {
+                        'Content-Type': 'application/json',
+                        access_token: process.env.ASAAS_API_KEY || '',
+                      },
+                    },
+                  )
+
+                  const subscriptionData = newSubscription.data
+                  const subscriptionId = subscriptionData.id
+
+                  // Atualiza o owner;
+                  owner = {
+                    ...owner,
+                    plan: selectedPlanData._id,
+                    adCredits: selectedPlanData.commonAd,
+                    highlightCredits: selectedPlanData.highlightAd,
+                    paymentData: {
+                      ...owner.paymentData,
+                      subscriptionId,
+                      cpfCnpj,
+                    },
+                  }
+                } else {
+                  // Cria assinatura com dados do cartão;
+                  const response = await axios.post(
+                    `${process.env.PAYMENT_URL}/payment/subscription`,
+                    {
+                      billingType: 'CREDIT_CARD',
+                      cycle: 'MONTHLY',
+                      customer: paymentData.customerId,
+                      value: selectedPlanData.price,
+                      nextDueDate: formattedDate,
+                      creditCard: {
+                        holderName: cardName,
+                        number: cardNumber,
+                        expiryMonth,
+                        expiryYear,
+                        ccv,
+                      },
+                      creditCardHolderInfo: {
+                        name: cardName,
+                        email: email,
+                        phone: cellPhone,
+                        cpfCnpj,
+                        postalCode: userAddress.zipCode,
+                        addressNumber: userAddress.streetNumber,
+                      },
+                    },
+                    {
+                      headers: {
+                        'Content-Type': 'application/json',
+                        access_token: process.env.ASAAS_API_KEY || '',
+                      },
+                    },
+                  )
+
+                  const responseData = response.data
+
+                  const creditCardInfo = responseData.creditCard
+                  const subscriptionId = responseData.id
+
+                  // Salvar o token do cartão de crédito no banco de dados
+                  owner.paymentData.creditCardInfo = creditCardInfo
+                  owner.paymentData.subscriptionId = subscriptionId
+                  owner.adCredits = adCredits
+                  owner.highlightCredits = highlightCredits
+                }
+              } catch (error) {
+                throw new BadRequestException(`Não foi possível gerar o pagamento do plano. Erro: ${error}`)
+              }
+            }
           } else {
             if (coupon) {
               owner = {
@@ -1467,7 +1628,8 @@ export class UsersService {
         const plans = await this.planModel.find()
         const freePlan = plans.find(plan => plan.name === 'Free')
         if (
-          foundOwner.plan.toString() !== freePlan._id.toString() &&
+          foundOwner?.plan?.toString() !== freePlan._id.toString() &&
+          foundOwner?.plan !== null &&
           foundOwner?.paymentData?.subscriptionId !== undefined
         ) {
           const subscriptionId = foundOwner?.paymentData?.subscriptionId
