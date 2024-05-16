@@ -4,9 +4,12 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  Validate,
 } from 'class-validator'
 import { IOwner } from 'common/schemas/Owner.schema'
 import { IPlan } from 'common/schemas/Plan.schema'
+import { IDValidator } from 'common/validators/ID.validator'
+import { Schema } from 'mongoose'
 
 export class EditCreditCardDto {
   @IsNotEmpty()
@@ -37,7 +40,7 @@ export class EditCreditCardDto {
   @IsString()
   phone: string
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsObject()
   plan: IPlan
 
@@ -49,9 +52,13 @@ export class EditCreditCardDto {
   @IsString()
   streetNumber: string
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsObject()
   owner: IOwner
+
+  @IsNotEmpty()
+  @Validate(IDValidator)
+  userId: Schema.Types.ObjectId
 
   @IsOptional()
   @IsString()

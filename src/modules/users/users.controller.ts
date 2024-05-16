@@ -80,7 +80,7 @@ export class UsersController {
     summary: 'Update the user and owner data.',
   })
   @Post('edit-user')
-  async editUser(@Body() body: EditUserDto): Promise<{ success: boolean }> {
+  async editUser(@Body() body: EditUserDto) {
     this.logger.log({ body }, 'start edit user > [controller]')
 
     return this.usersService.editUser(body)
