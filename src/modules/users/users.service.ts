@@ -965,9 +965,6 @@ export class UsersService {
     try {
       const { _id, phone, cellPhone } = owner
       let ownerExists
-      // let newAdCredits = planData?.commonAd ? planData.commonAd : owner?.adCredits;
-      // let newHighlightCredits = planData?.highlightAd ? planData.highlightAd : owner?.;
-      // let newPlan = planData?._id ? planData._id : null;
 
       if (_id) {
         ownerExists = await this.ownerModel.findById(_id).lean()
@@ -985,10 +982,10 @@ export class UsersService {
           picture: '',
           creci: '',
           notifications: [],
-          plan: planData._id,
+          plan: planData?._id ?? null,
           userId,
-          highlightCredits: planData.highlightAd,
-          adCredits: planData.commonAd,
+          highlightCredits: planData?.highlightAd ?? 0,
+          adCredits: planData?.commonAd ?? 0,
           isActive: true,
         }
       }
