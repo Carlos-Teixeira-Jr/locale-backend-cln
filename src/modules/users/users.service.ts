@@ -1,5 +1,5 @@
 // @typescript-eslint/no-unused-vars
-import mongoose, { Model, ObjectId, Schema } from 'mongoose'
+import mongoose, { Model, Schema } from 'mongoose'
 import {
   BadRequestException,
   Injectable,
@@ -371,13 +371,6 @@ export class UsersService {
         }
       }
 
-      // Formatação da data;
-      const currentDate = new Date()
-      const year = currentDate.getFullYear()
-      const month = (currentDate.getMonth() + 1).toString().padStart(2, '0')
-      const day = currentDate.getDate().toString().padStart(2, '0')
-      const formattedDate = `${year}-${month}-${day}`
-
       //Se o owner já tiver um cartão registrado;
       if (!ownerData?.paymentData?.creditCardInfo?.creditCardToken) {
         // Gerar token dos dados do cartão;
@@ -741,23 +734,26 @@ export class UsersService {
       await session.startTransaction()
       this.logger.log({ body }, 'start edit user > [service]')
 
-      const {
-        id: userId,
-      } = body.user
+      const { id: userId } = body.user
 
-      let user
       let updatedUser
       let encryptedPassword
-      let newOwner
       let planData
-      let updatedOwner
+      let plans
+      let plusPlan
 
-      if (body.owner.plan) {
-        planData = await this.planModel.findById(body.owner.plan).lean()
+      if (body.owner?.plan) {
+        plans = await this.planModel.find().lean()
+
+        planData = plans.find(
+          e => e._id.toString() === body.owner.plan.toString(),
+        )
+
+        plusPlan = plans.find(e => e.name === 'Locale Plus')
       }
 
       // USER
-      const userExists = await this.userModel.findOne({ _id: userId })
+      const userExists = await this.userModel.findOne({ _id: userId }).lean()
 
       if (!userExists || !userExists.isActive) {
         throw new NotFoundException(
@@ -765,7 +761,7 @@ export class UsersService {
         )
       }
 
-      user = userExists
+      const user = userExists
 
       updatedUser = await this.handleEditUser(user, body)
 
@@ -779,68 +775,100 @@ export class UsersService {
       }
 
       // OWNER
-      updatedOwner = await this.handleOwner(
+      const updatedOwner = await this.handleOwner(
         body.owner,
         updatedUser.username,
         body.user.id,
-        planData
+        planData,
       )
 
-      newOwner = {
-        ...newOwner,
-        updatedOwner
-      }
+      const newOwner = updatedOwner
+
+      const coupon = body?.coupon
 
       // PAYMENT DATA
-      // Selecionou um plano;
-      if (planData && planData.price > 0) {
-        if (!newOwner?.paymentData?.subscriptionId) {
-          if (!newOwner?.paymentData?.customerId) {
-            const newPaymentData = await this.handleCustomer(
-              body.user,
+      if (!coupon) {
+        // Selecionou um plano;
+        if (planData && planData.price > 0) {
+          if (!newOwner?.paymentData?.subscriptionId) {
+            if (!newOwner?.paymentData?.customerId) {
+              const newPaymentData = await this.handleCustomer(
+                body.user,
+                updatedUser,
+              )
+
+              newOwner.paymentData = {
+                ...newOwner.paymentData,
+                ...newPaymentData,
+              }
+            }
+
+            const newSubscription = await this.handleSubscription(
+              newOwner,
               updatedUser,
+              planData.price,
+              body.creditCard,
             )
-  
+
             newOwner.paymentData = {
               ...newOwner.paymentData,
-              ...newPaymentData,
+              subscriptionId: newSubscription.subscriptionId,
+              creditCardInfo: newSubscription.creditCardInfo,
             }
+          } else {
+            await this.handleSubscription(
+              newOwner,
+              updatedUser,
+              planData.price,
+              body.creditCard,
+            )
           }
+        } else {
+          if (newOwner?.paymentData?.subscriptionId) {
+            await axios.delete(
+              `${process.env.PAYMENT_URL}/payment/subscription/${newOwner?.paymentData?.subscriptionId}`,
+              {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json',
+                  access_token: process.env.ASSAS_API_KEY || '',
+                },
+              },
+            )
 
-          const newSubscription = await this.handleSubscription(
-            newOwner,
-            updatedUser,
-            planData.price,
-            body.creditCard
-          )
-  
-          newOwner.paymentData = {
-            ...newOwner.paymentData,
-            subscriptionId: newSubscription.subscriptionId,
-            creditCardInfo: newSubscription.creditCardToken
+            newOwner.paymentData = {}
           }
         }
+      } else {
+        const newPaymentData = await this.handleCoupon(
+          coupon,
+          newOwner?.paymentData,
+        )
+
+        newOwner.adCredits = plusPlan.commonAd
+        newOwner.highlightCredits = plusPlan.highlightAd
+        newOwner.plan = plusPlan._id
+        newOwner.paymentData = newPaymentData
       }
 
       // CRUD USER
       await this.userModel.updateOne(
         { _id: user._id },
         { $set: updatedUser },
-        { session }
+        { session },
       )
 
       if (!body.owner?._id) {
         await this.ownerModel.create([newOwner], { session })
-      }else {
+      } else {
         await this.ownerModel.updateOne(
           { _id: newOwner._id },
           { $set: newOwner },
-          { session }
+          { session },
         )
       }
 
       await session.commitTransaction()
-
     } catch (error) {
       await session.abortTransaction()
       this.logger.error({
@@ -853,9 +881,12 @@ export class UsersService {
     }
   }
 
-  async handleCoupon(coupon?: string) {
+  async handleCoupon(coupon: string, paymentData: any) {
     try {
-      const couponData = await this.couponModel.findOne({ coupon })
+      const { subscriptionId } = paymentData
+      let newPaymentData
+
+      const couponData = await this.couponModel.findOne({ coupon }).lean()
 
       if (!couponData || !couponData.isActive) {
         throw new BadRequestException(`Cupom de desconto inválido.`)
@@ -865,6 +896,25 @@ export class UsersService {
         { _id: couponData._id },
         { $set: { isActive: false } },
       )
+
+      if (!subscriptionId) {
+        newPaymentData = {}
+      } else {
+        await axios.delete(
+          `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
+          {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              access_token: process.env.ASSAS_API_KEY || '',
+            },
+          },
+        )
+
+        newPaymentData = {}
+      }
+
+      return newPaymentData
     } catch (error) {
       throw new Error(`${error}`)
     }
@@ -874,16 +924,13 @@ export class UsersService {
     try {
       const { username: userName, email, cpf, address: userAddress } = body.user
       const { cellPhone } = body.owner
-      let updatedUser = user
+      const updatedUser = { ...user }
 
-      updatedUser = {
-        ...updatedUser,
-        username: userName,
-        email,
-        cpf,
-        address: userAddress,
-        phone: cellPhone,
-      }
+      updatedUser.username = userName
+      updatedUser.email = email
+      updatedUser.cpf = cpf
+      updatedUser.address = userAddress
+      updatedUser.phone = cellPhone
 
       return updatedUser
     } catch (error) {
@@ -895,15 +942,13 @@ export class UsersService {
     try {
       const { password, passwordConfirmattion } = passwordData
 
-      let encryptedPassword
-
       if (password && password !== passwordConfirmattion) {
         throw new BadRequestException(
           'A confirmação de senha não é igual a senha informada',
         )
       }
 
-      encryptedPassword = await bcrypt.hash(password, 10)
+      const encryptedPassword = await bcrypt.hash(password, 10)
 
       return encryptedPassword
     } catch (error) {
@@ -911,18 +956,26 @@ export class UsersService {
     }
   }
 
-  async handleOwner(owner: OwnerDto, userName: string, userId: any, planData: IPlan) {
+  async handleOwner(
+    owner: OwnerDto,
+    userName: string,
+    userId: any,
+    planData: IPlan,
+  ) {
     try {
       const { _id, phone, cellPhone } = owner
-      let ownerExists;
-
+      let ownerExists
+      // let newAdCredits = planData?.commonAd ? planData.commonAd : owner?.adCredits;
+      // let newHighlightCredits = planData?.highlightAd ? planData.highlightAd : owner?.;
+      // let newPlan = planData?._id ? planData._id : null;
 
       if (_id) {
-        ownerExists = await this.ownerModel.findById(_id);
+        ownerExists = await this.ownerModel.findById(_id).lean()
 
-        ownerExists.adCredits = planData.commonAd;
-        ownerExists.highlightCredits = planData.highlightAd;
-        ownerExists.plan = planData._id;
+        ownerExists.adCredits = planData?.commonAd ?? ownerExists?.adCredits
+        ownerExists.highlightCredits =
+          planData?.highlightAd ?? ownerExists?.highlightCredits
+        ownerExists.plan = planData?._id ?? ownerExists?.plan
       } else {
         ownerExists = {
           name: userName,
@@ -950,8 +1003,6 @@ export class UsersService {
     try {
       const { username, email, address, cpf } = user
 
-      let paymentData
-
       const { data } = await axios.post(
         `${paymentUrl}/customer`,
         {
@@ -971,7 +1022,7 @@ export class UsersService {
         },
       )
 
-      paymentData = {
+      const paymentData = {
         customerId: data.id,
         cpfCnpj: cpf,
         subscriptionId: '',
@@ -983,120 +1034,94 @@ export class UsersService {
     }
   }
 
-  async handleSubscription(owner: any, user: any, price: number, creditCard: any) {
+  async handleSubscription(
+    owner: any,
+    user: any,
+    price: number,
+    creditCard: any,
+  ) {
     try {
-      const { paymentData } = owner
+      const { paymentData, cellPhone } = owner
+      const { cardNumber, cardName, expiry, ccv, cpfCnpj } = creditCard
+      const { email, address } = user
       let subscriptionId
-      let creditCardToken
       let body
+      let creditCardInfo
 
       const formattedDate = await this.getFormattedDate()
+      const expiryYear = `20${expiry[2] + expiry[3]}`
+      const expiryMonth = `${expiry[0] + expiry[1]}`
 
       if (!paymentData?.subscriptionId) {
-        if (!paymentData?.creditCardInfo) {
-          creditCardToken = await this.handleTokenizeCard(owner, user, creditCard)
-
+        if (!paymentData?.creditCardInfo?.creditCardToken) {
           body = {
             customer: owner.paymentData.customerId,
             value: price,
             nextDueDate: formattedDate,
             billingType: 'CREDIT_CARD',
             cycle: 'MONTHLY',
-            creditCardToken,
+            creditCard: {
+              holderName: cardName,
+              number: cardNumber,
+              expiryMonth,
+              expiryYear,
+              ccv: ccv,
+            },
+            creditCardHolderInfo: {
+              name: cardName,
+              email,
+              phone: cellPhone,
+              cpfCnpj,
+              postalCode: address.zipCode,
+              addressNumber: address.streetNumber,
+            },
           }
-
-          const { data } = await axios.post(
-            `${process.env.PAYMENT_URL}/payment/subscription`,
-            {
-              customer: owner.paymentData.customerId,
-              value: price,
-              nextDueDate: formattedDate,
-              billingType: 'CREDIT_CARD',
-              cycle: 'MONTHLY',
-              creditCardToken,
-            },
-            {
-              headers: {
-                'Content-Type': 'application/json',
-                access_token: process.env.ASAAS_API_KEY || '',
-              },
-            },
-          )
-
-          subscriptionId = data.id
         } else {
           body = {
-            customer: owner.paymentData.customerId,
+            customer: paymentData.customerId,
             value: price,
             nextDueDate: formattedDate,
             billingType: 'CREDIT_CARD',
             cycle: 'MONTHLY',
-            creditCardToken: owner.paymentData.creditCardInfo.creditCardToken,
+            creditCardToken: paymentData.creditCardInfo.creditCardToken,
           }
         }
-      } else {
-        // Atualizar;
-        subscriptionId = owner.paymentData.subscriptionId
-        await axios.post(
-          //Atualiza o valor do plano;
-          `${process.env.PAYMENT_URL}/payment/update-subscription/${subscriptionId}`,
+
+        const { data } = await axios.post(
+          `${process.env.PAYMENT_URL}/payment/subscription`,
+          body,
           {
             headers: {
               'Content-Type': 'application/json',
               access_token: process.env.ASAAS_API_KEY || '',
             },
+            timeout: 100000,
           },
         )
+
+        subscriptionId = data.id
+        creditCardInfo = data.creditCard
+      } else {
+        // Atualizar;
+        subscriptionId = owner.paymentData.subscriptionId
+        body = { value: 50 }
+        await axios.post(
+          //Atualiza o valor do plano;
+          `${process.env.PAYMENT_URL}/payment/update-subscription/${subscriptionId}`,
+          body,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              access_token: process.env.ASAAS_API_KEY || '',
+            },
+            timeout: 100000,
+          },
+        )
+
+        creditCardInfo = paymentData?.creditCardInfo
       }
 
-      return {subscriptionId, creditCardToken}
-    } catch (error) {
-      throw new Error(`${error}`)
-    }
-  }
-
-  async handleTokenizeCard(owner: any, user: UserDto, creditCard: any) {
-    try {
-      const { paymentData, updatedOwner } = owner;
-      const { cardNumber, cardName, expiry, ccv, cpfCnpj } = creditCard;
-
-      const { email, address } = user
-
-      let creditCardInfo
-      let expiryYear = `20${expiry[2] + expiry[3]}`
-      let expiryMonth = `${expiry[0] + expiry[1]}`
-
-      const { data } = await axios.post(
-        `${process.env.PAYMENT_URL}/payment/tokenize`,
-        {
-          customer: paymentData?.customerId,
-          creditCard: {
-            holderName: cardName,
-            number: cardNumber,
-            expiryMonth,
-            expiryYear,
-            ccv: ccv,
-          },
-          creditCardHolderInfo: {
-            name: cardName,
-            email,
-            phone: updatedOwner.cellPhone,
-            cpfCnpj,
-            postalCode: address.zipCode,
-            addressNumber: address.streetNumber,
-          },
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            access_token: process.env.ASAAS_API_KEY || '',
-          },
-        },
-      )
-
-      creditCardInfo = data
-
-      return creditCardInfo
+      return { subscriptionId, creditCardInfo }
     } catch (error) {
       throw new Error(`${error}`)
     }
