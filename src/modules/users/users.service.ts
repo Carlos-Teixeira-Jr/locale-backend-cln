@@ -288,6 +288,20 @@ export class UsersService {
       let plan
       let ownerData
       let ownerExists
+      const creditCardData = {
+        cardName,
+        cardNumber,
+        expiry,
+        ccv,
+        cpfCnpj,
+      }
+      const user = await this.userModel.findById(userId).lean()
+
+      if (!user) {
+        throw new NotFoundException(
+          `Usuário com o id '${userId}' não encontrado.`,
+        )
+      }
 
       // Cadastrar os dados do novo cartão de crédito no owner do usuário;
       ownerExists = await this.ownerModel.findById(owner).lean()
@@ -448,12 +462,33 @@ export class UsersService {
             if (!success) {
               throw new Error('Não foi possível remover a assinatura')
             }
+
+            ownerData.paymentData.creditCardInfo = {}
+            ownerData.paymentData.subscriptionId = ''
           } catch (error) {
             throw new Error(
               'Não foi possível atualizar o token dos dados do cartão',
             )
           }
         }
+        // Nova assinatura
+
+        const { creditCardInfo, subscriptionId } =
+          await this.handleSubscription(
+            ownerData,
+            user,
+            plan.price,
+            creditCardData,
+          )
+
+        ownerData.paymentData.creditCardInfo = creditCardInfo
+        ownerData.paymentData.subscriptionId = subscriptionId
+
+        await this.ownerModel.updateOne(
+          { _id: ownerData._id },
+          { $set: ownerData },
+          { session },
+        )
       }
 
       await session.commitTransaction()
@@ -739,16 +774,14 @@ export class UsersService {
       let updatedUser
       let encryptedPassword
       let planData
-      let plans
       let plusPlan
+      const plans = await this.planModel.find().lean()
+      const freePlan = plans.find(e => e.name === 'Free')
 
       if (body.owner?.plan) {
-        plans = await this.planModel.find().lean()
-
         planData = plans.find(
           e => e._id.toString() === body.owner.plan.toString(),
         )
-
         plusPlan = plans.find(e => e.name === 'Locale Plus')
       }
 
@@ -775,14 +808,15 @@ export class UsersService {
       }
 
       // OWNER
-      const updatedOwner = await this.handleOwner(
+      const { ownerExists, ownerPrevPlan } = await this.handleOwner(
         body.owner,
         updatedUser.username,
         body.user.id,
         planData,
+        freePlan,
       )
 
-      const newOwner = updatedOwner
+      const newOwner = ownerExists
 
       const coupon = body?.coupon
 
@@ -824,7 +858,11 @@ export class UsersService {
             )
           }
         } else {
-          if (newOwner?.paymentData?.subscriptionId) {
+          if (
+            planData &&
+            planData?._id.toString() !== ownerPrevPlan.toString() &&
+            newOwner?.paymentData?.subscriptionId
+          ) {
             await axios.delete(
               `${process.env.PAYMENT_URL}/payment/subscription/${newOwner?.paymentData?.subscriptionId}`,
               {
@@ -961,13 +999,16 @@ export class UsersService {
     userName: string,
     userId: any,
     planData: IPlan,
+    freePlan: any,
   ) {
     try {
       const { _id, phone, cellPhone } = owner
       let ownerExists
+      let ownerPrevPlan
 
       if (_id) {
         ownerExists = await this.ownerModel.findById(_id).lean()
+        ownerPrevPlan = ownerExists.plan
 
         ownerExists.adCredits = planData?.commonAd ?? ownerExists?.adCredits
         ownerExists.highlightCredits =
@@ -982,15 +1023,15 @@ export class UsersService {
           picture: '',
           creci: '',
           notifications: [],
-          plan: planData?._id ?? null,
+          plan: planData?._id ?? freePlan?._id,
           userId,
-          highlightCredits: planData?.highlightAd ?? 0,
-          adCredits: planData?.commonAd ?? 0,
+          highlightCredits: planData?.highlightAd ?? freePlan?.highlightAd,
+          adCredits: planData?.commonAd ?? freePlan?.commonAd,
           isActive: true,
         }
       }
 
-      return ownerExists
+      return { ownerExists, ownerPrevPlan }
     } catch (error) {
       throw new Error(`${error}`)
     }
@@ -1092,7 +1133,7 @@ export class UsersService {
               'Content-Type': 'application/json',
               access_token: process.env.ASAAS_API_KEY || '',
             },
-            timeout: 100000,
+            timeout: 200000,
           },
         )
 
@@ -1101,7 +1142,7 @@ export class UsersService {
       } else {
         // Atualizar;
         subscriptionId = owner.paymentData.subscriptionId
-        body = { value: 50 }
+        body = { value: price }
         await axios.post(
           //Atualiza o valor do plano;
           `${process.env.PAYMENT_URL}/payment/update-subscription/${subscriptionId}`,
@@ -1111,7 +1152,7 @@ export class UsersService {
               'Content-Type': 'application/json',
               access_token: process.env.ASAAS_API_KEY || '',
             },
-            timeout: 100000,
+            timeout: 200000,
           },
         )
 

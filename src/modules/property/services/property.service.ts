@@ -289,7 +289,7 @@ export class PropertyService {
 
       const property = await this.propertyModel.findById(propertyId).lean()
 
-      if (!property || !property.isActive) {
+      if (!property) {
         throw new NotFoundException(
           `Imóvel com o id ${propertyId} não encontrado.`,
         )
@@ -316,7 +316,7 @@ export class PropertyService {
 
       await this.propertyModel.updateOne(
         { _id: propertyId },
-        { $set: { highlighted: true } },
+        { $set: { highlighted: !property?.highlighted } },
         opt,
       )
 

@@ -30,6 +30,7 @@ export async function getPropertiesData(
 
   const ownerProperties = await propertyModel
     .find({ owner: owner._id })
+    .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit)
 
