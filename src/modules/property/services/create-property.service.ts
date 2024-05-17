@@ -81,13 +81,13 @@ export class CreateProperty_Service {
         plan,
         cellPhone,
         deactivateProperties,
-      } = createPropertyDto
+      } = createPropertyDto;
 
-      let coupon
-      let updatedOwner
+      let coupon;
+      let updatedOwner;
 
       if (createPropertyDto?.coupon) {
-        coupon = createPropertyDto?.coupon
+        coupon = createPropertyDto?.coupon;
       }
 
       const { ownerInfo } = propertyData
@@ -114,7 +114,7 @@ export class CreateProperty_Service {
           cellPhone,
           creditCardData,
         )
-        updatedOwner = tempUpdatedOwner
+        updatedOwner = tempUpdatedOwner;
       }
 
       if (!isPlanFree) {
@@ -130,6 +130,18 @@ export class CreateProperty_Service {
             session,
           )
         }
+      } else {
+        if (owner && owner.adCredits === 0) {
+          throw new BadRequestException(`O anunciante não tem mais créditos.`)
+        }
+
+        updatedOwner.adCredits = owner.adCredits - 1;
+        
+        await this.ownerModel.updateOne(
+          { _id: updatedOwner?._id },
+          { $set: updatedOwner },
+          { session }
+        )
       }
 
       // Deactivates the properties that the user choose in case that he changes his plan to a minor one;
@@ -208,11 +220,11 @@ export class CreateProperty_Service {
       cellPhone,
       wppNumber,
       profilePicture,
-    } = userData
+    } = userData;
 
     const plans = await this.planModel.find().lean()
     const plusPlan = plans.find(e => e.name === 'Locale Plus')
-    const selectedPlan = plans.find(e => e._id === plan)
+    const selectedPlan = plans.find(e => e._id.toString() === plan.toString())
 
     // Verificar se o usuário já está cadastrado
     if (userId) {
@@ -359,7 +371,7 @@ export class CreateProperty_Service {
     const { paymentData, name } = owner
 
     if (!isPlanFree && !paymentData?.customerId) {
-      cpfCnpj = creditCardData.cpfCnpj
+      cpfCnpj = creditCardData?.cpfCnpj
       // Cadastrar customer no payment api;
       const response = await axios.post(
         `${process.env.PAYMENT_URL}/customer`,
@@ -564,7 +576,7 @@ export class CreateProperty_Service {
           const subscription = response.data
           const nextDueDate = subscription.nextDueDate
 
-          if (adCredits < 1) {
+          if (adCredits < 1 || adCredits === 0 && ownerActualPlanString !== planIdString) {
             // Caso em que o usuário não tem mais créditos e selecionou outro plano
             if (selectedPlanId !== ownerActualPlan) {
               const subscriptionId = paymentData.subscriptionId
@@ -590,6 +602,7 @@ export class CreateProperty_Service {
                     'Content-Type': 'application/json',
                     access_token: process.env.ASAAS_API_KEY || '',
                   },
+                  timeout: 100000
                 },
               )
 
