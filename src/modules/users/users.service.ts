@@ -293,12 +293,14 @@ export class UsersService {
         cardNumber,
         expiry,
         ccv,
-        cpfCnpj
+        cpfCnpj,
       }
-      const user = await this.userModel.findById(userId).lean();
+      const user = await this.userModel.findById(userId).lean()
 
       if (!user) {
-        throw new NotFoundException(`Usuário com o id '${userId}' não encontrado.`)
+        throw new NotFoundException(
+          `Usuário com o id '${userId}' não encontrado.`,
+        )
       }
 
       // Cadastrar os dados do novo cartão de crédito no owner do usuário;
@@ -461,8 +463,8 @@ export class UsersService {
               throw new Error('Não foi possível remover a assinatura')
             }
 
-            ownerData.paymentData.creditCardInfo = {};
-            ownerData.paymentData.subscriptionId = '';
+            ownerData.paymentData.creditCardInfo = {}
+            ownerData.paymentData.subscriptionId = ''
           } catch (error) {
             throw new Error(
               'Não foi possível atualizar o token dos dados do cartão',
@@ -471,15 +473,21 @@ export class UsersService {
         }
         // Nova assinatura
 
-        const { creditCardInfo, subscriptionId } = await this.handleSubscription(ownerData, user, plan.price, creditCardData);
+        const { creditCardInfo, subscriptionId } =
+          await this.handleSubscription(
+            ownerData,
+            user,
+            plan.price,
+            creditCardData,
+          )
 
-        ownerData.paymentData.creditCardInfo = creditCardInfo;
-        ownerData.paymentData.subscriptionId = subscriptionId;
+        ownerData.paymentData.creditCardInfo = creditCardInfo
+        ownerData.paymentData.subscriptionId = subscriptionId
 
         await this.ownerModel.updateOne(
           { _id: ownerData._id },
           { $set: ownerData },
-          { session }
+          { session },
         )
       }
 
@@ -767,11 +775,13 @@ export class UsersService {
       let encryptedPassword
       let planData
       let plusPlan
-      let plans = await this.planModel.find().lean()
-      let freePlan = plans.find((e) => e.name === 'Free');
+      const plans = await this.planModel.find().lean()
+      const freePlan = plans.find(e => e.name === 'Free')
 
       if (body.owner?.plan) {
-        planData = plans.find(e => e._id.toString() === body.owner.plan.toString())
+        planData = plans.find(
+          e => e._id.toString() === body.owner.plan.toString(),
+        )
         plusPlan = plans.find(e => e.name === 'Locale Plus')
       }
 
@@ -798,12 +808,12 @@ export class UsersService {
       }
 
       // OWNER
-      const { ownerExists, ownerPrevPlan} = await this.handleOwner(
+      const { ownerExists, ownerPrevPlan } = await this.handleOwner(
         body.owner,
         updatedUser.username,
         body.user.id,
         planData,
-        freePlan
+        freePlan,
       )
 
       const newOwner = ownerExists
@@ -849,8 +859,8 @@ export class UsersService {
           }
         } else {
           if (
-            planData && 
-            planData?._id.toString() !== ownerPrevPlan.toString() && 
+            planData &&
+            planData?._id.toString() !== ownerPrevPlan.toString() &&
             newOwner?.paymentData?.subscriptionId
           ) {
             await axios.delete(
@@ -989,15 +999,15 @@ export class UsersService {
     userName: string,
     userId: any,
     planData: IPlan,
-    freePlan: any
+    freePlan: any,
   ) {
     try {
       const { _id, phone, cellPhone } = owner
       let ownerExists
-      let ownerPrevPlan;
+      let ownerPrevPlan
 
       if (_id) {
-        ownerExists = await this.ownerModel.findById(_id).lean();
+        ownerExists = await this.ownerModel.findById(_id).lean()
         ownerPrevPlan = ownerExists.plan
 
         ownerExists.adCredits = planData?.commonAd ?? ownerExists?.adCredits
@@ -1021,7 +1031,7 @@ export class UsersService {
         }
       }
 
-      return {ownerExists, ownerPrevPlan}
+      return { ownerExists, ownerPrevPlan }
     } catch (error) {
       throw new Error(`${error}`)
     }

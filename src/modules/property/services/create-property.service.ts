@@ -81,13 +81,13 @@ export class CreateProperty_Service {
         plan,
         cellPhone,
         deactivateProperties,
-      } = createPropertyDto;
+      } = createPropertyDto
 
-      let coupon;
-      let updatedOwner;
+      let coupon
+      let updatedOwner
 
       if (createPropertyDto?.coupon) {
-        coupon = createPropertyDto?.coupon;
+        coupon = createPropertyDto?.coupon
       }
 
       const { ownerInfo } = propertyData
@@ -114,7 +114,7 @@ export class CreateProperty_Service {
           cellPhone,
           creditCardData,
         )
-        updatedOwner = tempUpdatedOwner;
+        updatedOwner = tempUpdatedOwner
       }
 
       if (!isPlanFree) {
@@ -127,6 +127,7 @@ export class CreateProperty_Service {
             creditCardData,
             cellPhone,
             ownerPreviousPlan,
+            deactivateProperties?.length,
             session,
           )
         }
@@ -135,12 +136,12 @@ export class CreateProperty_Service {
           throw new BadRequestException(`O anunciante não tem mais créditos.`)
         }
 
-        updatedOwner.adCredits = owner.adCredits - 1;
-        
+        updatedOwner.adCredits = owner.adCredits - 1
+
         await this.ownerModel.updateOne(
           { _id: updatedOwner?._id },
           { $set: updatedOwner },
-          { session }
+          { session },
         )
       }
 
@@ -220,7 +221,7 @@ export class CreateProperty_Service {
       cellPhone,
       wppNumber,
       profilePicture,
-    } = userData;
+    } = userData
 
     const plans = await this.planModel.find().lean()
     const plusPlan = plans.find(e => e.name === 'Locale Plus')
@@ -434,6 +435,7 @@ export class CreateProperty_Service {
     creditCardData: CreditCardData,
     cellPhone: string,
     ownerPreviousPlan: string,
+    propertiesToDeactivate: number,
     session: any,
   ) {
     let cpfCnpj: string
@@ -527,7 +529,7 @@ export class CreateProperty_Service {
           newAdCredits =
             selectedPlan.price > previousPlanData.price
               ? owner.adCredits + selectedPlan.commonAd
-              : owner.adCredits - selectedPlan.commonAd
+              : owner.adCredits - selectedPlan.commonAd - propertiesToDeactivate
 
           newHighlightCredits =
             selectedPlan.price > previousPlanData.price
@@ -576,7 +578,10 @@ export class CreateProperty_Service {
           const subscription = response.data
           const nextDueDate = subscription.nextDueDate
 
-          if (adCredits < 1 || adCredits === 0 && ownerActualPlanString !== planIdString) {
+          if (
+            adCredits < 1 ||
+            (adCredits === 0 && ownerActualPlanString !== planIdString)
+          ) {
             // Caso em que o usuário não tem mais créditos e selecionou outro plano
             if (selectedPlanId !== ownerActualPlan) {
               const subscriptionId = paymentData.subscriptionId
@@ -602,7 +607,7 @@ export class CreateProperty_Service {
                     'Content-Type': 'application/json',
                     access_token: process.env.ASAAS_API_KEY || '',
                   },
-                  timeout: 100000
+                  timeout: 100000,
                 },
               )
 
