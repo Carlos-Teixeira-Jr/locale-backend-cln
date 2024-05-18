@@ -61,7 +61,7 @@ export class PropertyOwnerInfoDto {
 
   @IsOptional()
   @IsString()
-  wppNumber: string
+  wwpNumber: string
 }
 
 export class PropertySizeDto {

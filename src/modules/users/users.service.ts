@@ -1002,7 +1002,7 @@ export class UsersService {
     freePlan: any,
   ) {
     try {
-      const { _id, phone, cellPhone } = owner
+      const { _id, phone, cellPhone, wwpNumber } = owner
       let ownerExists
       let ownerPrevPlan
 
@@ -1014,6 +1014,9 @@ export class UsersService {
         ownerExists.highlightCredits =
           planData?.highlightAd ?? ownerExists?.highlightCredits
         ownerExists.plan = planData?._id ?? ownerExists?.plan
+        if (wwpNumber) {
+          ownerExists.wwpNumber = wwpNumber
+        }
       } else {
         ownerExists = {
           name: userName,
