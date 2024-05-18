@@ -860,7 +860,7 @@ export class UsersService {
         } else {
           if (
             planData &&
-            planData?._id.toString() !== ownerPrevPlan.toString() &&
+            planData?._id.toString() !== ownerPrevPlan?.toString() &&
             newOwner?.paymentData?.subscriptionId
           ) {
             await axios.delete(
