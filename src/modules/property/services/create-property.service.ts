@@ -34,7 +34,7 @@ interface IOwnerData {
   name: string
   phone: string
   cellPhone: string
-  wppNumber: string
+  wwpNumber: string
   picture: string
   plan: any
   userId: any
@@ -219,7 +219,7 @@ export class CreateProperty_Service {
       cpf,
       phone,
       cellPhone,
-      wppNumber,
+      wwpNumber,
       profilePicture,
     } = userData
 
@@ -301,7 +301,7 @@ export class CreateProperty_Service {
           name: username,
           phone,
           cellPhone,
-          wppNumber,
+          wwpNumber,
           plan,
           picture: profilePicture,
           userId: user._id,
@@ -314,7 +314,7 @@ export class CreateProperty_Service {
           name: username,
           phone,
           cellPhone,
-          wppNumber,
+          wwpNumber,
           plan: plusPlan._id,
           picture: profilePicture,
           userId: user._id,
