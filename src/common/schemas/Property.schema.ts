@@ -40,7 +40,7 @@ export interface IProperty extends BaseModel, Document {
   ownerInfo: {
     name: string
     phones?: string[]
-    wppNumber?: string
+    wwpNumber?: string
     creci: string
     picture: string
     email: string
@@ -102,7 +102,7 @@ export const PropertySchema = new Schema<IProperty>(
         type: String,
       },
       phones: [{ type: String }],
-      wppNumber: { type: String },
+      wwpNumber: { type: String },
       creci: {
         type: String,
       },

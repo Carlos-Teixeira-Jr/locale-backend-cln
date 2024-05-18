@@ -38,7 +38,7 @@ export const OwnerSchema = new Schema(
     name: { type: String },
     phone: { type: String },
     cellPhone: { type: String },
-    wppNumber: { type: String },
+    wwpNumber: { type: String },
     picture: { type: String },
     creci: { type: String },
     notifications: [
