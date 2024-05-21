@@ -2,10 +2,12 @@ import { Schema } from 'mongoose'
 
 export const UserModelName = 'User'
 
+//To-do: tornar telefone e cpf únicos (atualizar string no banco);
+
 export const UserSchema = new Schema(
   {
     username: { type: String },
-    email: { type: String },
+    email: { type: String, unique: true },
     password: { type: String },
     picture: { type: String },
     phone: { type: String },
