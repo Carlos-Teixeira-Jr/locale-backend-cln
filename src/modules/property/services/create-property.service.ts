@@ -306,8 +306,8 @@ export class CreateProperty_Service {
           picture: profilePicture,
           userId: user._id,
           email,
-          adCredits: 0,
-          highlightCredits: 0,
+          adCredits: selectedPlan?.commonAd,
+          highlightCredits: selectedPlan?.highlightAd,
         }
       } else {
         ownerData = {
