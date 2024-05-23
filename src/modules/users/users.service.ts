@@ -199,7 +199,7 @@ export class UsersService {
 
       const user = await this.userModel
         .findOne({ _id: userId, isActive: true })
-        .select('username email address cpf picture phone')
+        .select('username email address cpf picture phone cellPhone')
 
       if (!user) {
         throw new NotFoundException(
@@ -770,6 +770,7 @@ export class UsersService {
       this.logger.log({ body }, 'start edit user > [service]')
 
       const { id: userId } = body.user
+      const { isChangePlan } = body
 
       let updatedUser
       let encryptedPassword
@@ -778,7 +779,7 @@ export class UsersService {
       const plans = await this.planModel.find().lean()
       const freePlan = plans.find(e => e.name === 'Free')
 
-      if (body.owner?.plan) {
+      if (isChangePlan) {
         planData = plans.find(
           e => e._id.toString() === body.owner.plan.toString(),
         )
@@ -814,6 +815,7 @@ export class UsersService {
         body.user.id,
         planData,
         freePlan,
+        isChangePlan,
       )
 
       const newOwner = ownerExists
@@ -823,7 +825,7 @@ export class UsersService {
       // PAYMENT DATA
       if (!coupon) {
         // Selecionou um plano;
-        if (planData && planData.price > 0) {
+        if (isChangePlan && planData.price > 0) {
           if (!newOwner?.paymentData?.subscriptionId) {
             if (!newOwner?.paymentData?.customerId) {
               const newPaymentData = await this.handleCustomer(
@@ -859,7 +861,7 @@ export class UsersService {
           }
         } else {
           if (
-            planData &&
+            isChangePlan &&
             planData?._id.toString() !== ownerPrevPlan?.toString() &&
             newOwner?.paymentData?.subscriptionId
           ) {
@@ -896,14 +898,16 @@ export class UsersService {
         { session },
       )
 
-      if (!body.owner?._id) {
+      if (!body.owner?._id && isChangePlan) {
         await this.ownerModel.create([newOwner], { session })
       } else {
-        await this.ownerModel.updateOne(
-          { _id: newOwner._id },
-          { $set: newOwner },
-          { session },
-        )
+        if (isChangePlan) {
+          await this.ownerModel.updateOne(
+            { _id: newOwner._id },
+            { $set: newOwner },
+            { session },
+          )
+        }
       }
 
       await session.commitTransaction()
@@ -960,15 +964,22 @@ export class UsersService {
 
   async handleEditUser(user: any, body: EditUserDto) {
     try {
-      const { username: userName, email, cpf, address: userAddress } = body.user
-      const { cellPhone } = body.owner
+      const {
+        username: userName,
+        email,
+        cpf,
+        address: userAddress,
+        phone,
+        cellPhone,
+      } = body.user
       const updatedUser = { ...user }
 
       updatedUser.username = userName
       updatedUser.email = email
       updatedUser.cpf = cpf
       updatedUser.address = userAddress
-      updatedUser.phone = cellPhone
+      updatedUser.phone = phone
+      updatedUser.cellPhone = cellPhone
 
       return updatedUser
     } catch (error) {
@@ -1000,6 +1011,7 @@ export class UsersService {
     userId: any,
     planData: IPlan,
     freePlan: any,
+    isChangePlan: boolean,
   ) {
     try {
       const { _id, phone, cellPhone, wwpNumber } = owner
@@ -1008,29 +1020,33 @@ export class UsersService {
 
       if (_id) {
         ownerExists = await this.ownerModel.findById(_id).lean()
-        ownerPrevPlan = ownerExists.plan
+        if (isChangePlan) {
+          ownerPrevPlan = ownerExists.plan
 
-        ownerExists.adCredits = planData?.commonAd ?? ownerExists?.adCredits
-        ownerExists.highlightCredits =
-          planData?.highlightAd ?? ownerExists?.highlightCredits
-        ownerExists.plan = planData?._id ?? ownerExists?.plan
-        if (wwpNumber) {
-          ownerExists.wwpNumber = wwpNumber
+          ownerExists.adCredits = planData?.commonAd ?? ownerExists?.adCredits
+          ownerExists.highlightCredits =
+            planData?.highlightAd ?? ownerExists?.highlightCredits
+          ownerExists.plan = planData?._id ?? ownerExists?.plan
+          if (wwpNumber) {
+            ownerExists.wwpNumber = wwpNumber
+          }
         }
       } else {
-        ownerExists = {
-          name: userName,
-          phone,
-          cellPhone,
-          wwpNumber: '',
-          picture: '',
-          creci: '',
-          notifications: [],
-          plan: planData?._id ?? freePlan?._id,
-          userId,
-          highlightCredits: planData?.highlightAd ?? freePlan?.highlightAd,
-          adCredits: planData?.commonAd ?? freePlan?.commonAd,
-          isActive: true,
+        if (isChangePlan) {
+          ownerExists = {
+            name: userName,
+            phone,
+            cellPhone,
+            wwpNumber: '',
+            picture: '',
+            creci: '',
+            notifications: [],
+            plan: planData?._id ?? freePlan?._id,
+            userId,
+            highlightCredits: planData?.highlightAd ?? freePlan?.highlightAd,
+            adCredits: planData?.commonAd ?? freePlan?.commonAd,
+            isActive: true,
+          }
         }
       }
 
@@ -1049,7 +1065,7 @@ export class UsersService {
         {
           name: username,
           email,
-          phone: updatedUser.phone,
+          phone: updatedUser.cellPhone,
           postalCode: address.zipCode,
           description: 'Confirmação de criação de id de cliente',
           cpfCnpj: cpf,
@@ -1082,9 +1098,9 @@ export class UsersService {
     creditCard: any,
   ) {
     try {
-      const { paymentData, cellPhone } = owner
+      const { paymentData } = owner
       const { cardNumber, cardName, expiry, ccv, cpfCnpj } = creditCard
-      const { email, address } = user
+      const { email, address, cellPhone } = user
       let subscriptionId
       let body
       let creditCardInfo

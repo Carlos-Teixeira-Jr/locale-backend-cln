@@ -155,6 +155,8 @@ export class AuthService {
         password: encryptedPassword,
         emailVerificationCode,
         emailVerificationExpiry,
+        phone: '',
+        cellPhone: '',
       })
 
       await sendEmailVerificationCode(email, emailVerificationCode)
@@ -201,6 +203,8 @@ export class AuthService {
           picture,
           password: encryptedPassword,
           isEmailVerified: true,
+          phone: '',
+          cellPhone: '',
         })
 
         const payload = {
@@ -420,18 +424,4 @@ export class AuthService {
       throw error
     }
   }
-
-  // async validateUser(
-  //   username: string,
-  //   password: string,
-  // ): Promise<IUserPartialData | null> {
-  //   const user: IUserReturn = await this.userService.findOneByUsername(username)
-
-  //   if (user && user.password === password) {
-  //     const userData = { username: user.username, email: user.email }
-  //     return userData
-  //   }
-
-  //   return null
-  // }
 }
