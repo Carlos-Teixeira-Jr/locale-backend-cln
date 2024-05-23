@@ -47,9 +47,12 @@ export class PropertyOwnerInfoDto {
   picture: string
 
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  phones: string[]
+  @IsString()
+  phone: string
+
+  @IsOptional()
+  @IsString()
+  cellPhone: string
 
   @IsOptional()
   @IsString()

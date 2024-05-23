@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer'
 import {
+  IsBoolean,
   IsEmail,
   IsNotEmpty,
   IsNumber,
@@ -91,6 +92,14 @@ export class UserDto {
 
   @IsNotEmpty()
   @IsString()
+  cellPhone: string
+
+  @IsOptional()
+  @IsString()
+  phone: string
+
+  @IsNotEmpty()
+  @IsString()
   @IsEmail()
   email: string
 
@@ -140,4 +149,8 @@ export class EditUserDto {
   @IsOptional()
   @IsString()
   coupon: string
+
+  @IsNotEmpty()
+  @IsBoolean()
+  isChangePlan: boolean
 }
