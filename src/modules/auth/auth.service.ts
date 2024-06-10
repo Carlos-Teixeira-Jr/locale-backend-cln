@@ -307,11 +307,16 @@ export class AuthService {
 
       const { email } = reSendVerifyEmailDto
 
-      const newEmailVerificationCode = generateRandomString()
+      const newEmailVerificationCode = generateRandomString();
+
+      const newExpiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000)
 
       const updateUser = await this.userModel.updateOne(
         { email: email },
-        { $set: { emailVerificationCode: newEmailVerificationCode } },
+        { $set: { 
+          emailVerificationCode: newEmailVerificationCode,
+          emailVerificationExpiry: newExpiryDate 
+        } },
       )
 
       if (updateUser.modifiedCount === 0) {
