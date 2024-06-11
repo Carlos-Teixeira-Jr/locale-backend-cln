@@ -138,27 +138,29 @@ export class CreateProperty_Service {
           )
         }
       } else {
-        if (owner && owner.adCredits === 0) {
-          throw new BadRequestException(`O anunciante não tem mais créditos.`)
+        if (!isPlanFree) {
+          if (owner && owner.adCredits === 0) {
+            throw new BadRequestException(`O anunciante não tem mais créditos.`)
+          }
+  
+          updatedOwner.paymentData.creditCardInfo = {
+            creditCardBrand: '',
+            creditCardNumber: '',
+            creditCardToken: '',
+          }
+          updatedOwner.paymentData.subscriptionId = ''
+  
+          updatedOwner = {
+            ...updatedOwner,
+            adCredits: owner.adCredits - 1,
+          }
+  
+          await this.ownerModel.updateOne(
+            { _id: updatedOwner?._id },
+            { $set: updatedOwner },
+            { session },
+          )
         }
-
-        updatedOwner.paymentData.creditCardInfo = {
-          creditCardBrand: '',
-          creditCardNumber: '',
-          creditCardToken: '',
-        }
-        updatedOwner.paymentData.subscriptionId = ''
-
-        updatedOwner = {
-          ...updatedOwner,
-          adCredits: owner.adCredits - 1,
-        }
-
-        await this.ownerModel.updateOne(
-          { _id: updatedOwner?._id },
-          { $set: updatedOwner },
-          { session },
-        )
       }
 
       // Deactivates the properties that the user choose in case that he changes his plan to a minor one;
