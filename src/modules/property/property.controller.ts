@@ -10,7 +10,6 @@ import {
 } from '@nestjs/common'
 import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import { LoggerService } from 'modules/logger/logger.service'
-import { GetPropertyParams } from './dto/getProperty.params'
 import { CommonQueryFilter } from 'common/utils/query.filter'
 import { CreatePropertyDto } from './dto/create-property.dto'
 import { IFilterReturn, PropertyService } from './services/property.service'
@@ -45,16 +44,16 @@ export class PropertyController {
     return await this.propertyService.filter(queryFilter)
   }
 
-  @Get(':id')
+  @Post('/findOne/:id')
   @ApiOperation({
     summary: 'Search a specific property based on the query params.',
   })
   async findOne(
-    @Param() params: GetPropertyParams,
-    @Query('isEdit') isEdit: boolean,
+    @Param() propertyId: any,
+    @Body() getPropertyParams: any,
   ): Promise<IProperty> {
     this.logger.log({}, 'findOne')
-    return await this.propertyService.findOne(params.id, isEdit)
+    return await this.propertyService.findOne(getPropertyParams, propertyId)
   }
 
   @Post()
@@ -88,7 +87,7 @@ export class PropertyController {
   async findByOwner(
     @Body() getPropertiesByOwnerDto: GetPropertiesByOwnerDto,
   ): Promise<IOwnerPropertiesReturn> {
-    this.logger.log({}, 'start findByOwner > [controller]')
+    this.logger.log({}, 'start findByOwner > [property controller]')
 
     return this.propertyService.findByOwner(getPropertiesByOwnerDto)
   }

@@ -92,11 +92,4 @@ export class AuthController {
   async requestPassword(@Body() requestPasswordDto: RequestPasswordDto) {
     return await this.authService.requestPassword(requestPasswordDto)
   }
-
-  //Rota para testar o middleware que exige e verifica o token jwt;
-  // @Get('protected')
-  // @UseGuards(JwtAuthGuard)
-  // async protected() {
-  //   return 'success'
-  // }
 }

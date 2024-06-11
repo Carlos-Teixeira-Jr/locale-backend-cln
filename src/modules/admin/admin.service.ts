@@ -6,6 +6,12 @@ import { LoggerService } from 'modules/logger/logger.service'
 import { InjectModel } from '@nestjs/mongoose'
 import { IProperty, PropertyModelName } from 'common/schemas/Property.schema'
 import { Model, Schema } from 'mongoose'
+import { GetPropertyParams } from 'modules/property/dto/getProperty.params'
+import {
+  getPropertyById,
+  incrementViews,
+} from 'modules/property/auxiliar/auxiliar-functions.service'
+import { OwnerModelName, IOwner } from 'common/schemas/Owner.schema'
 
 @Injectable()
 export class AdminService {
@@ -14,6 +20,8 @@ export class AdminService {
     private readonly logger: LoggerService,
     @InjectModel(PropertyModelName)
     private readonly propertyModel: Model<IProperty>,
+    @InjectModel(OwnerModelName)
+    private readonly ownerModel: Model<IOwner>,
   ) {}
 
   create(_createAdminDto: CreateAdminDto) {
@@ -24,15 +32,41 @@ export class AdminService {
     return `This action returns all admin`
   }
 
-  async findOne(id: Schema.Types.ObjectId): Promise<IProperty> {
+  async findOne(
+    getPropertiesByOwner: GetPropertyParams,
+    propertyId: Schema.Types.ObjectId,
+  ): Promise<IProperty> {
+    console.log('🚀 ~ PropertyService ~ propertyId:', propertyId)
     try {
-      this.logger.log({}, 'start findOne')
+      this.logger.log({}, 'start findOne Property > [property service]')
 
-      const property: IProperty = await this.propertyModel.findById(id).lean()
+      const { userId, isEdit } = getPropertiesByOwner
 
-      if (!property) {
-        throw new NotFoundException(`O id ${id} não foi encontrado`)
+      let ownerId
+
+      const userIdString = userId.toString()
+
+      const property: IProperty = await getPropertyById(
+        propertyId,
+        this.propertyModel,
+      )
+
+      if (!property) throw new NotFoundException(`O imóvel não foi encontrado.`)
+
+      const owner = await this.ownerModel.findOne({ userId }).lean()
+
+      if (owner) {
+        ownerId = owner._id
       }
+
+      // Verificar se o usuário já acessou este imóvel ou se ele é o owner do imóvel;
+      if (
+        property.owner !== ownerId &&
+        !property.views.some(e => e === userIdString)
+      ) {
+        await incrementViews(property, userIdString, isEdit, this.propertyModel)
+      }
+
       return property
     } catch (error) {
       this.logger.error({

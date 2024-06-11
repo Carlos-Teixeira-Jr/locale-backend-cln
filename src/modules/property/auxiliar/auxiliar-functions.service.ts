@@ -4,13 +4,15 @@ import { IProperty } from 'common/schemas/Property.schema'
 import { Model, Schema } from 'mongoose'
 
 export async function getPropertyById(
-  id: Schema.Types.ObjectId,
+  propertyId: any,
   propertyModel: Model<IProperty>,
 ): Promise<IProperty> {
-  const property: IProperty = await propertyModel.findById(id).lean()
+  const property: IProperty = await propertyModel.findById(propertyId.id).lean()
+
   if (!property) {
-    throw new NotFoundException(`Property with id ${id} not found`)
+    throw new NotFoundException(`Property with id ${propertyId.id} not found`)
   }
+
   return property
 }
 
@@ -45,11 +47,15 @@ export async function getPropertiesData(
 
 export async function incrementViews(
   property: IProperty,
+  userId: string,
   isEdit: boolean,
   propertyModel: Model<IProperty>,
 ): Promise<void> {
   if (!isEdit) {
-    await propertyModel.updateOne({ _id: property._id }, { $inc: { views: 1 } })
+    await propertyModel.updateOne(
+      { _id: property._id },
+      { $addToSet: { views: userId } },
+    )
   }
 }
 

@@ -138,27 +138,29 @@ export class CreateProperty_Service {
           )
         }
       } else {
-        if (owner && owner.adCredits === 0) {
-          throw new BadRequestException(`O anunciante não tem mais créditos.`)
-        }
+        if (!isPlanFree) {
+          if (owner && owner.adCredits === 0) {
+            throw new BadRequestException(`O anunciante não tem mais créditos.`)
+          }
 
-        updatedOwner.paymentData.creditCardInfo = {
-          creditCardBrand: '',
-          creditCardNumber: '',
-          creditCardToken: '',
-        }
-        updatedOwner.paymentData.subscriptionId = ''
+          updatedOwner.paymentData.creditCardInfo = {
+            creditCardBrand: '',
+            creditCardNumber: '',
+            creditCardToken: '',
+          }
+          updatedOwner.paymentData.subscriptionId = ''
 
-        updatedOwner = {
-          ...updatedOwner,
-          adCredits: owner.adCredits - 1,
-        }
+          updatedOwner = {
+            ...updatedOwner,
+            adCredits: owner.adCredits - 1,
+          }
 
-        await this.ownerModel.updateOne(
-          { _id: updatedOwner?._id },
-          { $set: updatedOwner },
-          { session },
-        )
+          await this.ownerModel.updateOne(
+            { _id: updatedOwner?._id },
+            { $set: updatedOwner },
+            { session },
+          )
+        }
       }
 
       // Deactivates the properties that the user choose in case that he changes his plan to a minor one;
@@ -772,7 +774,7 @@ export class CreateProperty_Service {
       // Usuário selecionou o plano grátis ou o mesmo plano que já tem;
       if (owner.adCredits > 0) {
         // Fazer a assinatura caso ainda não tenha;
-        if (!owner?.paymentData?.subscriptionId) {
+        if (!owner?.paymentData?.subscriptionId && !isPlanFree) {
           const response = await axios.post(
             `${process.env.PAYMENT_URL}/payment/subscription`,
             {
@@ -861,42 +863,44 @@ export class CreateProperty_Service {
             )
           }
         } else {
-          // Cancelar a assinatura
-          const { data } = await axios.delete(
-            `${process.env.PAYMENT_URL}/payment/subscription/${owner?.paymentData?.subscriptionId}`,
-            {
-              method: 'DELETE',
-              headers: {
-                'Content-Type': 'application/json',
-                access_token: process.env.ASSAS_API_KEY || '',
+          if (owner.paymentData?.subscriptionId) {
+            // Cancelar a assinatura
+            const { data } = await axios.delete(
+              `${process.env.PAYMENT_URL}/payment/subscription/${owner?.paymentData?.subscriptionId}`,
+              {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json',
+                  access_token: process.env.ASSAS_API_KEY || '',
+                },
               },
-            },
-          )
+            )
 
-          const success = data.deleted
+            const success = data.deleted
 
-          if (!success) {
-            throw new Error('Não foi possível remover a assinatura')
+            if (!success) {
+              throw new Error('Não foi possível remover a assinatura')
+            }
+
+            updatedOwner.paymentData.creditCardInfo = {
+              creditCardBrand: '',
+              creditCardNumber: '',
+              creditCardToken: '',
+            }
+            updatedOwner.paymentData.subscriptionId = ''
+
+            updatedOwner = {
+              ...updatedOwner,
+              adCredits: owner.adCredits - 1,
+            }
+
+            // Atualiza o owner;
+            await this.ownerModel.updateOne(
+              { _id: updatedOwner._id },
+              { $set: updatedOwner },
+              { session },
+            )
           }
-
-          updatedOwner.paymentData.creditCardInfo = {
-            creditCardBrand: '',
-            creditCardNumber: '',
-            creditCardToken: '',
-          }
-          updatedOwner.paymentData.subscriptionId = ''
-
-          updatedOwner = {
-            ...updatedOwner,
-            adCredits: owner.adCredits - 1,
-          }
-
-          // Atualiza o owner;
-          await this.ownerModel.updateOne(
-            { _id: updatedOwner._id },
-            { $set: updatedOwner },
-            { session },
-          )
         }
       } else {
         throw new BadRequestException(
