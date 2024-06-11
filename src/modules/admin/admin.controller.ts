@@ -16,9 +16,9 @@ export class AdminController {
   @Get('/edit-property/:id')
   async findOne(
     @Param() propertyId: Schema.Types.ObjectId,
-    @Body() getPropertyParams: GetPropertyParams
+    @Body() getPropertyParams: GetPropertyParams,
   ): Promise<any> {
-    this.logger.log({propertyId}, 'findOne property > [controller]')
+    this.logger.log({ propertyId }, 'findOne property > [controller]')
     return await this.adminService.findOne(getPropertyParams, propertyId)
   }
 }

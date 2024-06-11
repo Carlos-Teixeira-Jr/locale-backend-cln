@@ -6,6 +6,7 @@ import {
   PropertyModelName,
   PropertySchema,
 } from 'common/schemas/Property.schema'
+import { OwnerModelName, OwnerSchema } from 'common/schemas/Owner.schema'
 
 @Module({
   imports: [
@@ -13,6 +14,10 @@ import {
       {
         name: PropertyModelName,
         schema: PropertySchema,
+      },
+      {
+        name: OwnerModelName,
+        schema: OwnerSchema,
       },
     ]),
   ],

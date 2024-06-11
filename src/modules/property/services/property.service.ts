@@ -94,34 +94,37 @@ export class PropertyService {
     getPropertiesByOwner: GetPropertyParams,
     propertyId: Schema.Types.ObjectId,
   ): Promise<IProperty> {
-    console.log("🚀 ~ PropertyService ~ propertyId:", propertyId)
+    console.log('🚀 ~ PropertyService ~ propertyId:', propertyId)
     try {
-      this.logger.log({}, 'start findOne Property > [property service]');
+      this.logger.log({}, 'start findOne Property > [property service]')
 
-      const {
-        userId,
-        isEdit
-      } = getPropertiesByOwner;
+      const { userId, isEdit } = getPropertiesByOwner
 
-      let ownerId;
+      let ownerId
 
-      const userIdString = userId.toString();
+      const userIdString = userId.toString()
 
-      const property: IProperty = await getPropertyById(propertyId, this.propertyModel)
+      const property: IProperty = await getPropertyById(
+        propertyId,
+        this.propertyModel,
+      )
 
       if (!property) throw new NotFoundException(`O imóvel não foi encontrado.`)
 
-      const owner = await this.ownerModel.findOne({ userId }).lean();
-      
+      const owner = await this.ownerModel.findOne({ userId }).lean()
+
       if (owner) {
-        ownerId = owner._id;
+        ownerId = owner._id
       }
 
       // Verificar se o usuário já acessou este imóvel ou se ele é o owner do imóvel;
-      if (property.owner !== ownerId && !property.views.some((e) => e === userIdString)) {
-        await incrementViews(property, userIdString, isEdit, this.propertyModel);
+      if (
+        property.owner !== ownerId &&
+        !property.views.some(e => e === userIdString)
+      ) {
+        await incrementViews(property, userIdString, isEdit, this.propertyModel)
       }
-      
+
       return property
     } catch (error) {
       this.logger.error({

@@ -8,9 +8,11 @@ export async function getPropertyById(
   propertyModel: Model<IProperty>,
 ): Promise<IProperty> {
   const property: IProperty = await propertyModel.findById(propertyId.id).lean()
+
   if (!property) {
     throw new NotFoundException(`Property with id ${propertyId.id} not found`)
   }
+
   return property
 }
 
@@ -51,8 +53,8 @@ export async function incrementViews(
 ): Promise<void> {
   if (!isEdit) {
     await propertyModel.updateOne(
-      { _id: property._id }, 
-      { $addToSet: { views: userId } }
+      { _id: property._id },
+      { $addToSet: { views: userId } },
     )
   }
 }

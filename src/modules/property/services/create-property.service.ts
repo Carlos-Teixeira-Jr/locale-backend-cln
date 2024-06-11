@@ -142,19 +142,19 @@ export class CreateProperty_Service {
           if (owner && owner.adCredits === 0) {
             throw new BadRequestException(`O anunciante não tem mais créditos.`)
           }
-  
+
           updatedOwner.paymentData.creditCardInfo = {
             creditCardBrand: '',
             creditCardNumber: '',
             creditCardToken: '',
           }
           updatedOwner.paymentData.subscriptionId = ''
-  
+
           updatedOwner = {
             ...updatedOwner,
             adCredits: owner.adCredits - 1,
           }
-  
+
           await this.ownerModel.updateOne(
             { _id: updatedOwner?._id },
             { $set: updatedOwner },

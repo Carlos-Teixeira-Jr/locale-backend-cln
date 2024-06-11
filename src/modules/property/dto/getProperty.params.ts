@@ -1,4 +1,4 @@
-import { IsBoolean, IsNotEmpty, IsOptional, Validate } from 'class-validator'
+import { IsBoolean, IsNotEmpty, Validate } from 'class-validator'
 import { IDValidator } from 'common/validators/ID.validator'
 import { Schema } from 'mongoose'
 

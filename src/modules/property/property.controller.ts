@@ -10,7 +10,6 @@ import {
 } from '@nestjs/common'
 import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import { LoggerService } from 'modules/logger/logger.service'
-import { GetPropertyParams } from './dto/getProperty.params'
 import { CommonQueryFilter } from 'common/utils/query.filter'
 import { CreatePropertyDto } from './dto/create-property.dto'
 import { IFilterReturn, PropertyService } from './services/property.service'
