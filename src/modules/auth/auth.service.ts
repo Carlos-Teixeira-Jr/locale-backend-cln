@@ -155,6 +155,8 @@ export class AuthService {
         password: encryptedPassword,
         emailVerificationCode,
         emailVerificationExpiry,
+        phone: '',
+        cellPhone: '',
       })
 
       await sendEmailVerificationCode(email, emailVerificationCode)
@@ -201,6 +203,8 @@ export class AuthService {
           picture,
           password: encryptedPassword,
           isEmailVerified: true,
+          phone: '',
+          cellPhone: '',
         })
 
         const payload = {
@@ -305,9 +309,16 @@ export class AuthService {
 
       const newEmailVerificationCode = generateRandomString()
 
+      const newExpiryDate = new Date(Date.now() + 24 * 60 * 60 * 1000)
+
       const updateUser = await this.userModel.updateOne(
         { email: email },
-        { $set: { emailVerificationCode: newEmailVerificationCode } },
+        {
+          $set: {
+            emailVerificationCode: newEmailVerificationCode,
+            emailVerificationExpiry: newExpiryDate,
+          },
+        },
       )
 
       if (updateUser.modifiedCount === 0) {
@@ -420,18 +431,4 @@ export class AuthService {
       throw error
     }
   }
-
-  // async validateUser(
-  //   username: string,
-  //   password: string,
-  // ): Promise<IUserPartialData | null> {
-  //   const user: IUserReturn = await this.userService.findOneByUsername(username)
-
-  //   if (user && user.password === password) {
-  //     const userData = { username: user.username, email: user.email }
-  //     return userData
-  //   }
-
-  //   return null
-  // }
 }

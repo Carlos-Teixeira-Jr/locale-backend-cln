@@ -11,6 +11,7 @@ export const UserSchema = new Schema(
     password: { type: String },
     picture: { type: String },
     phone: { type: String },
+    cellPhone: { type: String },
     address: {
       zipCode: { type: String },
       city: { type: String },
@@ -52,6 +53,7 @@ export interface IUser extends Document {
   password?: string
   picture: string
   phone: string
+  cellPhone: string
   address: {
     zipCode: string
     city: string

@@ -33,6 +33,7 @@ import {
 } from '../auxiliar/auxiliar-functions.service'
 import { findActiveOwner } from 'modules/users/auxiliar/auxiliarFunctions'
 import { findOwnerMessages } from 'modules/message/auxiliar/auxiliarFunctions'
+import { GetPropertyParams } from '../dto/getProperty.params'
 
 export interface IDocsWithPagination {
   docs: IProperty[]
@@ -90,17 +91,39 @@ export class PropertyService {
   }
 
   async findOne(
-    id: Schema.Types.ObjectId,
-    isEdit: boolean,
+    getPropertiesByOwner: GetPropertyParams,
+    propertyId: Schema.Types.ObjectId,
   ): Promise<IProperty> {
+    console.log('🚀 ~ PropertyService ~ propertyId:', propertyId)
     try {
-      this.logger.log({}, 'start findOne')
+      this.logger.log({}, 'start findOne Property > [property service]')
 
-      const property: IProperty = await getPropertyById(id, this.propertyModel)
+      const { userId, isEdit } = getPropertiesByOwner
+
+      let ownerId
+
+      const userIdString = userId.toString()
+
+      const property: IProperty = await getPropertyById(
+        propertyId,
+        this.propertyModel,
+      )
 
       if (!property) throw new NotFoundException(`O imóvel não foi encontrado.`)
 
-      await incrementViews(property, isEdit, this.propertyModel)
+      const owner = await this.ownerModel.findOne({ userId }).lean()
+
+      if (owner) {
+        ownerId = owner._id
+      }
+
+      // Verificar se o usuário já acessou este imóvel ou se ele é o owner do imóvel;
+      if (
+        property.owner !== ownerId &&
+        !property.views.some(e => e === userIdString)
+      ) {
+        await incrementViews(property, userIdString, isEdit, this.propertyModel)
+      }
 
       return property
     } catch (error) {

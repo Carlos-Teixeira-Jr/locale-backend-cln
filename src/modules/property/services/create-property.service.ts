@@ -41,6 +41,7 @@ interface IOwnerData {
   adCredits?: number
   highlightCredits?: number
   email: string
+  isActive: boolean
 }
 
 @Injectable()
@@ -80,6 +81,7 @@ export class CreateProperty_Service {
         isPlanFree,
         plan,
         cellPhone,
+        phone,
         deactivateProperties,
       } = createPropertyDto
 
@@ -112,12 +114,16 @@ export class CreateProperty_Service {
           owner,
           userData,
           cellPhone,
+          phone,
           creditCardData,
         )
         updatedOwner = tempUpdatedOwner
       }
 
-      if (!isPlanFree) {
+      if (
+        !isPlanFree ||
+        ownerPreviousPlan?._id?.toString() !== selectedPlan?._id?.toString()
+      ) {
         if (!coupon) {
           await this.handlePayment(
             isPlanFree,
@@ -132,17 +138,29 @@ export class CreateProperty_Service {
           )
         }
       } else {
-        if (owner && owner.adCredits === 0) {
-          throw new BadRequestException(`O anunciante não tem mais créditos.`)
+        if (!isPlanFree) {
+          if (owner && owner.adCredits === 0) {
+            throw new BadRequestException(`O anunciante não tem mais créditos.`)
+          }
+
+          updatedOwner.paymentData.creditCardInfo = {
+            creditCardBrand: '',
+            creditCardNumber: '',
+            creditCardToken: '',
+          }
+          updatedOwner.paymentData.subscriptionId = ''
+
+          updatedOwner = {
+            ...updatedOwner,
+            adCredits: owner.adCredits - 1,
+          }
+
+          await this.ownerModel.updateOne(
+            { _id: updatedOwner?._id },
+            { $set: updatedOwner },
+            { session },
+          )
         }
-
-        updatedOwner.adCredits = owner.adCredits - 1
-
-        await this.ownerModel.updateOne(
-          { _id: updatedOwner?._id },
-          { $set: updatedOwner },
-          { session },
-        )
       }
 
       // Deactivates the properties that the user choose in case that he changes his plan to a minor one;
@@ -306,6 +324,7 @@ export class CreateProperty_Service {
           picture: profilePicture,
           userId: user._id,
           email,
+          isActive: true,
           adCredits: selectedPlan?.commonAd,
           highlightCredits: selectedPlan?.highlightAd,
         }
@@ -319,6 +338,7 @@ export class CreateProperty_Service {
           picture: profilePicture,
           userId: user._id,
           email,
+          isActive: true,
           adCredits: plusPlan.commonAd,
           highlightCredits: plusPlan.highlightAd,
         }
@@ -347,6 +367,9 @@ export class CreateProperty_Service {
       }
     } else {
       owner = ownerExists
+      owner.plan = selectedPlan._id
+      owner.adCredits = selectedPlan.commonAd
+      owner.highlightCredits = selectedPlan.highlightAd
       ownerPreviousPlan = ownerExists.plan
     }
 
@@ -364,6 +387,7 @@ export class CreateProperty_Service {
     owner: any,
     userData: UserData,
     cellPhone: string,
+    phone: string,
     creditCardData: any,
   ) {
     let cpfCnpj: string
@@ -379,7 +403,8 @@ export class CreateProperty_Service {
         {
           name,
           email,
-          phone: cellPhone,
+          phone,
+          cellPhone,
           postalCode: address.zipCode,
           description: 'Confirmação de criação de id de cliente',
           cpfCnpj,
@@ -444,10 +469,18 @@ export class CreateProperty_Service {
     let cardNumber: string
     let ccv: string
 
+    let currentDate
+    let year
+    let month
+    let day
+    let formattedDate
+    let expiryYear
+    let expiryMonth
+
     let price
     let selectedPlanId
 
-    let updatedOwner
+    let updatedOwner = { ...owner }
 
     const { address, email } = userData
     const { paymentData, adCredits, plan: ownerActualPlan } = owner
@@ -470,18 +503,18 @@ export class CreateProperty_Service {
       cardNumber = creditCardData.cardNumber
       expiry = creditCardData.expiry
       ccv = creditCardData.ccv
+
+      currentDate = new Date()
+      year = currentDate.getFullYear()
+      month = (currentDate.getMonth() + 1).toString().padStart(2, '0')
+      day = currentDate.getDate().toString().padStart(2, '0')
+      formattedDate = `${year}-${month}-${day}`
+      expiryYear = `20${expiry[2] + expiry[3]}`
+      expiryMonth = `${expiry[0] + expiry[1]}`
     }
 
     const planIdString = selectedPlanId.toString()
     const ownerActualPlanString = ownerActualPlan.toString()
-
-    const currentDate = new Date()
-    const year = currentDate.getFullYear()
-    const month = (currentDate.getMonth() + 1).toString().padStart(2, '0')
-    const day = currentDate.getDate().toString().padStart(2, '0')
-    const formattedDate = `${year}-${month}-${day}`
-    const expiryYear = `20${expiry[2] + expiry[3]}`
-    const expiryMonth = `${expiry[0] + expiry[1]}`
 
     // Usuário mudou de plano pago;
     if (!isPlanFree && ownerActualPlanString !== planIdString) {
@@ -741,7 +774,7 @@ export class CreateProperty_Service {
       // Usuário selecionou o plano grátis ou o mesmo plano que já tem;
       if (owner.adCredits > 0) {
         // Fazer a assinatura caso ainda não tenha;
-        if (!owner?.paymentData?.subscriptionId) {
+        if (!owner?.paymentData?.subscriptionId && !isPlanFree) {
           const response = await axios.post(
             `${process.env.PAYMENT_URL}/payment/subscription`,
             {
@@ -830,17 +863,44 @@ export class CreateProperty_Service {
             )
           }
         } else {
-          updatedOwner = {
-            ...owner,
-            adCredits: owner.adCredits - 1,
-          }
+          if (owner.paymentData?.subscriptionId) {
+            // Cancelar a assinatura
+            const { data } = await axios.delete(
+              `${process.env.PAYMENT_URL}/payment/subscription/${owner?.paymentData?.subscriptionId}`,
+              {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json',
+                  access_token: process.env.ASSAS_API_KEY || '',
+                },
+              },
+            )
 
-          // Atualiza o owner;
-          await this.ownerModel.updateOne(
-            { _id: updatedOwner._id },
-            { $set: updatedOwner },
-            { session },
-          )
+            const success = data.deleted
+
+            if (!success) {
+              throw new Error('Não foi possível remover a assinatura')
+            }
+
+            updatedOwner.paymentData.creditCardInfo = {
+              creditCardBrand: '',
+              creditCardNumber: '',
+              creditCardToken: '',
+            }
+            updatedOwner.paymentData.subscriptionId = ''
+
+            updatedOwner = {
+              ...updatedOwner,
+              adCredits: owner.adCredits - 1,
+            }
+
+            // Atualiza o owner;
+            await this.ownerModel.updateOne(
+              { _id: updatedOwner._id },
+              { $set: updatedOwner },
+              { session },
+            )
+          }
         }
       } else {
         throw new BadRequestException(

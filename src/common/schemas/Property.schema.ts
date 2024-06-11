@@ -39,7 +39,8 @@ export interface IProperty extends BaseModel, Document {
   owner: Schema.Types.ObjectId
   ownerInfo: {
     name: string
-    phones?: string[]
+    phone?: string
+    cellPhone?: string
     wwpNumber?: string
     creci: string
     picture: string
@@ -61,7 +62,7 @@ export interface IProperty extends BaseModel, Document {
   ]
   youtubeLink: string
   highlighted: boolean
-  views: number
+  views: string[]
 }
 
 export const PropertySchema = new Schema<IProperty>(
@@ -101,7 +102,8 @@ export const PropertySchema = new Schema<IProperty>(
       name: {
         type: String,
       },
-      phones: [{ type: String }],
+      phone: { type: String },
+      cellPhone: { type: String },
       wwpNumber: { type: String },
       creci: {
         type: String,
@@ -131,10 +133,12 @@ export const PropertySchema = new Schema<IProperty>(
     ],
     youtubeLink: String,
     highlighted: Boolean,
-    views: {
-      type: Number,
-      default: 0,
-    },
+    views: [
+      {
+        type: String,
+        default: [],
+      },
+    ],
   },
   {
     timestamps: true,
