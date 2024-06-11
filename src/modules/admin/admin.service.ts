@@ -6,6 +6,7 @@ import { LoggerService } from 'modules/logger/logger.service'
 import { InjectModel } from '@nestjs/mongoose'
 import { IProperty, PropertyModelName } from 'common/schemas/Property.schema'
 import { Model, Schema } from 'mongoose'
+import { GetPropertyParams } from 'modules/property/dto/getProperty.params'
 
 @Injectable()
 export class AdminService {
@@ -24,15 +25,20 @@ export class AdminService {
     return `This action returns all admin`
   }
 
-  async findOne(id: Schema.Types.ObjectId): Promise<IProperty> {
+  async findOne(getPropertyParams: GetPropertyParams, propertyId: Schema.Types.ObjectId): Promise<IProperty> {
     try {
-      this.logger.log({}, 'start findOne')
+      this.logger.log({}, 'start findOne property > [AdminService]');
 
-      const property: IProperty = await this.propertyModel.findById(id).lean()
+      const {
+        userId
+      } = getPropertyParams;
+
+      const property: IProperty = await this.propertyModel.findById(propertyId).lean()
 
       if (!property) {
-        throw new NotFoundException(`O id ${id} não foi encontrado`)
+        throw new NotFoundException(`O id ${propertyId} não foi encontrado`)
       }
+
       return property
     } catch (error) {
       this.logger.error({

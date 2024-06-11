@@ -1,8 +1,9 @@
-import { Controller, Get, Param } from '@nestjs/common'
+import { Body, Controller, Get, Param } from '@nestjs/common'
 import { AdminService } from './admin.service'
 import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
 import { LoggerService } from 'modules/logger/logger.service'
 import { GetPropertyParams } from 'modules/property/dto/getProperty.params'
+import { Schema } from 'mongoose'
 
 @Controller('admin')
 export class AdminController {
@@ -13,9 +14,11 @@ export class AdminController {
   ) {}
 
   @Get('/edit-property/:id')
-  async findOne(@Param() params: GetPropertyParams): Promise<any> {
-    this.logger.log({}, 'findOne')
-    this.logger.info(params.id, 'params')
-    return await this.adminService.findOne(params.id)
+  async findOne(
+    @Param() propertyId: Schema.Types.ObjectId,
+    @Body() getPropertyParams: GetPropertyParams
+  ): Promise<any> {
+    this.logger.log({propertyId}, 'findOne property > [controller]')
+    return await this.adminService.findOne(getPropertyParams, propertyId)
   }
 }
