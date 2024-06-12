@@ -76,7 +76,7 @@ export class PropertyController {
   async findByAnnouncementCode(
     @Param('announcementCode') announcementCode: string,
   ): Promise<IFilterReturn> {
-    this.logger.log({}, 'findByAnnouncementCode')
+    this.logger.log({}, 'start - findByAnnouncementCode > [property controller]')
     return this.propertyService.findByAnnouncementCode(announcementCode)
   }
 
@@ -87,7 +87,7 @@ export class PropertyController {
   async findByOwner(
     @Body() getPropertiesByOwnerDto: GetPropertiesByOwnerDto,
   ): Promise<IOwnerPropertiesReturn> {
-    this.logger.log({}, 'start findByOwner > [property controller]')
+    this.logger.log({}, 'start - findByOwner > [property controller]')
 
     return this.propertyService.findByOwner(getPropertiesByOwnerDto)
   }
@@ -186,5 +186,18 @@ export class PropertyController {
     this.logger.info({}, 'edit property images > body')
 
     return await this.propertyService.editPropertyImages(files, body)
+  }
+
+  @Get('/filter-by-owner/:ownerId')
+  @ApiOperation({
+    summary:
+      'Search owner properties based on filter params passed on the query and provides pagination data.',
+  })
+  async filterByOwner(
+    @Query() queryFilter: CommonQueryFilter,
+    @Param('ownerId') ownerId: Schema.Types.ObjectId
+  ): Promise<IFilterReturn> {
+    this.logger.log({}, 'filterByOwner > [property controller]')
+    return await this.propertyService.filterByOwner(queryFilter, ownerId)
   }
 }

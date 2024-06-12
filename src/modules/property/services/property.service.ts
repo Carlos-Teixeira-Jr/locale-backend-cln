@@ -601,4 +601,82 @@ export class PropertyService {
       throw error
     }
   }
+
+  async filterByOwner(
+    queryFilter: CommonQueryFilter,
+    ownerId: Schema.Types.ObjectId,
+  ): Promise<IFilterReturn> {
+    try {
+      this.logger.log({ ownerId }, 'start filterByOwner > [property service]')
+
+      const { page, limit, filter, sort, need_count } = queryFilter
+      const originalPage = page + 1
+      const highlightsSkip = page * limit
+
+      const location = filter[0]?.locationFilter || ''
+      const normalizedLocation = this.normalizeText(location)
+
+      const addressQuery = {
+        $or: [
+          { 'address.zipCode': { $regex: normalizedLocation, $options: 'i' } },
+          { 'address.city': { $regex: normalizedLocation, $options: 'i' } },
+          { 'address.uf': { $regex: normalizedLocation, $options: 'i' } },
+          {
+            'address.streetName': { $regex: normalizedLocation, $options: 'i' },
+          },
+          {
+            'address.streetNumber': {
+              $regex: normalizedLocation,
+              $options: 'i',
+            },
+          },
+          {
+            'address.complement': { $regex: normalizedLocation, $options: 'i' },
+          },
+          {
+            'address.neighborhood': {
+              $regex: normalizedLocation,
+              $options: 'i',
+            },
+          },
+        ],
+      }
+
+      const docs = await this.propertyModel
+        .find({ $and: [addressQuery, { owner: ownerId }] })
+        .skip(highlightsSkip)
+        .limit(limit)
+        .sort(sort)
+
+      let totalCount = 0
+      let totalPages;
+      if (need_count) {
+        totalCount = await this.propertyModel.countDocuments({
+          $and: [addressQuery, { owner: ownerId }],
+        })
+        totalPages = Math.ceil(totalCount / limit)
+      }
+
+      return {
+        docs,
+        totalCount,
+        page: originalPage,
+        totalPages
+      };
+    } catch (error) {
+      this.logger.error({
+        error: JSON.stringify(error),
+        exception: '> exception',
+      })
+      throw error
+    }
+  }
+
+  // Função de normalização de texto para remover acentos e transformar em minúsculas
+  normalizeText(text: string): string {
+    return text
+      .normalize('NFD') // Normaliza o texto para decompor caracteres acentuados
+      .replace(/[\u0300-\u036f]/g, '') // Remove os sinais diacríticos (acentos)
+      .toLowerCase() // Transforma o texto em minúsculas
+  }
 }
