@@ -7,10 +7,17 @@ export async function getPropertyById(
   propertyId: any,
   propertyModel: Model<IProperty>,
 ): Promise<IProperty> {
-  const property: IProperty = await propertyModel.findById(propertyId).lean()
+  console.log("🚀 ~ propertyId:", typeof propertyId)
+
+  let id;
+
+  if (typeof propertyId === 'string') id = propertyId;
+  if (typeof propertyId === 'object') id = propertyId.id
+
+  const property: IProperty = await propertyModel.findById(id).lean()
 
   if (!property) {
-    throw new NotFoundException(`Property with id ${propertyId} not found`)
+    throw new NotFoundException(`Property with id ${id} not found`)
   }
 
   return property
