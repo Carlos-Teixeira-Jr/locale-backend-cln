@@ -45,7 +45,7 @@ export class UsersController {
   })
   @Post('find-by-email')
   async findByEmail(@Body() body: GetUserByEmailDto): Promise<IUser> {
-    this.logger.log({ body }, 'start find user by email > [controller]')
+    this.logger.log({ body }, 'start find user by email > [user controller]')
 
     return this.usersService.findOneByEmail(body)
   }
