@@ -62,7 +62,7 @@ export interface IProperty extends BaseModel, Document {
   ]
   youtubeLink: string
   highlighted: boolean
-  views: string[]
+  views: number
 }
 
 export const PropertySchema = new Schema<IProperty>(
@@ -135,8 +135,7 @@ export const PropertySchema = new Schema<IProperty>(
     highlighted: Boolean,
     views: [
       {
-        type: String,
-        default: [],
+        type: Number,
       },
     ],
   },

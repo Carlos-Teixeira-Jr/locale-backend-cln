@@ -22,6 +22,7 @@ import { IOwnerPropertiesReturn } from './services/property.service'
 import { FilesInterceptor } from '@nestjs/platform-express'
 import { Schema } from 'mongoose'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
+import { GetPropertyParams } from './dto/getProperty.params'
 
 @ApiTags('property')
 @Controller('property')
@@ -50,10 +51,10 @@ export class PropertyController {
   })
   async findOne(
     @Param() propertyId: any,
-    @Body() getPropertyParams: any,
+    @Body() getPropertyParams: GetPropertyParams,
   ): Promise<IProperty> {
     this.logger.log({}, 'findOne')
-    return await this.propertyService.findOne(getPropertyParams, propertyId)
+    return await this.propertyService.findOne(getPropertyParams, propertyId);
   }
 
   @Post()
