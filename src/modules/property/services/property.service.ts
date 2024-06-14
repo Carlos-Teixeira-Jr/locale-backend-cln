@@ -92,7 +92,7 @@ export class PropertyService {
 
   async findOne(
     getPropertiesByOwner: GetPropertyParams,
-    propertyId: Schema.Types.ObjectId,
+    propertyId: any,
   ): Promise<IProperty> {
     console.log('🚀 ~ PropertyService ~ propertyId:', propertyId)
     try {
@@ -102,17 +102,19 @@ export class PropertyService {
 
       let ownerId
 
-      const property: IProperty = await getPropertyById(
+      let property: IProperty = await getPropertyById(
         propertyId,
         this.propertyModel,
       )
 
       if (!property) throw new NotFoundException(`O imóvel não foi encontrado.`)
 
-      const owner = await this.ownerModel.findOne({ userId }).lean()
+      if (userId) {
+        const owner = await this.ownerModel.findOne({ userId }).lean();
 
-      if (owner) {
-        ownerId = owner._id
+        if (owner) {
+          ownerId = owner._id
+        }
       }
 
       // Verificar se o usuário já acessou este imóvel ou se ele é o owner do imóvel;
@@ -124,10 +126,15 @@ export class PropertyService {
           )  
         } else {
           await this.propertyModel.updateOne(
-            { _id: propertyId },
+            { _id: propertyId.id },
             { $inc: { views: 1 } }
           )  
         }
+
+        property = await getPropertyById(
+          propertyId,
+          this.propertyModel,
+        )
       }
 
       return property
@@ -259,13 +266,21 @@ export class PropertyService {
         })
       }
 
+      // Desativar
       if (!isActive) {
         await this.propertyModel.updateMany(
           { _id: { $in: propertyId } },
           { $set: { isActive: isActive } },
           opt,
         )
+
+        await this.ownerModel.updateOne(
+          { userId: userId },
+          { $set: { adCredits: propertyOwner.adCredits + 1 } },
+          opt,
+        )
       } else {
+        // Ativar
         if (!propertyOwner.adCredits || propertyOwner.adCredits <= 0) {
           throw new BadRequestException(
             `O usuário com o id ${userId} não tem mais créditos para ativar esse anúncio.`,
