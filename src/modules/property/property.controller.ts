@@ -54,7 +54,7 @@ export class PropertyController {
     @Body() getPropertyParams: GetPropertyParams,
   ): Promise<IProperty> {
     this.logger.log({}, 'findOne')
-    return await this.propertyService.findOne(getPropertyParams, propertyId);
+    return await this.propertyService.findOne(getPropertyParams, propertyId)
   }
 
   @Post()
@@ -77,7 +77,10 @@ export class PropertyController {
   async findByAnnouncementCode(
     @Param('announcementCode') announcementCode: string,
   ): Promise<IFilterReturn> {
-    this.logger.log({}, 'start - findByAnnouncementCode > [property controller]')
+    this.logger.log(
+      {},
+      'start - findByAnnouncementCode > [property controller]',
+    )
     return this.propertyService.findByAnnouncementCode(announcementCode)
   }
 
@@ -196,7 +199,7 @@ export class PropertyController {
   })
   async filterByOwner(
     @Query() queryFilter: CommonQueryFilter,
-    @Param('ownerId') ownerId: Schema.Types.ObjectId
+    @Param('ownerId') ownerId: Schema.Types.ObjectId,
   ): Promise<IFilterReturn> {
     this.logger.log({}, 'filterByOwner > [property controller]')
     return await this.propertyService.filterByOwner(queryFilter, ownerId)

@@ -7,10 +7,7 @@ import { InjectModel } from '@nestjs/mongoose'
 import { IProperty, PropertyModelName } from 'common/schemas/Property.schema'
 import { Model, Schema } from 'mongoose'
 import { GetPropertyParams } from 'modules/property/dto/getProperty.params'
-import {
-  getPropertyById,
-  incrementViews,
-} from 'modules/property/auxiliar/auxiliar-functions.service'
+import { getPropertyById } from 'modules/property/auxiliar/auxiliar-functions.service'
 import { OwnerModelName, IOwner } from 'common/schemas/Owner.schema'
 
 @Injectable()
@@ -62,13 +59,13 @@ export class AdminService {
         if (ownerId && property.owner !== ownerId) {
           await this.propertyModel.updateOne(
             { _id: propertyId },
-            { $inc: { views: 1 } }
-          )  
+            { $inc: { views: 1 } },
+          )
         } else {
           await this.propertyModel.updateOne(
             { _id: propertyId },
-            { $inc: { views: 1 } }
-          )  
+            { $inc: { views: 1 } },
+          )
         }
       }
 

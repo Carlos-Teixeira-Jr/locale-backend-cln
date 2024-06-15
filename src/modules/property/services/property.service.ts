@@ -26,7 +26,6 @@ import { PropertyFilter_Service } from './property-filter.service'
 import { CreateProperty_Service } from './create-property.service'
 import {
   getPropertyById,
-  incrementViews,
   findActivePropertiesByAnnouncementCode,
   getPropertiesData,
   updatePropertyImages,
@@ -110,7 +109,7 @@ export class PropertyService {
       if (!property) throw new NotFoundException(`O imóvel não foi encontrado.`)
 
       if (userId) {
-        const owner = await this.ownerModel.findOne({ userId }).lean();
+        const owner = await this.ownerModel.findOne({ userId }).lean()
 
         if (owner) {
           ownerId = owner._id
@@ -122,19 +121,16 @@ export class PropertyService {
         if (ownerId && property.owner !== ownerId) {
           await this.propertyModel.updateOne(
             { _id: propertyId },
-            { $inc: { views: 1 } }
-          )  
+            { $inc: { views: 1 } },
+          )
         } else {
           await this.propertyModel.updateOne(
             { _id: propertyId.id },
-            { $inc: { views: 1 } }
-          )  
+            { $inc: { views: 1 } },
+          )
         }
 
-        property = await getPropertyById(
-          propertyId,
-          this.propertyModel,
-        )
+        property = await getPropertyById(propertyId, this.propertyModel)
       }
 
       return property
@@ -669,7 +665,7 @@ export class PropertyService {
         .sort(sort)
 
       let totalCount = 0
-      let totalPages;
+      let totalPages
       if (need_count) {
         totalCount = await this.propertyModel.countDocuments({
           $and: [addressQuery, { owner: ownerId }],
@@ -681,8 +677,8 @@ export class PropertyService {
         docs,
         totalCount,
         page: originalPage,
-        totalPages
-      };
+        totalPages,
+      }
     } catch (error) {
       this.logger.error({
         error: JSON.stringify(error),

@@ -156,7 +156,7 @@ export class CreateProperty_Service {
           }
         } else {
           if (updatedOwner.adCredits > 0) {
-            updatedOwner.adCredits = updatedOwner.adCredits - 1;
+            updatedOwner.adCredits = updatedOwner.adCredits - 1
           }
         }
       }
@@ -375,7 +375,7 @@ export class CreateProperty_Service {
       owner.plan = selectedPlan._id
       owner.adCredits = selectedPlan.commonAd
       owner.highlightCredits = selectedPlan.highlightAd
-      ownerPreviousPlan = plans.find((e) => e._id === ownerExists.plan);
+      ownerPreviousPlan = plans.find(e => e._id === ownerExists.plan)
     }
 
     return {
