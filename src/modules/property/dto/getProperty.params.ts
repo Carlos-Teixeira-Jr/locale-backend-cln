@@ -1,13 +1,17 @@
-import { IsBoolean, IsNotEmpty, Validate } from 'class-validator'
+import { IsBoolean, IsNotEmpty, IsOptional, Validate } from 'class-validator'
 import { IDValidator } from 'common/validators/ID.validator'
 import { Schema } from 'mongoose'
 
 export class GetPropertyParams {
-  @IsNotEmpty()
+  @IsOptional()
   @Validate(IDValidator)
   userId: Schema.Types.ObjectId
 
   @IsNotEmpty()
   @IsBoolean()
   isEdit: boolean
+
+  @IsNotEmpty()
+  @IsBoolean()
+  increment: boolean
 }

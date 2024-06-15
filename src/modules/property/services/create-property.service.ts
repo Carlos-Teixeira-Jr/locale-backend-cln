@@ -154,19 +154,24 @@ export class CreateProperty_Service {
             ...updatedOwner,
             adCredits: owner.adCredits - 1,
           }
-
-          await this.ownerModel.updateOne(
-            { _id: updatedOwner?._id },
-            { $set: updatedOwner },
-            { session },
-          )
+        } else {
+          if (updatedOwner.adCredits > 0) {
+            updatedOwner.adCredits = updatedOwner.adCredits - 1
+          }
         }
       }
+
+      await this.ownerModel.updateOne(
+        { _id: updatedOwner?._id },
+        { $set: updatedOwner },
+        { session },
+      )
 
       // Deactivates the properties that the user choose in case that he changes his plan to a minor one;
       if (
         deactivateProperties !== undefined &&
-        deactivateProperties.length > 0
+        deactivateProperties.length > 0 &&
+        selectedPlan.price < ownerPreviousPlan.price
       ) {
         const deactivatepropertiesBody: PropertyActivationDto = {
           propertyId: deactivateProperties,
@@ -370,7 +375,7 @@ export class CreateProperty_Service {
       owner.plan = selectedPlan._id
       owner.adCredits = selectedPlan.commonAd
       owner.highlightCredits = selectedPlan.highlightAd
-      ownerPreviousPlan = ownerExists.plan
+      ownerPreviousPlan = plans.find(e => e._id === ownerExists.plan)
     }
 
     return {
