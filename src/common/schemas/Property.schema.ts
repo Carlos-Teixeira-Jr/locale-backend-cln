@@ -133,11 +133,9 @@ export const PropertySchema = new Schema<IProperty>(
     ],
     youtubeLink: String,
     highlighted: Boolean,
-    views: [
-      {
-        type: Number,
-      },
-    ],
+    views: {
+      type: Number,
+    },
   },
   {
     timestamps: true,

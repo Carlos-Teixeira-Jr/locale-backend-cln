@@ -86,7 +86,7 @@ export class PropertyController {
 
   @Post('owner-properties')
   @ApiOperation({
-    summary: 'Search all properties of an owner basedon his ownerId.',
+    summary: 'Search all properties of an owner based on his ownerId.',
   })
   async findByOwner(
     @Body() getPropertiesByOwnerDto: GetPropertiesByOwnerDto,

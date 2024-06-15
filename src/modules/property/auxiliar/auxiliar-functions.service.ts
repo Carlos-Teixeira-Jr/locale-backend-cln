@@ -43,6 +43,24 @@ export async function getPropertiesData(
     .skip(skip)
     .limit(limit)
 
+  // Custom sorting logic
+  ownerProperties.sort((a, b) => {
+    // First, handle the 'highlighted' property
+    if (a.highlighted && !b.highlighted) return -1
+    if (!a.highlighted && b.highlighted) return 1
+
+    // Then, handle the 'isActive' property
+    if (a.isActive && !b.isActive) return -1
+    if (!a.isActive && b.isActive) return 1
+
+    // Finally, handle the 'createdAt' property
+    // Ensure createdAt is treated as a Date object
+    const dateA = new Date(a.createdAt as any)
+    const dateB = new Date(b.createdAt as any)
+
+    return dateB.getTime() - dateA.getTime()
+  })
+
   const count = await propertyModel.countDocuments({
     owner: owner._id,
     isActive: true,
