@@ -9,6 +9,8 @@ import {
   IsBoolean,
   IsCreditCard,
   IsEmail,
+  IsNumber,
+  ValidateIf,
 } from 'class-validator'
 import {
   PropertyAddressDto,
@@ -187,6 +189,11 @@ export class CreatePropertyDto {
   @IsArray()
   @IsString({ each: true })
   deactivateProperties: string[]
+
+  @ValidateIf(o => o.creditsLeft !== null)
+  @IsNotEmpty()
+  @IsNumber()
+  creditsLeft: number | null
 
   @IsOptional()
   @IsString()
