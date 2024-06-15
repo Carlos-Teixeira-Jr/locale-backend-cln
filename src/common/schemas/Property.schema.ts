@@ -135,6 +135,7 @@ export const PropertySchema = new Schema<IProperty>(
     highlighted: Boolean,
     views: {
       type: Number,
+      default: 0,
     },
   },
   {
