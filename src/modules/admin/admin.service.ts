@@ -7,10 +7,7 @@ import { InjectModel } from '@nestjs/mongoose'
 import { IProperty, PropertyModelName } from 'common/schemas/Property.schema'
 import { Model, Schema } from 'mongoose'
 import { GetPropertyParams } from 'modules/property/dto/getProperty.params'
-import {
-  getPropertyById,
-  incrementViews,
-} from 'modules/property/auxiliar/auxiliar-functions.service'
+import { getPropertyById } from 'modules/property/auxiliar/auxiliar-functions.service'
 import { OwnerModelName, IOwner } from 'common/schemas/Owner.schema'
 
 @Injectable()
@@ -40,11 +37,9 @@ export class AdminService {
     try {
       this.logger.log({}, 'start findOne Property > [property service]')
 
-      const { userId, isEdit } = getPropertiesByOwner
+      const { userId, isEdit, increment } = getPropertiesByOwner
 
       let ownerId
-
-      const userIdString = userId.toString()
 
       const property: IProperty = await getPropertyById(
         propertyId,
@@ -60,11 +55,18 @@ export class AdminService {
       }
 
       // Verificar se o usuário já acessou este imóvel ou se ele é o owner do imóvel;
-      if (
-        property.owner !== ownerId &&
-        !property.views.some(e => e === userIdString)
-      ) {
-        await incrementViews(property, userIdString, isEdit, this.propertyModel)
+      if (increment && !isEdit) {
+        if (ownerId && property.owner !== ownerId) {
+          await this.propertyModel.updateOne(
+            { _id: propertyId },
+            { $inc: { views: 1 } },
+          )
+        } else {
+          await this.propertyModel.updateOne(
+            { _id: propertyId },
+            { $inc: { views: 1 } },
+          )
+        }
       }
 
       return property
