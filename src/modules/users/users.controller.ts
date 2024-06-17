@@ -81,7 +81,7 @@ export class UsersController {
   })
   @Post('edit-user')
   async editUser(@Body() body: EditUserDto) {
-    this.logger.log({ body }, 'start edit user > [controller]')
+    this.logger.log({ body }, 'start edit user > [user controller]')
 
     return this.usersService.editUser(body)
   }

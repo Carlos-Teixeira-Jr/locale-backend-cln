@@ -224,12 +224,11 @@ export class PropertyService {
     const db = await mongoose.createConnection(mongodbUri).asPromise()
     const session = await db.startSession()
     const opt = { session, new: true }
-
     try {
       await session.startTransaction()
       this.logger.log(
         { propertyActivationDto },
-        'start property activation > [service]',
+        'start property activation > [property service]',
       )
 
       const { isActive, propertyId, userId } = propertyActivationDto
@@ -270,6 +269,7 @@ export class PropertyService {
           opt,
         )
 
+        // OWNER recebe de volta o crédito correspondente ao imóvel que desativou;
         await this.ownerModel.updateOne(
           { userId: userId },
           { $set: { adCredits: propertyOwner.adCredits + 1 } },
@@ -288,6 +288,7 @@ export class PropertyService {
             opt,
           )
 
+          // OWNER gasta um crédito referente ao imóvel que está ativando;
           await this.ownerModel.updateOne(
             { userId: userId },
             { $set: { adCredits: propertyOwner.adCredits - 1 } },

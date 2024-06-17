@@ -18,18 +18,6 @@ export class PlanTransitionDto {
   @IsNotEmpty()
   newPlan: IPlan
 
-  // @IsNotEmpty()
-  // @IsPositive()
-  // newAdCredits: number
-
-  // @IsNotEmpty()
-  // @IsPositive()
-  // newHighlightCredits: number
-
-  // @IsNotEmpty()
-  // @IsBoolean()
-  // downgrade: number
-
   @IsNotEmpty()
   @IsArray()
   @IsString({ each: true })
@@ -37,4 +25,8 @@ export class PlanTransitionDto {
 
   @IsNotEmpty()
   creditCard: ICreditCard
+
+  @IsNotEmpty()
+  @IsBoolean()
+  isCreate: boolean
 }
