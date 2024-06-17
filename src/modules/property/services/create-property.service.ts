@@ -88,7 +88,6 @@ export class CreateProperty_Service {
 
       let coupon
       let updatedOwner
-      let ownerActiveProperties
 
       if (createPropertyDto?.coupon) {
         coupon = createPropertyDto?.coupon
@@ -110,7 +109,7 @@ export class CreateProperty_Service {
         coupon,
       )
 
-      ownerActiveProperties = await this.propertyModel
+      const ownerActiveProperties = await this.propertyModel
         .find({ owner: owner._id, isActive: true })
         .lean()
 
@@ -177,10 +176,9 @@ export class CreateProperty_Service {
 
       // Deactivates the properties that the user choose in case that he changes his plan to a minor one;
       if (
-        deactivateProperties !== undefined &&
-        deactivateProperties.length > 0 ||
-        selectedPlan.name === 'Free' && 
-        ownerActiveProperties.length > 0
+        (deactivateProperties !== undefined &&
+          deactivateProperties.length > 0) ||
+        (selectedPlan.name === 'Free' && ownerActiveProperties.length > 0)
       ) {
         const deactivatepropertiesBody: PropertyActivationDto = {
           propertyId: [],
@@ -830,6 +828,11 @@ export class CreateProperty_Service {
                 selectedPlan.price > previousPlanData.price
                   ? owner.adCredits + selectedPlan.commonAd
                   : owner.adCredits - selectedPlan.commonAd
+
+              console.log(
+                '🚀 ~ CreateProperty_Service ~ newAdCredits:',
+                newAdCredits,
+              )
 
               newHighlightCredits =
                 selectedPlan.price > previousPlanData.price
