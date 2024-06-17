@@ -83,6 +83,7 @@ export class CreateProperty_Service {
         cellPhone,
         phone,
         deactivateProperties,
+        creditsLeft,
       } = createPropertyDto
 
       let coupon
@@ -108,6 +109,10 @@ export class CreateProperty_Service {
         coupon,
       )
 
+      const ownerActiveProperties = await this.propertyModel
+        .find({ owner: owner._id, isActive: true })
+        .lean()
+
       if (!coupon) {
         const { updatedOwner: tempUpdatedOwner } = await this.handleCustomer(
           isPlanFree,
@@ -125,7 +130,7 @@ export class CreateProperty_Service {
         ownerPreviousPlan?._id?.toString() !== selectedPlan?._id?.toString()
       ) {
         if (!coupon) {
-          await this.handlePayment(
+          updatedOwner = await this.handlePayment(
             isPlanFree,
             selectedPlan,
             updatedOwner,
@@ -134,6 +139,8 @@ export class CreateProperty_Service {
             cellPhone,
             ownerPreviousPlan,
             deactivateProperties?.length,
+            ownerActiveProperties.length,
+            creditsLeft,
             session,
           )
         }
@@ -169,17 +176,26 @@ export class CreateProperty_Service {
 
       // Deactivates the properties that the user choose in case that he changes his plan to a minor one;
       if (
-        deactivateProperties !== undefined &&
-        deactivateProperties.length > 0 &&
-        selectedPlan.price < ownerPreviousPlan.price
+        (deactivateProperties !== undefined &&
+          deactivateProperties.length > 0) ||
+        (selectedPlan.name === 'Free' && ownerActiveProperties.length > 0)
       ) {
         const deactivatepropertiesBody: PropertyActivationDto = {
-          propertyId: deactivateProperties,
+          propertyId: [],
           userId: userData._id,
           isActive: false,
           session: session,
         }
-        await this.activateDeactivateProperties(deactivatepropertiesBody)
+        if (selectedPlan.name === 'Free' && ownerActiveProperties.length > 0) {
+          ownerActiveProperties.forEach(e => {
+            deactivatepropertiesBody.propertyId.push(e._id)
+          })
+
+          await this.activateDeactivateProperties(deactivatepropertiesBody)
+        } else {
+          deactivatepropertiesBody.propertyId = deactivateProperties
+          await this.activateDeactivateProperties(deactivatepropertiesBody)
+        }
       }
 
       await this.handleLocationCreation(propertyData.address, session)
@@ -300,7 +316,7 @@ export class CreateProperty_Service {
           { session },
         )
 
-        // Buscar o usuário atualizado
+        // Buscar o USER atualizado;
         user = await this.userModel.findById(registerUser._id)
       } else {
         user = userEmailExists
@@ -309,7 +325,7 @@ export class CreateProperty_Service {
       userAlreadyExists = false
     }
 
-    // Verificar se o usuário já é anunciante;
+    // Verificar se o USER já é OWNER;
     const ownerExists = await this.ownerModel
       .findOne({
         userId: user._id,
@@ -371,11 +387,23 @@ export class CreateProperty_Service {
         )
       }
     } else {
-      owner = ownerExists
-      owner.plan = selectedPlan._id
-      owner.adCredits = selectedPlan.commonAd
-      owner.highlightCredits = selectedPlan.highlightAd
-      ownerPreviousPlan = plans.find(e => e._id === ownerExists.plan)
+      if (
+        ownerExists.plan.toString() !== selectedPlan._id.toString() ||
+        !ownerExists.plan
+      ) {
+        owner = ownerExists
+        ownerPreviousPlan = plans.find(
+          e => e._id.toString() === owner.plan.toString(),
+        )
+        owner.plan = selectedPlan._id
+        owner.adCredits = selectedPlan.commonAd
+        owner.highlightCredits = selectedPlan.highlightAd
+      } else {
+        owner = ownerExists
+        ownerPreviousPlan = plans.find(
+          e => e._id.toString() === owner.plan.toString(),
+        )
+      }
     }
 
     return {
@@ -408,8 +436,7 @@ export class CreateProperty_Service {
         {
           name,
           email,
-          phone,
-          cellPhone,
+          phone: cellPhone,
           postalCode: address.zipCode,
           description: 'Confirmação de criação de id de cliente',
           cpfCnpj,
@@ -435,18 +462,7 @@ export class CreateProperty_Service {
           },
         }
 
-        try {
-          await this.ownerModel.updateOne(
-            { _id: owner._id },
-            { $set: updatedOwner },
-          )
-
-          return { updatedOwner }
-        } catch (error) {
-          throw new Error(
-            `Falha ao atualizar o anunciante: ${response.statusText}`,
-          )
-        }
+        return { updatedOwner }
       } else {
         throw new Error(`Falha ao criar o cliente: ${response.statusText}`)
       }
@@ -466,6 +482,8 @@ export class CreateProperty_Service {
     cellPhone: string,
     ownerPreviousPlan: string,
     propertiesToDeactivate: number,
+    ownerActiveProperties: number,
+    creditsLeft: number | null,
     session: any,
   ) {
     let cpfCnpj: string
@@ -519,9 +537,9 @@ export class CreateProperty_Service {
     }
 
     const planIdString = selectedPlanId.toString()
-    const ownerActualPlanString = ownerActualPlan.toString()
+    const ownerActualPlanString = previousPlanData?._id.toString()
 
-    // Usuário mudou de plano pago;
+    // Usuário mudou de plano pago > pago;
     if (!isPlanFree && ownerActualPlanString !== planIdString) {
       if (!paymentData?.creditCardInfo?.creditCardToken) {
         const response = await axios.post(
@@ -564,37 +582,40 @@ export class CreateProperty_Service {
           const creditCardInfo = responseData.creditCard
           const subscriptionId = responseData.id
 
-          newAdCredits =
-            selectedPlan.price > previousPlanData.price
-              ? owner.adCredits + selectedPlan.commonAd
-              : owner.adCredits - selectedPlan.commonAd - propertiesToDeactivate
+          // newAdCredits =
+          //   selectedPlan.price > previousPlanData.price
+          //     ? owner.adCredits + selectedPlan.commonAd
+          //     : owner.adCredits - selectedPlan.commonAd - propertiesToDeactivate
 
-          newHighlightCredits =
-            selectedPlan.price > previousPlanData.price
-              ? owner.highlightCredits + selectedPlan.highlightAd
-              : owner.highlightCredits - selectedPlan.highlightAd
+          // newHighlightCredits =
+          //   selectedPlan.price > previousPlanData.price
+          //     ? owner.highlightCredits + selectedPlan.highlightAd
+          //     : owner.highlightCredits - selectedPlan.highlightAd
 
-          updatedOwner = {
-            ...owner,
-            plan: selectedPlan._id,
-            adCredits: newAdCredits - 1,
-            highlightCredits: newHighlightCredits,
-            paymentData: {
-              ...owner.paymentData,
-              creditCardInfo,
-              subscriptionId,
-            },
-          }
-
-          try {
-            await this.ownerModel.updateOne(
-              { _id: updatedOwner._id },
-              { $set: updatedOwner },
-            )
-          } catch (error) {
-            throw new Error(
-              `Falha ao atualizar o anunciante: ${response.statusText}`,
-            )
+          if (creditsLeft) {
+            updatedOwner = {
+              ...owner,
+              plan: selectedPlan._id,
+              adCredits: creditsLeft,
+              highlightCredits: selectedPlan.highlightAd,
+              paymentData: {
+                ...owner.paymentData,
+                creditCardInfo,
+                subscriptionId,
+              },
+            }
+          } else {
+            updatedOwner = {
+              ...owner,
+              plan: selectedPlan._id,
+              adCredits: selectedPlan.commonAd - 1,
+              highlightCredits: selectedPlan.highlightAd,
+              paymentData: {
+                ...owner.paymentData,
+                creditCardInfo,
+                subscriptionId,
+              },
+            }
           }
         } else {
           throw new Error(`Falha ao gerar a cobrança: ${response.statusText}`)
@@ -739,36 +760,13 @@ export class CreateProperty_Service {
               },
             )
 
-            newAdCredits =
-              selectedPlan.price > previousPlanData.price
-                ? owner.adCredits + selectedPlan.commonAd
-                : selectedPlan.commonAd
-
-            newHighlightCredits =
-              selectedPlan.price > previousPlanData.price
-                ? owner.highlightCredits + selectedPlan.highlightAd
-                : selectedPlan.highlightAd
-
-            try {
-              const result = await this.ownerModel.updateOne(
-                { _id: owner._id },
-                {
-                  adCredits: newAdCredits - 1,
-                  highlightCredits: newHighlightCredits,
-                  plan: selectedPlan._id,
-                },
-                { session },
-              )
-
-              if (result.modifiedCount < 0) {
-                throw new Error(
-                  `Não foi possível atualizar os créditos do proprietário.`,
-                )
-              }
-            } catch (error) {
-              throw new Error(
-                `Não foi possível atualizar os créditos do proprietário.`,
-              )
+            // Atualização dos créditos;
+            if (typeof creditsLeft === 'number') {
+              updatedOwner.adCredits = creditsLeft
+            } else {
+              updatedOwner.adCredits =
+                selectedPlan.commonAd - 1 - ownerActiveProperties
+              updatedOwner.plan = selectedPlan._id
             }
           } catch (error) {}
         } else {
@@ -819,16 +817,22 @@ export class CreateProperty_Service {
             // Atribuir os valores da resposta às variáveis
             const creditCardInfo = responseData.creditCard
             const subscriptionId = responseData.id
+            updatedOwner.paymentData.subscriptionId = subscriptionId
 
             // Condicional dos créditos para casos em que já havia um plano anterior ou não;
             if (!previousPlanData) {
               newAdCredits = selectedPlan.commonAd
               newHighlightCredits = selectedPlan.highlightAd
-            } else {
+            } else if (ownerActualPlanString !== planIdString) {
               newAdCredits =
                 selectedPlan.price > previousPlanData.price
                   ? owner.adCredits + selectedPlan.commonAd
                   : owner.adCredits - selectedPlan.commonAd
+
+              console.log(
+                '🚀 ~ CreateProperty_Service ~ newAdCredits:',
+                newAdCredits,
+              )
 
               newHighlightCredits =
                 selectedPlan.price > previousPlanData.price
@@ -839,7 +843,7 @@ export class CreateProperty_Service {
             updatedOwner = {
               ...owner,
               plan: selectedPlan._id,
-              adCredits: newAdCredits - 1,
+              adCredits: owner.adCredits - 1,
               highlightCredits: newHighlightCredits,
               paymentData: {
                 ...owner.paymentData,
@@ -847,25 +851,11 @@ export class CreateProperty_Service {
                 subscriptionId,
               },
             }
-
-            // Atualiza o owner;
-            await this.ownerModel.updateOne(
-              { _id: updatedOwner._id },
-              { $set: updatedOwner },
-              { session },
-            )
           } else {
             updatedOwner = {
               ...owner,
               adCredits: owner.adCredits - 1,
             }
-
-            // Atualiza o owner;
-            await this.ownerModel.updateOne(
-              { _id: updatedOwner._id },
-              { $set: updatedOwner },
-              { session },
-            )
           }
         } else {
           if (owner.paymentData?.subscriptionId) {
@@ -898,13 +888,12 @@ export class CreateProperty_Service {
               ...updatedOwner,
               adCredits: owner.adCredits - 1,
             }
-
-            // Atualiza o owner;
-            await this.ownerModel.updateOne(
-              { _id: updatedOwner._id },
-              { $set: updatedOwner },
-              { session },
-            )
+          } else {
+            updatedOwner = {
+              ...updatedOwner,
+              adCredits: owner.adCredits - 1,
+              highlightCredits: 0,
+            }
           }
         }
       } else {
@@ -913,6 +902,8 @@ export class CreateProperty_Service {
         )
       }
     }
+
+    return updatedOwner
   }
 
   private async handleLocationCreation(address: any, session: any) {

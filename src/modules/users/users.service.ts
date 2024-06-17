@@ -767,7 +767,7 @@ export class UsersService {
     const session = await this.startSession()
     try {
       await session.startTransaction()
-      this.logger.log({ body }, 'start edit user > [service]')
+      this.logger.log({ body }, 'start edit user > [user service]')
 
       const { id: userId } = body.user
       const { isChangePlan } = body
@@ -891,13 +891,14 @@ export class UsersService {
         newOwner.paymentData = newPaymentData
       }
 
-      // CRUD USER
+      // Atualiza o User;
       await this.userModel.updateOne(
         { _id: user._id },
         { $set: updatedUser },
         { session },
       )
 
+      // Atualiza o owner;
       if (!body.owner?._id && isChangePlan) {
         await this.ownerModel.create([newOwner], { session })
       } else {
@@ -1014,12 +1015,14 @@ export class UsersService {
     isChangePlan: boolean,
   ) {
     try {
-      const { _id, phone, cellPhone, wwpNumber } = owner
+      const { _id: ownerId, phone, cellPhone, wwpNumber } = owner
       let ownerExists
       let ownerPrevPlan
 
-      if (_id) {
-        ownerExists = await this.ownerModel.findById(_id).lean()
+      // USER já é um OWNER;
+      if (ownerId) {
+        ownerExists = await this.ownerModel.findById(ownerId).lean()
+        // OWNER está trocando de plano;
         if (isChangePlan) {
           ownerPrevPlan = ownerExists.plan
 
@@ -1031,7 +1034,9 @@ export class UsersService {
             ownerExists.wwpNumber = wwpNumber
           }
         }
+        // USER ainda não é um OWNER;
       } else {
+        // USER tem plano grátis e ainda não usou o crédito para anúnciar, logo, não é OWNER e deseja trocar seu plano;
         if (isChangePlan) {
           ownerExists = {
             name: userName,
