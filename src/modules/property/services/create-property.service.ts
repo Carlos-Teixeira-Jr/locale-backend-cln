@@ -29,7 +29,6 @@ import { TagModelName, ITag } from 'common/schemas/Tag.schema'
 import axios from 'axios'
 import { PropertyActivationDto } from '../dto/property-activation.dto'
 import { CouponModelName, ICoupon } from 'common/schemas/Coupon.schema'
-import { PlanService } from 'modules/plan/plan.service'
 import { PlanTransitionDto } from 'modules/plan/dto/planTransition.dto'
 import { ICreditCard } from 'modules/plan/dto/creditCard.dto'
 
@@ -239,14 +238,13 @@ export class CreateProperty_Service {
         cellPhone,
         phone,
         deactivateProperties,
-        creditsLeft,
       } = createPropertyDto
 
       let coupon
       let updatedOwner
 
       if (createPropertyDto?.coupon) {
-        coupon = createPropertyDto?.coupon;
+        coupon = createPropertyDto?.coupon
       }
 
       const { ownerInfo } = propertyData
@@ -269,7 +267,7 @@ export class CreateProperty_Service {
 
       const ownerActiveProperties = await this.propertyModel
         .find({ owner: owner._id, isActive: true })
-        .lean();
+        .lean()
 
       if (!coupon) {
         const { updatedOwner: tempUpdatedOwner } = await this.handleCustomer(
@@ -283,26 +281,32 @@ export class CreateProperty_Service {
         updatedOwner = tempUpdatedOwner
       }
 
-      if (
-        !isPlanFree ||
-        ownerPreviousPlan?._id?.toString() !== selectedPlan?._id?.toString() &&
-        ownerPreviousPlan !== undefined
-      ) {
-        if (!coupon) {
-          const createPlanTransition = {
-            owner: updatedOwner,
-            user,
-            prevPlan: ownerPreviousPlan,
-            newPlan: selectedPlan,
-            propertiesToDeactivate: deactivateProperties,
-            creditCard: creditCardData,
-            isCreate: true
+      if (!isPlanFree) {
+        if (
+          ownerPreviousPlan?._id?.toString() !==
+            selectedPlan?._id?.toString() &&
+          ownerPreviousPlan !== undefined
+        ) {
+          if (!coupon) {
+            const createPlanTransition = {
+              owner: updatedOwner,
+              user,
+              prevPlan: ownerPreviousPlan,
+              newPlan: selectedPlan,
+              propertiesToDeactivate: deactivateProperties,
+              creditCard: creditCardData,
+              isCreate: true,
+            }
+            const planTransitionData = await this.createPlanTransition(
+              createPlanTransition,
+            )
+            updatedOwner = {
+              ...planTransitionData,
+              adCredits: updatedOwner.adCredits - 1,
+            }
           }
-          const planTransitionData = await this.createPlanTransition(createPlanTransition);
-          updatedOwner = {
-            ...planTransitionData,
-            adCredits: updatedOwner.adCredits - 1
-          }
+        } else {
+          updatedOwner.adCredits = updatedOwner.adCredits - 1
         }
       } else {
         if (!isPlanFree) {
@@ -441,10 +445,7 @@ export class CreateProperty_Service {
           ...user,
           address: address,
         }
-        await this.userModel.updateOne(
-          { _id: user._id },
-          { $set: user}
-        )
+        await this.userModel.updateOne({ _id: user._id }, { $set: user })
       }
     } else {
       // Verificar se o e-mail do usuário já existe no banco de dados
@@ -1214,19 +1215,14 @@ export class CreateProperty_Service {
     }
   }
 
-  async createPlanTransition(planTransitionDto: PlanTransitionDto): Promise<IOwner> {
+  async createPlanTransition(
+    planTransitionDto: PlanTransitionDto,
+  ): Promise<IOwner> {
     try {
       this.logger.log({}, 'start create plan transition > [plan service]')
 
-      const {
-        owner,
-        user,
-        prevPlan,
-        newPlan,
-        propertiesToDeactivate,
-        creditCard,
-        isCreate
-      } = planTransitionDto
+      const { owner, user, prevPlan, newPlan, creditCard, isCreate } =
+        planTransitionDto
 
       let updatedOwner: any = owner
 
@@ -1256,9 +1252,10 @@ export class CreateProperty_Service {
       }
 
       // Aumentar creditos (prevPlan + newPlan);
-      updatedOwner.plan = newPlan._id;
+      updatedOwner.plan = newPlan._id
       updatedOwner.adCredits = owner.adCredits + newPlan.commonAd
-      updatedOwner.highlightCredits = owner.highlightCredits + newPlan.highlightAd
+      updatedOwner.highlightCredits =
+        owner.highlightCredits + newPlan.highlightAd
 
       if (isCreate) {
         updatedOwner.adCredits = updatedOwner.adCredits - 1
@@ -1283,7 +1280,7 @@ export class CreateProperty_Service {
 
       const subscriptionId = paymentData.subscriptionId
 
-      const {data} = await axios.post(
+      const { data } = await axios.post(
         `${process.env.PAYMENT_URL}/payment/update-subscription/${subscriptionId}`,
         {
           value: price,
@@ -1297,44 +1294,10 @@ export class CreateProperty_Service {
           },
         },
       )
-      console.log("🚀 ~ CreateProperty_Service ~ updateSubscription ~ data:", data)
-    } catch (error) {
-      this.logger.error({
-        error: JSON.stringify(error),
-        exception: '> exception',
-      })
-      throw error
-    }
-  }
-
-  async createCustomer(user: IUser): Promise<string> {
-    try {
-      this.logger.log({}, 'create payment subscription > [plan service]')
-
-      const { username: name, email, cellPhone: phone, address, cpf } = user
-
-      let customerId: string
-
-      const { data } = await axios.post(
-        `${process.env.PAYMENT_URL}/customer`,
-        {
-          name,
-          email,
-          phone,
-          postalCode: address.zipCode,
-          description: 'Confirmação de criação de id de cliente',
-          cpfCnpj: cpf,
-          addressNumber: address.streetNumber,
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            access_token: process.env.ASAAS_API_KEY || '',
-          },
-        },
+      console.log(
+        '🚀 ~ CreateProperty_Service ~ updateSubscription ~ data:',
+        data,
       )
-
-      return customerId
     } catch (error) {
       this.logger.error({
         error: JSON.stringify(error),
@@ -1343,6 +1306,43 @@ export class CreateProperty_Service {
       throw error
     }
   }
+
+  // async createCustomer(user: IUser): Promise<string> {
+  //   try {
+  //     this.logger.log({}, 'create payment subscription > [plan service]')
+
+  //     const { username: name, email, cellPhone: phone, address, cpf } = user
+
+  //     let customerId: string
+
+  //     const { data } = await axios.post(
+  //       `${process.env.PAYMENT_URL}/customer`,
+  //       {
+  //         name,
+  //         email,
+  //         phone,
+  //         postalCode: address.zipCode,
+  //         description: 'Confirmação de criação de id de cliente',
+  //         cpfCnpj: cpf,
+  //         addressNumber: address.streetNumber,
+  //       },
+  //       {
+  //         headers: {
+  //           'Content-Type': 'application/json',
+  //           access_token: process.env.ASAAS_API_KEY || '',
+  //         },
+  //       },
+  //     )
+
+  //     return customerId
+  //   } catch (error) {
+  //     this.logger.error({
+  //       error: JSON.stringify(error),
+  //       exception: '> exception',
+  //     })
+  //     throw error
+  //   }
+  // }
 
   async createSubscription(
     user: IUser,
@@ -1353,7 +1353,7 @@ export class CreateProperty_Service {
     try {
       this.logger.log({}, 'create payment subscription > [plan service]')
 
-      const { paymentData, cellPhone: phone } = owner;
+      const { paymentData, cellPhone: phone } = owner
 
       const { username: holderName, email, address } = user
 
@@ -1363,9 +1363,6 @@ export class CreateProperty_Service {
 
       const { formattedDate, expiryMonth, expiryYear } =
         this.getFormattedDate(expiry)
-
-      let subscriptionId
-      let creditCardInfo
 
       const { data } = await axios.post(
         `${process.env.PAYMENT_URL}/payment/subscription`,
@@ -1386,7 +1383,9 @@ export class CreateProperty_Service {
             name,
             email,
             phone,
-            cpfCnpj: paymentData.cpfCnpj ? paymentData.cpfCnpj : creditCard.cpfCnpj,
+            cpfCnpj: paymentData.cpfCnpj
+              ? paymentData.cpfCnpj
+              : creditCard.cpfCnpj,
             postalCode: address.zipCode,
             addressNumber: address.streetNumber,
           },
@@ -1413,17 +1412,13 @@ export class CreateProperty_Service {
   }
 
   getFormattedDate(expiry: string): IFormattedDate {
-    let formattedDate: string
-    let expiryYear: string
-    let expiryMonth: string
-
-    let currentDate = new Date()
-    let year = currentDate.getFullYear()
-    let month = (currentDate.getMonth() + 1).toString().padStart(2, '0')
-    let day = currentDate.getDate().toString().padStart(2, '0')
-    formattedDate = `${year}-${month}-${day}`
-    expiryYear = `20${expiry[2] + expiry[3]}`
-    expiryMonth = `${expiry[0] + expiry[1]}`
+    const currentDate = new Date()
+    const year = currentDate.getFullYear()
+    const month = (currentDate.getMonth() + 1).toString().padStart(2, '0')
+    const day = currentDate.getDate().toString().padStart(2, '0')
+    const formattedDate = `${year}-${month}-${day}`
+    const expiryYear = `20${expiry[2] + expiry[3]}`
+    const expiryMonth = `${expiry[0] + expiry[1]}`
 
     return {
       formattedDate,
