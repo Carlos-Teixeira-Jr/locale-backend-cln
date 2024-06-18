@@ -29,6 +29,14 @@ import { TagModelName, ITag } from 'common/schemas/Tag.schema'
 import axios from 'axios'
 import { PropertyActivationDto } from '../dto/property-activation.dto'
 import { CouponModelName, ICoupon } from 'common/schemas/Coupon.schema'
+import { PlanTransitionDto } from 'modules/plan/dto/planTransition.dto'
+import { ICreditCard } from 'modules/plan/dto/creditCard.dto'
+
+export interface IFormattedDate {
+  formattedDate: string
+  expiryYear: string
+  expiryMonth: string
+}
 
 interface IOwnerData {
   name: string
@@ -68,6 +76,153 @@ export class CreateProperty_Service {
     private readonly authService: AuthService,
   ) {}
 
+  // async createOne(createPropertyDto: CreatePropertyDto): Promise<any> {
+  //   const session = await this.startSession()
+  //   try {
+  //     await session.startTransaction()
+  //     this.logger.log({}, 'start createOne')
+
+  //     const {
+  //       userData,
+  //       propertyData,
+  //       creditCardData,
+  //       isPlanFree,
+  //       plan,
+  //       cellPhone,
+  //       phone,
+  //       deactivateProperties,
+  //     } = createPropertyDto
+
+  //     let coupon
+  //     let updatedOwner
+
+  //     if (createPropertyDto?.coupon) {
+  //       coupon = createPropertyDto?.coupon
+  //     }
+
+  //     const { ownerInfo } = propertyData
+
+  //     const {
+  //       owner,
+  //       userAlreadyExists,
+  //       user,
+  //       selectedPlan,
+  //       ownerPreviousPlan,
+  //     } = await this.getUserAndOwner(
+  //       userData,
+  //       isPlanFree,
+  //       plan,
+  //       session,
+  //       coupon,
+  //     )
+
+  //     if (!coupon) {
+  //       const { updatedOwner: tempUpdatedOwner } = await this.handleCustomer(
+  //         isPlanFree,
+  //         owner,
+  //         userData,
+  //         cellPhone,
+  //         phone,
+  //         creditCardData,
+  //       )
+  //       updatedOwner = tempUpdatedOwner
+  //     }
+
+  //     if (
+  //       !isPlanFree ||
+  //       ownerPreviousPlan?._id?.toString() !== selectedPlan?._id?.toString()
+  //     ) {
+  //       if (!coupon) {
+  //         await this.handlePayment(
+  //           isPlanFree,
+  //           selectedPlan,
+  //           updatedOwner,
+  //           userData,
+  //           creditCardData,
+  //           cellPhone,
+  //           ownerPreviousPlan,
+  //           deactivateProperties?.length,
+  //           session,
+  //         )
+  //       }
+  //     } else {
+  //       if (!isPlanFree) {
+  //         if (owner && owner.adCredits === 0) {
+  //           throw new BadRequestException(`O anunciante não tem mais créditos.`)
+  //         }
+
+  //         updatedOwner.paymentData.creditCardInfo = {
+  //           creditCardBrand: '',
+  //           creditCardNumber: '',
+  //           creditCardToken: '',
+  //         }
+  //         updatedOwner.paymentData.subscriptionId = ''
+
+  //         updatedOwner = {
+  //           ...updatedOwner,
+  //           adCredits: owner.adCredits - 1,
+  //         }
+  //       } else {
+  //         if (updatedOwner.adCredits > 0) {
+  //           updatedOwner.adCredits = updatedOwner.adCredits - 1
+  //         }
+  //       }
+  //     }
+
+  //     await this.ownerModel.updateOne(
+  //       { _id: updatedOwner?._id },
+  //       { $set: updatedOwner },
+  //       { session },
+  //     )
+
+  //     // Deactivates the properties that the user choose in case that he changes his plan to a minor one;
+  //     if (
+  //       deactivateProperties !== undefined &&
+  //       deactivateProperties.length > 0 &&
+  //       selectedPlan.price < ownerPreviousPlan.price
+  //     ) {
+  //       const deactivatepropertiesBody: PropertyActivationDto = {
+  //         propertyId: deactivateProperties,
+  //         userId: userData._id,
+  //         isActive: false,
+  //         session: session,
+  //       }
+  //       await this.activateDeactivateProperties(deactivatepropertiesBody)
+  //     }
+
+  //     await this.handleLocationCreation(propertyData.address, session)
+  //     await this.handlePropertyTypeCreation(propertyData.propertyType, session)
+  //     await this.handleTagsCreation(propertyData.tags)
+
+  //     const createdProperty = await this.createProperty(
+  //       propertyData,
+  //       ownerInfo,
+  //       owner._id,
+  //     )
+
+  //     await session.commitTransaction()
+
+  //     return {
+  //       createdProperty,
+  //       creditCardBrand: owner?.paymentData?.creditCardInfo
+  //         ? owner?.paymentData?.creditCardInfo?.creditCardBrand
+  //         : null,
+  //       paymentValue: null,
+  //       userAlreadyExists,
+  //       user,
+  //     }
+  //   } catch (error) {
+  //     await session.abortTransaction()
+  //     this.logger.error({
+  //       error: JSON.stringify(error),
+  //       exception: '> exception',
+  //     })
+  //     return { message: error.message }
+  //   } finally {
+  //     session.endSession()
+  //   }
+  // }
+
   async createOne(createPropertyDto: CreatePropertyDto): Promise<any> {
     const session = await this.startSession()
     try {
@@ -83,7 +238,6 @@ export class CreateProperty_Service {
         cellPhone,
         phone,
         deactivateProperties,
-        creditsLeft,
       } = createPropertyDto
 
       let coupon
@@ -103,6 +257,8 @@ export class CreateProperty_Service {
         ownerPreviousPlan,
       } = await this.getUserAndOwner(
         userData,
+        phone,
+        cellPhone,
         isPlanFree,
         plan,
         session,
@@ -125,24 +281,32 @@ export class CreateProperty_Service {
         updatedOwner = tempUpdatedOwner
       }
 
-      if (
-        !isPlanFree ||
-        ownerPreviousPlan?._id?.toString() !== selectedPlan?._id?.toString()
-      ) {
-        if (!coupon) {
-          updatedOwner = await this.handlePayment(
-            isPlanFree,
-            selectedPlan,
-            updatedOwner,
-            userData,
-            creditCardData,
-            cellPhone,
-            ownerPreviousPlan,
-            deactivateProperties?.length,
-            ownerActiveProperties.length,
-            creditsLeft,
-            session,
-          )
+      if (!isPlanFree) {
+        if (
+          ownerPreviousPlan?._id?.toString() !==
+            selectedPlan?._id?.toString() &&
+          ownerPreviousPlan !== undefined
+        ) {
+          if (!coupon) {
+            const createPlanTransition = {
+              owner: updatedOwner,
+              user,
+              prevPlan: ownerPreviousPlan,
+              newPlan: selectedPlan,
+              propertiesToDeactivate: deactivateProperties,
+              creditCard: creditCardData,
+              isCreate: true,
+            }
+            const planTransitionData = await this.createPlanTransition(
+              createPlanTransition,
+            )
+            updatedOwner = {
+              ...planTransitionData,
+              adCredits: updatedOwner.adCredits - 1,
+            }
+          }
+        } else {
+          updatedOwner.adCredits = updatedOwner.adCredits - 1
         }
       } else {
         if (!isPlanFree) {
@@ -239,6 +403,8 @@ export class CreateProperty_Service {
 
   private async getUserAndOwner(
     userData: any,
+    phone: string,
+    cellPhone: string,
     isPlanFree: boolean,
     plan: any,
     session: any,
@@ -256,8 +422,6 @@ export class CreateProperty_Service {
       username,
       address,
       cpf,
-      phone,
-      cellPhone,
       wwpNumber,
       profilePicture,
     } = userData
@@ -276,7 +440,13 @@ export class CreateProperty_Service {
         )
       }
 
-      userAlreadyExists = true
+      if (!user.address) {
+        user = {
+          ...user,
+          address: address,
+        }
+        await this.userModel.updateOne({ _id: user._id }, { $set: user })
+      }
     } else {
       // Verificar se o e-mail do usuário já existe no banco de dados
       const userEmailExists = await this.userModel.findOne({
@@ -396,8 +566,6 @@ export class CreateProperty_Service {
           e => e._id.toString() === owner.plan.toString(),
         )
         owner.plan = selectedPlan._id
-        owner.adCredits = selectedPlan.commonAd
-        owner.highlightCredits = selectedPlan.highlightAd
       } else {
         owner = ownerExists
         ownerPreviousPlan = plans.find(
@@ -982,7 +1150,7 @@ export class CreateProperty_Service {
     return createdProperty
   }
 
-  private async activateDeactivateProperties(
+  async activateDeactivateProperties(
     propertyActivationDto: PropertyActivationDto,
   ) {
     try {
@@ -1044,6 +1212,218 @@ export class CreateProperty_Service {
       }
     } catch (error) {
       throw new Error(`Não foi possível desativar os imóveis do usuário.`)
+    }
+  }
+
+  async createPlanTransition(
+    planTransitionDto: PlanTransitionDto,
+  ): Promise<IOwner> {
+    try {
+      this.logger.log({}, 'start create plan transition > [plan service]')
+
+      const { owner, user, prevPlan, newPlan, creditCard, isCreate } =
+        planTransitionDto
+
+      let updatedOwner: any = owner
+
+      // Upgrade;
+      if (newPlan.price > prevPlan.price) {
+        if (owner.paymentData?.subscriptionId) {
+          // Atualizar a assinatura do pagamento junto a Asaas;
+          await this.updateSubscription(owner, newPlan)
+        } else {
+          // Criar a assinatura do pagamento junto a Asaas;
+          const { subscriptionId, creditCardInfo } =
+            await this.createSubscription(user, owner, newPlan, creditCard)
+
+          updatedOwner = {
+            ...updatedOwner,
+            paymentData: {
+              ...updatedOwner.paymentData,
+              subscriptionId,
+              creditCardInfo,
+              cpfCnpj: creditCard.cpfCnpj,
+            },
+          }
+        }
+      } else {
+        // Downgrade;
+        await this.updateSubscription(owner, newPlan)
+      }
+
+      // Aumentar creditos (prevPlan + newPlan);
+      updatedOwner.plan = newPlan._id
+      updatedOwner.adCredits = owner.adCredits + newPlan.commonAd
+      updatedOwner.highlightCredits =
+        owner.highlightCredits + newPlan.highlightAd
+
+      if (isCreate) {
+        updatedOwner.adCredits = updatedOwner.adCredits - 1
+      }
+
+      return updatedOwner
+    } catch (error) {
+      this.logger.error({
+        error: JSON.stringify(error),
+        exception: '> exception',
+      })
+      throw error
+    }
+  }
+
+  async updateSubscription(owner: IOwner, newPlan: IPlan) {
+    try {
+      this.logger.log({}, 'update payment subscription > [plan service]')
+
+      const { paymentData } = owner
+      const { price, name } = newPlan
+
+      const subscriptionId = paymentData.subscriptionId
+
+      const { data } = await axios.post(
+        `${process.env.PAYMENT_URL}/payment/update-subscription/${subscriptionId}`,
+        {
+          value: price,
+          updatePendingPayments: true,
+          description: `Assinatura do plano ${name}`,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            access_token: process.env.ASAAS_API_KEY || '',
+          },
+        },
+      )
+      console.log(
+        '🚀 ~ CreateProperty_Service ~ updateSubscription ~ data:',
+        data,
+      )
+    } catch (error) {
+      this.logger.error({
+        error: JSON.stringify(error),
+        exception: '> exception',
+      })
+      throw error
+    }
+  }
+
+  // async createCustomer(user: IUser): Promise<string> {
+  //   try {
+  //     this.logger.log({}, 'create payment subscription > [plan service]')
+
+  //     const { username: name, email, cellPhone: phone, address, cpf } = user
+
+  //     let customerId: string
+
+  //     const { data } = await axios.post(
+  //       `${process.env.PAYMENT_URL}/customer`,
+  //       {
+  //         name,
+  //         email,
+  //         phone,
+  //         postalCode: address.zipCode,
+  //         description: 'Confirmação de criação de id de cliente',
+  //         cpfCnpj: cpf,
+  //         addressNumber: address.streetNumber,
+  //       },
+  //       {
+  //         headers: {
+  //           'Content-Type': 'application/json',
+  //           access_token: process.env.ASAAS_API_KEY || '',
+  //         },
+  //       },
+  //     )
+
+  //     return customerId
+  //   } catch (error) {
+  //     this.logger.error({
+  //       error: JSON.stringify(error),
+  //       exception: '> exception',
+  //     })
+  //     throw error
+  //   }
+  // }
+
+  async createSubscription(
+    user: IUser,
+    owner: IOwner,
+    plan: IPlan,
+    creditCard: ICreditCard,
+  ): Promise<{ subscriptionId: string; creditCardInfo: any }> {
+    try {
+      this.logger.log({}, 'create payment subscription > [plan service]')
+
+      const { paymentData, cellPhone: phone } = owner
+
+      const { username: holderName, email, address } = user
+
+      const { price: value } = plan
+
+      const { cardName: name, cardNumber: number, expiry, ccv } = creditCard
+
+      const { formattedDate, expiryMonth, expiryYear } =
+        this.getFormattedDate(expiry)
+
+      const { data } = await axios.post(
+        `${process.env.PAYMENT_URL}/payment/subscription`,
+        {
+          billingType: 'CREDIT_CARD',
+          cycle: 'MONTHLY',
+          customer: paymentData.customerId,
+          value,
+          nextDueDate: formattedDate,
+          creditCard: {
+            holderName,
+            number,
+            expiryMonth,
+            expiryYear,
+            ccv,
+          },
+          creditCardHolderInfo: {
+            name,
+            email,
+            phone,
+            cpfCnpj: paymentData.cpfCnpj
+              ? paymentData.cpfCnpj
+              : creditCard.cpfCnpj,
+            postalCode: address.zipCode,
+            addressNumber: address.streetNumber,
+          },
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            access_token: process.env.ASAAS_API_KEY || '',
+          },
+        },
+      )
+
+      return {
+        subscriptionId: data.id,
+        creditCardInfo: data.creditCard,
+      }
+    } catch (error) {
+      this.logger.error({
+        error: JSON.stringify(error),
+        exception: '> exception',
+      })
+      throw error
+    }
+  }
+
+  getFormattedDate(expiry: string): IFormattedDate {
+    const currentDate = new Date()
+    const year = currentDate.getFullYear()
+    const month = (currentDate.getMonth() + 1).toString().padStart(2, '0')
+    const day = currentDate.getDate().toString().padStart(2, '0')
+    const formattedDate = `${year}-${month}-${day}`
+    const expiryYear = `20${expiry[2] + expiry[3]}`
+    const expiryMonth = `${expiry[0] + expiry[1]}`
+
+    return {
+      formattedDate,
+      expiryYear,
+      expiryMonth,
     }
   }
 }
