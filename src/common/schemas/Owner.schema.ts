@@ -31,6 +31,7 @@ export interface IOwner extends BaseModel, Document {
   isNewCreditCard?: boolean
   newPlan: boolean
   isActive: boolean
+  planTransitionStatus: string
 }
 
 export const OwnerSchema = new Schema(
@@ -64,6 +65,7 @@ export const OwnerSchema = new Schema(
     isNewCreditCard: { type: Boolean },
     newPlan: { type: Boolean },
     isActive: { type: Boolean, default: true },
+    planTransitionStatus: { type: String, default: 'none' }
   },
   {
     versionKey: false,

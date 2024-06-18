@@ -31,6 +31,9 @@ import { PropertyActivationDto } from '../dto/property-activation.dto'
 import { CouponModelName, ICoupon } from 'common/schemas/Coupon.schema'
 import { PlanTransitionDto } from 'modules/plan/dto/planTransition.dto'
 import { ICreditCard } from 'modules/plan/dto/creditCard.dto'
+import { SchedulerRegistry } from '@nestjs/schedule'
+import { CronJob } from 'cron'
+import { String } from 'aws-sdk/clients/apigateway'
 
 export interface IFormattedDate {
   formattedDate: string
@@ -39,6 +42,7 @@ export interface IFormattedDate {
 }
 
 interface IOwnerData {
+  _id?: string
   name: string
   phone: string
   cellPhone: string
@@ -50,6 +54,17 @@ interface IOwnerData {
   highlightCredits?: number
   email: string
   isActive: boolean
+  planTransitionStatus: string
+  paymentData?: {
+    subscriptionId: string,
+    cpfCnpj: string,
+    customerId: string,
+    creditCardInfo: {
+      cardNumber: string,
+      cardBrand: string,
+      creditCardToken: String
+    }
+  }
 }
 
 @Injectable()
@@ -74,160 +89,14 @@ export class CreateProperty_Service {
     @InjectModel(CouponModelName)
     private readonly couponModel: Model<ICoupon>,
     private readonly authService: AuthService,
+    private schedulerRegistry: SchedulerRegistry,
   ) {}
-
-  // async createOne(createPropertyDto: CreatePropertyDto): Promise<any> {
-  //   const session = await this.startSession()
-  //   try {
-  //     await session.startTransaction()
-  //     this.logger.log({}, 'start createOne')
-
-  //     const {
-  //       userData,
-  //       propertyData,
-  //       creditCardData,
-  //       isPlanFree,
-  //       plan,
-  //       cellPhone,
-  //       phone,
-  //       deactivateProperties,
-  //     } = createPropertyDto
-
-  //     let coupon
-  //     let updatedOwner
-
-  //     if (createPropertyDto?.coupon) {
-  //       coupon = createPropertyDto?.coupon
-  //     }
-
-  //     const { ownerInfo } = propertyData
-
-  //     const {
-  //       owner,
-  //       userAlreadyExists,
-  //       user,
-  //       selectedPlan,
-  //       ownerPreviousPlan,
-  //     } = await this.getUserAndOwner(
-  //       userData,
-  //       isPlanFree,
-  //       plan,
-  //       session,
-  //       coupon,
-  //     )
-
-  //     if (!coupon) {
-  //       const { updatedOwner: tempUpdatedOwner } = await this.handleCustomer(
-  //         isPlanFree,
-  //         owner,
-  //         userData,
-  //         cellPhone,
-  //         phone,
-  //         creditCardData,
-  //       )
-  //       updatedOwner = tempUpdatedOwner
-  //     }
-
-  //     if (
-  //       !isPlanFree ||
-  //       ownerPreviousPlan?._id?.toString() !== selectedPlan?._id?.toString()
-  //     ) {
-  //       if (!coupon) {
-  //         await this.handlePayment(
-  //           isPlanFree,
-  //           selectedPlan,
-  //           updatedOwner,
-  //           userData,
-  //           creditCardData,
-  //           cellPhone,
-  //           ownerPreviousPlan,
-  //           deactivateProperties?.length,
-  //           session,
-  //         )
-  //       }
-  //     } else {
-  //       if (!isPlanFree) {
-  //         if (owner && owner.adCredits === 0) {
-  //           throw new BadRequestException(`O anunciante não tem mais créditos.`)
-  //         }
-
-  //         updatedOwner.paymentData.creditCardInfo = {
-  //           creditCardBrand: '',
-  //           creditCardNumber: '',
-  //           creditCardToken: '',
-  //         }
-  //         updatedOwner.paymentData.subscriptionId = ''
-
-  //         updatedOwner = {
-  //           ...updatedOwner,
-  //           adCredits: owner.adCredits - 1,
-  //         }
-  //       } else {
-  //         if (updatedOwner.adCredits > 0) {
-  //           updatedOwner.adCredits = updatedOwner.adCredits - 1
-  //         }
-  //       }
-  //     }
-
-  //     await this.ownerModel.updateOne(
-  //       { _id: updatedOwner?._id },
-  //       { $set: updatedOwner },
-  //       { session },
-  //     )
-
-  //     // Deactivates the properties that the user choose in case that he changes his plan to a minor one;
-  //     if (
-  //       deactivateProperties !== undefined &&
-  //       deactivateProperties.length > 0 &&
-  //       selectedPlan.price < ownerPreviousPlan.price
-  //     ) {
-  //       const deactivatepropertiesBody: PropertyActivationDto = {
-  //         propertyId: deactivateProperties,
-  //         userId: userData._id,
-  //         isActive: false,
-  //         session: session,
-  //       }
-  //       await this.activateDeactivateProperties(deactivatepropertiesBody)
-  //     }
-
-  //     await this.handleLocationCreation(propertyData.address, session)
-  //     await this.handlePropertyTypeCreation(propertyData.propertyType, session)
-  //     await this.handleTagsCreation(propertyData.tags)
-
-  //     const createdProperty = await this.createProperty(
-  //       propertyData,
-  //       ownerInfo,
-  //       owner._id,
-  //     )
-
-  //     await session.commitTransaction()
-
-  //     return {
-  //       createdProperty,
-  //       creditCardBrand: owner?.paymentData?.creditCardInfo
-  //         ? owner?.paymentData?.creditCardInfo?.creditCardBrand
-  //         : null,
-  //       paymentValue: null,
-  //       userAlreadyExists,
-  //       user,
-  //     }
-  //   } catch (error) {
-  //     await session.abortTransaction()
-  //     this.logger.error({
-  //       error: JSON.stringify(error),
-  //       exception: '> exception',
-  //     })
-  //     return { message: error.message }
-  //   } finally {
-  //     session.endSession()
-  //   }
-  // }
 
   async createOne(createPropertyDto: CreatePropertyDto): Promise<any> {
     const session = await this.startSession()
     try {
       await session.startTransaction()
-      this.logger.log({}, 'start createOne')
+      this.logger.log({}, 'start createOne');
 
       const {
         userData,
@@ -302,7 +171,6 @@ export class CreateProperty_Service {
             )
             updatedOwner = {
               ...planTransitionData,
-              adCredits: updatedOwner.adCredits - 1,
             }
           }
         } else {
@@ -518,6 +386,7 @@ export class CreateProperty_Service {
           isActive: true,
           adCredits: selectedPlan?.commonAd,
           highlightCredits: selectedPlan?.highlightAd,
+          planTransitionStatus: 'none'
         }
       } else {
         ownerData = {
@@ -532,6 +401,7 @@ export class CreateProperty_Service {
           isActive: true,
           adCredits: plusPlan.commonAd,
           highlightCredits: plusPlan.highlightAd,
+          planTransitionStatus: 'none'
         }
       }
 
@@ -1138,13 +1008,9 @@ export class CreateProperty_Service {
     ownerInfo: any,
     ownerId: string,
   ) {
-    // Adds the owner id to property doc;
     propertyData.owner = ownerId
-
-    // Adds owner info object to the property doc;
     propertyData.ownerInfo = { ...ownerInfo, picture: '' }
 
-    // Creates the prperty on DB;
     const createdProperty = await this.propertyModel.create(propertyData)
 
     return createdProperty
@@ -1251,15 +1117,10 @@ export class CreateProperty_Service {
         await this.updateSubscription(owner, newPlan)
       }
 
-      // Aumentar creditos (prevPlan + newPlan);
-      updatedOwner.plan = newPlan._id
-      updatedOwner.adCredits = owner.adCredits + newPlan.commonAd
-      updatedOwner.highlightCredits =
-        owner.highlightCredits + newPlan.highlightAd
-
-      if (isCreate) {
-        updatedOwner.adCredits = updatedOwner.adCredits - 1
-      }
+      updatedOwner = await this.updateCredits(
+        updatedOwner,
+        newPlan,
+      )
 
       return updatedOwner
     } catch (error) {
@@ -1307,43 +1168,6 @@ export class CreateProperty_Service {
     }
   }
 
-  // async createCustomer(user: IUser): Promise<string> {
-  //   try {
-  //     this.logger.log({}, 'create payment subscription > [plan service]')
-
-  //     const { username: name, email, cellPhone: phone, address, cpf } = user
-
-  //     let customerId: string
-
-  //     const { data } = await axios.post(
-  //       `${process.env.PAYMENT_URL}/customer`,
-  //       {
-  //         name,
-  //         email,
-  //         phone,
-  //         postalCode: address.zipCode,
-  //         description: 'Confirmação de criação de id de cliente',
-  //         cpfCnpj: cpf,
-  //         addressNumber: address.streetNumber,
-  //       },
-  //       {
-  //         headers: {
-  //           'Content-Type': 'application/json',
-  //           access_token: process.env.ASAAS_API_KEY || '',
-  //         },
-  //       },
-  //     )
-
-  //     return customerId
-  //   } catch (error) {
-  //     this.logger.error({
-  //       error: JSON.stringify(error),
-  //       exception: '> exception',
-  //     })
-  //     throw error
-  //   }
-  // }
-
   async createSubscription(
     user: IUser,
     owner: IOwner,
@@ -1354,15 +1178,10 @@ export class CreateProperty_Service {
       this.logger.log({}, 'create payment subscription > [plan service]')
 
       const { paymentData, cellPhone: phone } = owner
-
       const { username: holderName, email, address } = user
-
       const { price: value } = plan
-
       const { cardName: name, cardNumber: number, expiry, ccv } = creditCard
-
-      const { formattedDate, expiryMonth, expiryYear } =
-        this.getFormattedDate(expiry)
+      const { formattedDate, expiryMonth, expiryYear } = this.getFormattedDate(expiry)
 
       const { data } = await axios.post(
         `${process.env.PAYMENT_URL}/payment/subscription`,
@@ -1395,6 +1214,7 @@ export class CreateProperty_Service {
             'Content-Type': 'application/json',
             access_token: process.env.ASAAS_API_KEY || '',
           },
+          timeout: 3000000
         },
       )
 
@@ -1424,6 +1244,65 @@ export class CreateProperty_Service {
       formattedDate,
       expiryYear,
       expiryMonth,
+    }
+  }
+
+  async updateCredits(
+    owner: IOwnerData,
+    newPlan: IPlan,
+  ): Promise<any> {
+    try {
+      const { paymentData, _id } = owner
+
+      let updateDate
+      let updatedOwner = owner
+      const newAdCredits = owner.adCredits + newPlan.commonAd;
+      const newHighlightCredits = owner.highlightCredits + newPlan.highlightAd;
+
+      // Buscar data de vencimento;
+      const { data } = await axios.get(
+        `${process.env.PAYMENT_URL}/payment/subscription/${paymentData?.subscriptionId}`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            access_token: process.env.ASAAS_API_KEY || '',
+          },
+          timeout: 3000000,
+        },
+      )
+
+      updateDate = new Date(data.nextDueDate)
+
+      // Lógica de mudança de créditos imediata;
+      updatedOwner = {
+        ...owner,
+        adCredits: newAdCredits,
+        highlightCredits: newHighlightCredits,
+        planTransitionStatus: 'processing'
+      };
+
+      const job = new CronJob(updateDate, async () => {
+        await this.ownerModel.updateOne(
+          { _id },
+          {
+            $set: {
+              adCredits: newAdCredits - owner.adCredits,
+              highlightCredits: newHighlightCredits - owner.highlightCredits,
+              planTransitionStatus: 'complete',
+            },
+          },
+        )
+        this.logger.debug(`Anunciante ${_id} atualizado`)
+        this.schedulerRegistry.deleteCronJob(_id.toString()) // remove o job após execução
+      })
+
+      this.schedulerRegistry.addCronJob(_id.toString(), job)
+      job.start()
+      this.logger.debug(`Job para o anunciante ${_id} agendado para: ${updateDate}`)
+
+      return updatedOwner
+    } catch (error) {
+      throw error
     }
   }
 }
