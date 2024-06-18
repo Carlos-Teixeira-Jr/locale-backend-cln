@@ -6,6 +6,12 @@ import { LoggerService } from 'modules/logger/logger.service'
 import { Model } from 'mongoose'
 import { CreatePlanDto } from './dto/createPlan.dto'
 
+export interface IFormattedDate {
+  formattedDate: string
+  expiryYear: string
+  expiryMonth: string
+}
+
 @Injectable()
 export class PlanService {
   constructor(
