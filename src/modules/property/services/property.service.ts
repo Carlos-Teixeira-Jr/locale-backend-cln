@@ -99,10 +99,11 @@ export class PropertyService {
 
       const { userId, isEdit, increment } = getPropertiesByOwner
 
-      let ownerId
+      let ownerId;
+      let propertyIdConditional = propertyId?.id ? propertyId?.id : propertyId;
 
       let property: IProperty = await getPropertyById(
-        propertyId,
+        propertyIdConditional,
         this.propertyModel,
       )
 
@@ -120,17 +121,17 @@ export class PropertyService {
       if (increment && !isEdit) {
         if (ownerId && property.owner !== ownerId) {
           await this.propertyModel.updateOne(
-            { _id: propertyId },
+            { _id: propertyIdConditional },
             { $inc: { views: 1 } },
           )
         } else {
           await this.propertyModel.updateOne(
-            { _id: propertyId.id },
+            { _id: propertyIdConditional },
             { $inc: { views: 1 } },
           )
         }
 
-        property = await getPropertyById(propertyId, this.propertyModel)
+        property = await getPropertyById(propertyIdConditional, this.propertyModel)
       }
 
       return property
