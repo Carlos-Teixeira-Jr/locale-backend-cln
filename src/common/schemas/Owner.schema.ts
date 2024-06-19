@@ -65,7 +65,7 @@ export const OwnerSchema = new Schema(
     isNewCreditCard: { type: Boolean },
     newPlan: { type: Boolean },
     isActive: { type: Boolean, default: true },
-    planTransitionStatus: { type: String, default: 'none' }
+    planTransitionStatus: { type: String, default: 'none' },
   },
   {
     versionKey: false,

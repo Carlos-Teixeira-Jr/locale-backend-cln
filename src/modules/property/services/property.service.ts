@@ -99,8 +99,8 @@ export class PropertyService {
 
       const { userId, isEdit, increment } = getPropertiesByOwner
 
-      let ownerId;
-      let propertyIdConditional = propertyId?.id ? propertyId?.id : propertyId;
+      let ownerId
+      const propertyIdConditional = propertyId?.id ? propertyId?.id : propertyId
 
       let property: IProperty = await getPropertyById(
         propertyIdConditional,
@@ -131,7 +131,10 @@ export class PropertyService {
           )
         }
 
-        property = await getPropertyById(propertyIdConditional, this.propertyModel)
+        property = await getPropertyById(
+          propertyIdConditional,
+          this.propertyModel,
+        )
       }
 
       return property
