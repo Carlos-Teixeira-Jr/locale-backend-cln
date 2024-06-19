@@ -80,28 +80,35 @@ export class PropertyFilter_Service {
   }
 
   getFilter(filter: any) {
+    // Função para normalizar strings (remover acentos e transformar em lowercase)
+    const normalizeString = (str: string) =>
+      str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+
     //Adiciona cada tipo de filtragem à query;
     const allFilters = []
 
     filter.forEach(obj => {
       if (obj.adType) {
-        allFilters.push({ adType: obj.adType })
+        allFilters.push({ adType: new RegExp(normalizeString(obj.adType), 'i') })
       }
       if (obj.adSubtype) {
-        allFilters.push({ adSubtype: obj.adSubtype })
+        allFilters.push({ adSubtype: new RegExp(normalizeString(obj.adSubtype)) })
       }
       if (obj.propertyType) {
         allFilters.push({
           propertyType: {
-            $in: obj.propertyType,
+            $in: new RegExp(normalizeString(obj.propertyType), 'i'),
           },
         })
       }
       if (obj.propertySubtype) {
-        allFilters.push({ propertySubtype: obj.propertySubtype })
+        allFilters.push({ propertySubtype: new RegExp(normalizeString(obj.propertySubtype)) })
       }
       if (obj.announcementCode) {
-        allFilters.push({ announcementCode: obj.announcementCode })
+        allFilters.push({ announcementCode: new RegExp(normalizeString(obj.announcementCode)) })
       }
       if (obj.bedroom) {
         allFilters.push({
@@ -217,7 +224,7 @@ export class PropertyFilter_Service {
       if (obj.tags) {
         allFilters.push({
           tags: {
-            $in: [new RegExp(obj.tags, 'i')],
+            $in: [new RegExp(normalizeString(obj.tags), 'i')],
           },
         })
       }
@@ -228,7 +235,9 @@ export class PropertyFilter_Service {
           const { name, category } = filter
           if (name && category) {
             const query = {
-              [`address.${category}`]: { $in: name },
+              [`address.${category}`]: {
+                $in: name.map((n: string) => new RegExp(normalizeString(n), 'i')),
+              },
             }
             orQuery.push(query)
           }
