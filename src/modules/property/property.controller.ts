@@ -54,6 +54,7 @@ export class PropertyController {
     @Body() getPropertyParams: GetPropertyParams,
   ): Promise<IProperty> {
     this.logger.log({}, 'findOne')
+
     return await this.propertyService.findOne(getPropertyParams, propertyId)
   }
 
