@@ -677,8 +677,7 @@ export class UsersService {
           // Verifica se o amount é menor ou igual a 0 após a atualização
           if (updatedTag && updatedTag.amount <= 0) {
             // Exclui a tag se o amount for menor ou igual a 0
-            const teste = await this.tagModel.deleteOne({ name: tag }, opt)
-            console.log('🚀 ~ UsersService ~ teste:', teste)
+            await this.tagModel.deleteOne({ name: tag }, opt)
           }
         }
 
