@@ -33,7 +33,6 @@ export class AdminService {
     getPropertiesByOwner: GetPropertyParams,
     propertyId: Schema.Types.ObjectId,
   ): Promise<IProperty> {
-    console.log('🚀 ~ PropertyService ~ propertyId:', propertyId)
     try {
       this.logger.log({}, 'start findOne Property > [property service]')
 

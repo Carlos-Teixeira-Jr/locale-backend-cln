@@ -125,7 +125,6 @@ export class PaymentService {
             commonCredits,
             highlightCredits,
           )
-          console.log('🚀 ~ PaymentService ~ response:', response)
 
           // Converte o documento Mongoose em objeto simples
           const plainOwner = response.updatedOwner

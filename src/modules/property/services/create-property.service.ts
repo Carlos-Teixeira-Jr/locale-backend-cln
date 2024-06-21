@@ -570,7 +570,6 @@ export class CreateProperty_Service {
       selectedPlanId = previousPlanData?._id
     }
 
-    let newAdCredits
     let newHighlightCredits
 
     if (creditCardData !== undefined) {
@@ -874,18 +873,13 @@ export class CreateProperty_Service {
 
             // Condicional dos créditos para casos em que já havia um plano anterior ou não;
             if (!previousPlanData) {
-              newAdCredits = selectedPlan.commonAd
+              // newAdCredits = selectedPlan.commonAd
               newHighlightCredits = selectedPlan.highlightAd
             } else if (ownerActualPlanString !== planIdString) {
-              newAdCredits =
-                selectedPlan.price > previousPlanData.price
-                  ? owner.adCredits + selectedPlan.commonAd
-                  : owner.adCredits - selectedPlan.commonAd
-
-              console.log(
-                '🚀 ~ CreateProperty_Service ~ newAdCredits:',
-                newAdCredits,
-              )
+              // newAdCredits =
+              //   selectedPlan.price > previousPlanData.price
+              //     ? owner.adCredits + selectedPlan.commonAd
+              //     : owner.adCredits - selectedPlan.commonAd
 
               newHighlightCredits =
                 selectedPlan.price > previousPlanData.price
@@ -1152,7 +1146,7 @@ export class CreateProperty_Service {
 
       const subscriptionId = paymentData.subscriptionId
 
-      const { data } = await axios.post(
+      await axios.post(
         `${process.env.PAYMENT_URL}/payment/update-subscription/${subscriptionId}`,
         {
           value: price,
@@ -1165,10 +1159,6 @@ export class CreateProperty_Service {
             access_token: process.env.ASAAS_API_KEY || '',
           },
         },
-      )
-      console.log(
-        '🚀 ~ CreateProperty_Service ~ updateSubscription ~ data:',
-        data,
       )
     } catch (error) {
       this.logger.error({
@@ -1274,56 +1264,60 @@ export class CreateProperty_Service {
         newAdCredits = owner.adCredits - 1
       }
 
-      // Buscar data de vencimento;
-      const { data } = await axios.get(
-        `${process.env.PAYMENT_URL}/payment/subscription/${paymentData?.subscriptionId}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            access_token: process.env.ASAAS_API_KEY || '',
-          },
-          timeout: 3000000,
-        },
-      )
-
-      const updateDate = new Date(data.nextDueDate)
-
-      // Lógica de mudança de créditos imediata;
-      updatedOwner = {
-        ...owner,
-        adCredits: newAdCredits,
-        highlightCredits: newHighlightCredits,
-        planTransitionStatus: 'processing',
-      }
-
-      // Verificar se já existe um cron job com este ID
-      if (this.schedulerRegistry.doesExist('cron', _id.toString())) {
-        // Se existe, deletar o cron job atual
-        this.schedulerRegistry.deleteCronJob(_id.toString())
-        this.logger.debug(`Job anterior para o anunciante ${_id} deletado`)
-      }
-
-      // Criar novo cron job
-      const job = new CronJob(updateDate, async () => {
-        await this.ownerModel.updateOne(
-          { _id },
+      if (paymentData?.customerId) {
+        // Buscar data de vencimento;
+        const { data } = await axios.get(
+          `${process.env.PAYMENT_URL}/payment/subscription/${paymentData?.subscriptionId}`,
           {
-            $set: {
-              adCredits: newAdCredits - owner.adCredits,
-              highlightCredits: newHighlightCredits - owner.highlightCredits,
-              planTransitionStatus: 'complete',
+            headers: {
+              'Content-Type': 'application/json',
+              access_token: process.env.ASAAS_API_KEY || '',
             },
+            timeout: 3000000,
           },
         )
-        this.logger.debug(`Anunciante ${_id} atualizado`)
-        this.schedulerRegistry.deleteCronJob(_id.toString()) // remove o job após execução
-      })
 
-      this.schedulerRegistry.addCronJob(_id.toString(), job)
-      job.start()
-      this.logger.debug(
-        `Job para o anunciante ${_id} agendado para: ${updateDate}`,
-      )
+        const updateDate = new Date(data.nextDueDate)
+
+        // Lógica de mudança de créditos imediata;
+        updatedOwner = {
+          ...owner,
+          adCredits: newAdCredits,
+          highlightCredits: newHighlightCredits,
+          planTransitionStatus: 'processing',
+        }
+
+        // Verificar se já existe um cron job com este ID
+        if (this.schedulerRegistry.doesExist('cron', _id.toString())) {
+          // Se existe, deletar o cron job atual
+          this.schedulerRegistry.deleteCronJob(_id.toString())
+          this.logger.debug(`Job anterior para o anunciante ${_id} deletado`)
+        }
+
+        // Criar novo cron job
+        const job = new CronJob(updateDate, async () => {
+          await this.ownerModel.updateOne(
+            { _id },
+            {
+              $set: {
+                adCredits: newAdCredits - owner.adCredits,
+                highlightCredits: newHighlightCredits - owner.highlightCredits,
+                planTransitionStatus: 'complete',
+              },
+            },
+          )
+          this.logger.debug(`Anunciante ${_id} atualizado`)
+          this.schedulerRegistry.deleteCronJob(_id.toString()) // remove o job após execução
+        })
+
+        this.schedulerRegistry.addCronJob(_id.toString(), job)
+        job.start()
+        this.logger.debug(
+          `Job para o anunciante ${_id} agendado para: ${updateDate}`,
+        )
+      } else {
+        updatedOwner.adCredits = newAdCredits
+      }
 
       return updatedOwner
     } catch (error) {
