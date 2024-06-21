@@ -25,6 +25,8 @@ import axios from 'axios'
 import { FindByUsernameDto } from './dto/find-by-username.dto'
 import { IPlan, PlanModelName } from 'common/schemas/Plan.schema'
 import { CouponModelName, ICoupon } from 'common/schemas/Coupon.schema'
+import { generateRandomString } from 'common/utils/generateRandomPassword'
+import { sendEmailVerificationCode } from 'common/utils/email/emailHandler'
 
 export type FindUserByOwnerOut = {
   owner: IOwner
@@ -775,6 +777,7 @@ export class UsersService {
       let encryptedPassword
       let planData
       let plusPlan
+
       const plans = await this.planModel.find().lean()
       const freePlan = plans.find(e => e.name === 'Free')
 
@@ -785,18 +788,7 @@ export class UsersService {
         plusPlan = plans.find(e => e.name === 'Locale Plus')
       }
 
-      // USER
-      const userExists = await this.userModel.findOne({ _id: userId }).lean()
-
-      if (!userExists || !userExists.isActive) {
-        throw new NotFoundException(
-          `Usuário com o id: ${userId} não foi encontrado`,
-        )
-      }
-
-      const user = userExists
-
-      updatedUser = await this.handleEditUser(user, body)
+      updatedUser = await this.handleEditUser(userId, body)
 
       // PASSWORD
       if (body.password) {
@@ -892,7 +884,7 @@ export class UsersService {
 
       // Atualiza o User;
       await this.userModel.updateOne(
-        { _id: user._id },
+        { _id: updatedUser._id },
         { $set: updatedUser },
         { session },
       )
@@ -962,7 +954,7 @@ export class UsersService {
     }
   }
 
-  async handleEditUser(user: any, body: EditUserDto) {
+  async handleEditUser(userId: Schema.Types.ObjectId, body: EditUserDto) {
     try {
       const {
         username: userName,
@@ -972,7 +964,20 @@ export class UsersService {
         phone,
         cellPhone,
       } = body.user
-      const updatedUser = { ...user }
+
+      let updatedUser;
+
+      // Verifica se há um usuário com o id passado;
+      const userExists: IUser = await this.userModel.findOne({ _id: userId }).lean()
+
+      if (!userExists || !userExists.isActive) {
+        throw new NotFoundException(
+          `Usuário com o id: ${userId} não foi encontrado`,
+        )
+      }
+
+      // Verifica se o email informado para edição já está vinculado a outra conta;
+      updatedUser = await this.handleEditEmail(userExists, email);
 
       updatedUser.username = userName
       updatedUser.email = email
@@ -1197,6 +1202,39 @@ export class UsersService {
       const formattedDate = `${year}-${month}-${day}`
 
       return formattedDate
+    } catch (error) {
+      throw new Error(`${error}`)
+    }
+  }
+
+  async handleEditEmail(user: IUser, email: string) {
+    try {
+      const { email: prevEmail } = user;
+
+      let updatedUser = user;
+
+      const isUsed = await this.userModel.findOne({ email });
+
+      if (isUsed && isUsed.email !== prevEmail) {
+        throw new BadRequestException(`Já há uma conta viculada ao e-mail informado.`)
+      }
+
+      // Se for novo email, envia um código de verificação e desloga o usuário;
+      if (email !== prevEmail) {
+        const emailVerificationCode = generateRandomString();
+        const emailVerificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000)
+
+        await sendEmailVerificationCode(email, emailVerificationCode);
+
+        updatedUser = {
+          ...user,
+          emailVerificationCode,
+          emailVerificationExpiry,
+          isEmailVerified: false
+        }
+      }
+
+      return updatedUser;
     } catch (error) {
       throw new Error(`${error}`)
     }
