@@ -570,7 +570,6 @@ export class CreateProperty_Service {
       selectedPlanId = previousPlanData?._id
     }
 
-    let newAdCredits
     let newHighlightCredits
 
     if (creditCardData !== undefined) {
@@ -874,18 +873,13 @@ export class CreateProperty_Service {
 
             // Condicional dos créditos para casos em que já havia um plano anterior ou não;
             if (!previousPlanData) {
-              newAdCredits = selectedPlan.commonAd
+              // newAdCredits = selectedPlan.commonAd
               newHighlightCredits = selectedPlan.highlightAd
             } else if (ownerActualPlanString !== planIdString) {
-              newAdCredits =
-                selectedPlan.price > previousPlanData.price
-                  ? owner.adCredits + selectedPlan.commonAd
-                  : owner.adCredits - selectedPlan.commonAd
-
-              console.log(
-                '🚀 ~ CreateProperty_Service ~ newAdCredits:',
-                newAdCredits,
-              )
+              // newAdCredits =
+              //   selectedPlan.price > previousPlanData.price
+              //     ? owner.adCredits + selectedPlan.commonAd
+              //     : owner.adCredits - selectedPlan.commonAd
 
               newHighlightCredits =
                 selectedPlan.price > previousPlanData.price
@@ -1152,7 +1146,7 @@ export class CreateProperty_Service {
 
       const subscriptionId = paymentData.subscriptionId
 
-      const { data } = await axios.post(
+      await axios.post(
         `${process.env.PAYMENT_URL}/payment/update-subscription/${subscriptionId}`,
         {
           value: price,
@@ -1165,10 +1159,6 @@ export class CreateProperty_Service {
             access_token: process.env.ASAAS_API_KEY || '',
           },
         },
-      )
-      console.log(
-        '🚀 ~ CreateProperty_Service ~ updateSubscription ~ data:',
-        data,
       )
     } catch (error) {
       this.logger.error({

@@ -6,7 +6,10 @@ import {
   LocationModelName,
   LocationSchema,
 } from 'common/schemas/Location.schema'
-import { PropertyModelName, PropertySchema } from 'common/schemas/Property.schema'
+import {
+  PropertyModelName,
+  PropertySchema,
+} from 'common/schemas/Property.schema'
 
 @Module({
   imports: [

@@ -19,9 +19,9 @@ export class LocationService {
 
   async findAll(): Promise<ILocation[]> {
     try {
-      this.logger.log({}, 'start findAll > [location service]');
+      this.logger.log({}, 'start findAll > [location service]')
 
-      let activeCities = []
+      const activeCities = []
 
       const cities = (await this.locationModel.find().lean()) as ILocation[]
 

@@ -93,7 +93,6 @@ export class PropertyService {
     getPropertiesByOwner: GetPropertyParams,
     propertyId: any,
   ): Promise<IProperty> {
-    console.log('🚀 ~ PropertyService ~ propertyId:', propertyId)
     try {
       this.logger.log({}, 'start findOne Property > [property service]')
 
@@ -598,8 +597,6 @@ export class PropertyService {
           { $set: { picture: profilePicture } },
         )
       }
-
-      console.log('🚀 ~ PropertyService ~ propertyId:', typeof propertyId)
 
       if (typeof propertyId !== 'object') {
         await this.propertyModel.updateOne(

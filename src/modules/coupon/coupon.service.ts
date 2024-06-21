@@ -37,9 +37,9 @@ export class CouponService {
     try {
       this.logger.log({}, 'start create coupon > [service]')
 
-      const code = await generateRandomString();
+      const code = await generateRandomString()
 
-      const formattedCoupon = `LOCALE-${code}`;
+      const formattedCoupon = `LOCALE-${code}`
 
       const coupon = await this.couponModel.create({
         coupon: formattedCoupon,

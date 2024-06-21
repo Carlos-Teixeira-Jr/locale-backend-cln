@@ -92,10 +92,14 @@ export class PropertyFilter_Service {
 
     filter.forEach(obj => {
       if (obj.adType) {
-        allFilters.push({ adType: new RegExp(normalizeString(obj.adType), 'i') })
+        allFilters.push({
+          adType: new RegExp(normalizeString(obj.adType), 'i'),
+        })
       }
       if (obj.adSubtype) {
-        allFilters.push({ adSubtype: new RegExp(normalizeString(obj.adSubtype)) })
+        allFilters.push({
+          adSubtype: new RegExp(normalizeString(obj.adSubtype)),
+        })
       }
       if (obj.propertyType) {
         allFilters.push({
@@ -105,10 +109,14 @@ export class PropertyFilter_Service {
         })
       }
       if (obj.propertySubtype) {
-        allFilters.push({ propertySubtype: new RegExp(normalizeString(obj.propertySubtype)) })
+        allFilters.push({
+          propertySubtype: new RegExp(normalizeString(obj.propertySubtype)),
+        })
       }
       if (obj.announcementCode) {
-        allFilters.push({ announcementCode: new RegExp(normalizeString(obj.announcementCode)) })
+        allFilters.push({
+          announcementCode: new RegExp(normalizeString(obj.announcementCode)),
+        })
       }
       if (obj.bedroom) {
         allFilters.push({
@@ -236,7 +244,9 @@ export class PropertyFilter_Service {
           if (name && category) {
             const query = {
               [`address.${category}`]: {
-                $in: name.map((n: string) => new RegExp(normalizeString(n), 'i')),
+                $in: name.map(
+                  (n: string) => new RegExp(normalizeString(n), 'i'),
+                ),
               },
             }
             orQuery.push(query)
