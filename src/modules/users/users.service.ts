@@ -95,6 +95,22 @@ export type UpdateSubscriptionBody = {
   creditCardHolderInfo?: CreditCardHolderInfo
 }
 
+interface Owner {
+  name?: string;
+  phone?: string;
+  cellPhone?: string;
+  wwpNumber?: string;
+  picture?: string;
+  creci?: string;
+  notifications?: any[];
+  plan?: Schema.Types.ObjectId;
+  userId?: string;
+  highlightCredits?: number;
+  adCredits?: number;
+  isActive?: boolean;
+  paymentData?: any;
+}
+
 const paymentUrl = process.env.PAYMENT_URL
 @Injectable()
 export class UsersService {
@@ -809,9 +825,9 @@ export class UsersService {
         isChangePlan,
       )
 
-      const newOwner = ownerExists
+      let newOwner = ownerExists
 
-      const coupon = body?.coupon
+      const coupon = body?.coupon;
 
       // PAYMENT DATA
       if (!coupon) {
@@ -871,15 +887,11 @@ export class UsersService {
           }
         }
       } else {
-        const newPaymentData = await this.handleCoupon(
+        newOwner = await this.handleCoupon(
           coupon,
-          newOwner?.paymentData,
+          body.user,
+          newOwner,
         )
-
-        newOwner.adCredits = plusPlan.commonAd
-        newOwner.highlightCredits = plusPlan.highlightAd
-        newOwner.plan = plusPlan._id
-        newOwner.paymentData = newPaymentData
       }
 
       // Atualiza o User;
@@ -887,10 +899,10 @@ export class UsersService {
         { _id: updatedUser._id },
         { $set: updatedUser },
         { session },
-      )
+      );
 
       // Atualiza o owner;
-      if (!body.owner?._id && isChangePlan) {
+      if (!body.owner?._id && isChangePlan || !body.owner?._id && coupon) {
         await this.ownerModel.create([newOwner], { session })
       } else {
         if (isChangePlan) {
@@ -915,12 +927,14 @@ export class UsersService {
     }
   }
 
-  async handleCoupon(coupon: string, paymentData: any) {
+  async handleCoupon(coupon: string, user: any, owner?: any) {
     try {
-      const { subscriptionId } = paymentData
-      let newPaymentData
+      const paymentData = owner?.paymentData;
+      const { userName, id: userId } = user;
+      let newPaymentData;
+      let updatedOwner: Owner = {};
 
-      const couponData = await this.couponModel.findOne({ coupon }).lean()
+      const couponData = await this.couponModel.findOne({ coupon }).lean();
 
       if (!couponData || !couponData.isActive) {
         throw new BadRequestException(`Cupom de desconto inválido.`)
@@ -931,11 +945,28 @@ export class UsersService {
         { $set: { isActive: false } },
       )
 
-      if (!subscriptionId) {
+      if (!paymentData) {
+        updatedOwner = {
+          name: userName,
+          phone: '',
+          cellPhone: '',
+          wwpNumber: '',
+          picture: '',
+          creci: '',
+          notifications: [],
+          plan: couponData?.plan,
+          userId,
+          highlightCredits: couponData?.highlightAd,
+          adCredits: couponData?.commonAd,
+          isActive: true,
+        }
+      }
+
+      if (!paymentData?.subscriptionId) {
         newPaymentData = {}
       } else {
         await axios.delete(
-          `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
+          `${process.env.PAYMENT_URL}/payment/subscription/${paymentData.subscriptionId}`,
           {
             method: 'DELETE',
             headers: {
@@ -948,7 +979,14 @@ export class UsersService {
         newPaymentData = {}
       }
 
-      return newPaymentData
+      if (updatedOwner && Object.keys(updatedOwner).length > 0) {
+        updatedOwner.paymentData = newPaymentData;
+      } else if (owner) {
+        owner.paymentData = newPaymentData;
+        updatedOwner = owner;
+      }
+
+      return updatedOwner
     } catch (error) {
       throw new Error(`${error}`)
     }

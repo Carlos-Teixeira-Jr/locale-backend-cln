@@ -1,8 +1,9 @@
-import { Controller, Get, LoggerService, Param, Post } from '@nestjs/common'
+import { Body, Controller, Get, LoggerService, Param, Post } from '@nestjs/common'
 import { ApiOperation, ApiTags } from '@nestjs/swagger'
 import { CouponService } from './coupon.service'
 import { ICoupon } from 'common/schemas/Coupon.schema'
 import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
+import { CouponDto } from './dto/coupon.dto'
 
 @ApiTags('coupons')
 @Controller('coupon')
@@ -29,9 +30,9 @@ export class CouponController {
   @ApiOperation({
     summary: 'Create a coupon on database.',
   })
-  async createCoupon(): Promise<ICoupon> {
+  async createCoupon(@Body() couponDto: CouponDto): Promise<ICoupon> {
     this.logger.log({}, 'start create coupon > [controller]')
-    const createdCoupon = await this.couponService.createCoupon()
+    const createdCoupon = await this.couponService.createCoupon(couponDto)
 
     return createdCoupon
   }
