@@ -14,6 +14,8 @@ import { ObjectId } from 'mongodb'
 import { CreditsDto, IncreaseCreditsDto } from './dto/increase-credits.dto'
 import axios, { AxiosResponse } from 'axios'
 import { IPlan, PlanModelName } from 'common/schemas/Plan.schema'
+import { UserData } from 'modules/property/dto/create-property.dto'
+import { IUser, UserModelName } from 'common/schemas/User.schema'
 
 type HandleUpdateSubscription = {
   success: boolean
@@ -32,6 +34,8 @@ export class PaymentService {
     private readonly ownerModel: Model<IOwner>,
     @InjectModel(PlanModelName)
     private readonly planModel: Model<IPlan>,
+    @InjectModel(UserModelName)
+    private readonly userModel: Model<IUser>,
   ) {}
 
   private async startSession() {
@@ -117,11 +121,24 @@ export class PaymentService {
 
       const paymentData = owner.paymentData
 
-      if (!paymentData?.subscriptionId) {
-        // Faz a assinatura;
-        try {
+      if (!paymentData?.customerId) {
+        // Registra o cliente junto a API de pagamentos;
+        const user: UserData = await this.userModel
+          .findById(owner.userId)
+          .lean()
+
+        if (!user) {
+          throw new BadRequestException(
+            `Nenhum usuário encontrado com o id ${owner.userId}.`,
+          )
+        }
+
+        const updatedOwner = await this.handleCustomer(owner, user)
+
+        if (!paymentData?.subscriptionId) {
+          // Faz a assinatura;
           const response = await this.handleCreateSubscription(
-            owner,
+            updatedOwner,
             commonCredits,
             highlightCredits,
           )
@@ -133,40 +150,87 @@ export class PaymentService {
             session,
             upsert: true,
           })
-        } catch (error) {
-          throw new BadRequestException(
-            `Não foi possível criar a assinatura do anunciante. Erro: ${error}`,
-          )
-        }
-      } else {
-        // Atualizar a subscription do usuário;
-        const { success } = await this.handleUpdateSubscription(
-          paymentData,
-          commonCredits,
-          highlightCredits,
-        )
-
-        // Atualiza a quantidade de créditos do usuário
-        if (success) {
-          const updateCredits = await this.ownerModel.updateOne(
-            {
-              _id: ownerId,
-            },
-            {
-              adCredits: owner.adCredits + commonCredits[0].amount,
-              highlightCredits:
-                owner.highlightCredits + highlightCredits[0].amount,
-            },
-            { session },
+        } else {
+          // Atualizar a subscription do usuário;
+          const { success } = await this.handleUpdateSubscription(
+            paymentData,
+            commonCredits,
+            highlightCredits,
           )
 
-          if (updateCredits.modifiedCount <= 0) {
-            throw new Error(
-              `Não foi possível atualizar os créditos do proprietário.`,
+          // Atualiza a quantidade de créditos do usuário
+          if (success) {
+            const updateCredits = await this.ownerModel.updateOne(
+              {
+                _id: ownerId,
+              },
+              {
+                adCredits: owner.adCredits + commonCredits[0].amount,
+                highlightCredits:
+                  owner.highlightCredits + highlightCredits[0].amount,
+              },
+              { session },
             )
+
+            if (updateCredits.modifiedCount <= 0) {
+              throw new Error(
+                `Não foi possível atualizar os créditos do proprietário.`,
+              )
+            }
           }
         }
       }
+
+      // if (!paymentData?.subscriptionId) {
+      //   // Faz a assinatura;
+      //   try {
+      //     const response = await this.handleCreateSubscription(
+      //       owner,
+      //       commonCredits,
+      //       highlightCredits,
+      //     )
+
+      //     // Converte o documento Mongoose em objeto simples
+      //     const plainOwner = response.updatedOwner
+
+      //     await this.ownerModel.updateOne({ _id: owner._id }, plainOwner, {
+      //       session,
+      //       upsert: true,
+      //     })
+      //   } catch (error) {
+      //     throw new BadRequestException(
+      //       `Não foi possível criar a assinatura do anunciante. Erro: ${error}`,
+      //     )
+      //   }
+      // } else {
+      //   // Atualizar a subscription do usuário;
+      //   const { success } = await this.handleUpdateSubscription(
+      //     paymentData,
+      //     commonCredits,
+      //     highlightCredits,
+      //   )
+
+      //   // Atualiza a quantidade de créditos do usuário
+      //   if (success) {
+      //     const updateCredits = await this.ownerModel.updateOne(
+      //       {
+      //         _id: ownerId,
+      //       },
+      //       {
+      //         adCredits: owner.adCredits + commonCredits[0].amount,
+      //         highlightCredits:
+      //           owner.highlightCredits + highlightCredits[0].amount,
+      //       },
+      //       { session },
+      //     )
+
+      //     if (updateCredits.modifiedCount <= 0) {
+      //       throw new Error(
+      //         `Não foi possível atualizar os créditos do proprietário.`,
+      //       )
+      //     }
+      //   }
+      // }
 
       await session.commitTransaction()
 
@@ -285,7 +349,7 @@ export class PaymentService {
       const commonCreditsPrice = process.env.COMMON_CREDITS_PRICE
       const highlightCreditsPrice = process.env.HIGHLIGHT_CREDITS_PRICE
 
-      let updatedOwner
+      let updatedOwner = owner
 
       const totalCommonCreditsPrice =
         commonCredits[0].amount * Number(commonCreditsPrice)
@@ -300,16 +364,73 @@ export class PaymentService {
       const day = currentDate.getDate().toString().padStart(2, '0')
       const formattedDate = `${year}-${month}-${day}`
 
-      try {
-        const newSubscription = await axios.post(
-          `${process.env.PAYMENT_URL}/payment/subscription`,
+      if (!paymentData?.creditCardInfo) {
+        throw new BadRequestException(
+          `O usuário não tem um cartão de crédito cadastrado.`,
+        )
+      }
+
+      const { data } = await axios.post(
+        `${process.env.PAYMENT_URL}/payment/subscription`,
+        {
+          customer: paymentData.customerId,
+          value: newCreditsPrice,
+          nextDueDate: formattedDate,
+          billingType: 'CREDIT_CARD',
+          cycle: 'MONTHLY',
+          creditCardToken: paymentData.creditCardInfo.creditCardToken,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            access_token: process.env.ASAAS_API_KEY || '',
+          },
+        },
+      )
+
+      const subscriptionId = data.id
+
+      // Atualiza o owner;
+      updatedOwner = {
+        ...owner,
+        adCredits: adCredits + commonCredits?.length,
+        highlightCredits: prevHighlightCredits + highlighCredits?.length,
+        paymentData: {
+          ...owner.paymentData,
+          subscriptionId,
+        },
+      }
+
+      return updatedOwner
+    } catch (error) {
+      this.logger.error({
+        error: JSON.stringify(error),
+        exception: '> exception',
+      })
+      throw error
+    }
+  }
+
+  private async handleCustomer(owner: any, userData: any) {
+    try {
+      let cpfCnpj: string
+      const { address, email, cpf, cellPhone: phone, username: name } = userData
+      const { paymentData } = owner
+      let updatedOwner = owner
+
+      if (!paymentData?.customerId) {
+        cpfCnpj = cpf
+        // Cadastrar customer no payment api;
+        const { data } = await axios.post(
+          `${process.env.PAYMENT_URL}/customer`,
           {
-            customer: paymentData.customerId,
-            value: newCreditsPrice,
-            nextDueDate: formattedDate,
-            billingType: 'CREDIT_CARD',
-            cycle: 'MONTHLY',
-            creditCardToken: paymentData.creditCardInfo.creditCardToken,
+            name,
+            email,
+            phone,
+            postalCode: address.zipCode,
+            description: 'Confirmação de criação de id de cliente',
+            cpfCnpj,
+            addressNumber: address.streetNumber,
           },
           {
             headers: {
@@ -319,32 +440,22 @@ export class PaymentService {
           },
         )
 
-        const subscriptionData = newSubscription.data
-        const subscriptionId = subscriptionData.id
-
-        // Atualiza o owner;
         updatedOwner = {
           ...owner,
-          adCredits: adCredits + commonCredits?.length,
-          highlightCredits: prevHighlightCredits + highlighCredits?.length,
           paymentData: {
             ...owner.paymentData,
-            subscriptionId,
+            customerId: data.id,
+            cpfCnpj,
           },
         }
 
-        return { updatedOwner }
-      } catch (error) {
-        throw new BadRequestException(
-          `Não foi possível criar a assinatura para este anunciante. Erro: ${error}`,
-        )
+        return updatedOwner
       }
     } catch (error) {
-      this.logger.error({
-        error: JSON.stringify(error),
-        exception: '> exception',
-      })
-      throw error
+      throw new BadRequestException(
+        `Houve um problema ao tentar acessar a API de pagamentos:`,
+        error,
+      )
     }
   }
 }

@@ -5,6 +5,7 @@ import { MongooseModule } from '@nestjs/mongoose'
 import { PaymentModelName, PaymentSchema } from 'common/schemas/Payment.schema'
 import { OwnerModelName, OwnerSchema } from 'common/schemas/Owner.schema'
 import { PlanModelName, PlanSchema } from 'common/schemas/Plan.schema'
+import { UserModelName, UserSchema } from 'common/schemas/User.schema'
 
 @Module({
   imports: [
@@ -20,6 +21,10 @@ import { PlanModelName, PlanSchema } from 'common/schemas/Plan.schema'
       {
         name: PlanModelName,
         schema: PlanSchema,
+      },
+      {
+        name: UserModelName,
+        schema: UserSchema,
       },
     ]),
   ],
