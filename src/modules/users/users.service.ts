@@ -1,4 +1,5 @@
-// @typescript-eslint/no-unused-vars
+/* eslint-disable prefer-const */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import mongoose, { Model, Schema } from 'mongoose'
 import {
   BadRequestException,
@@ -95,20 +96,20 @@ export type UpdateSubscriptionBody = {
   creditCardHolderInfo?: CreditCardHolderInfo
 }
 
-interface Owner {
-  name?: string;
-  phone?: string;
-  cellPhone?: string;
-  wwpNumber?: string;
-  picture?: string;
-  creci?: string;
-  notifications?: any[];
-  plan?: Schema.Types.ObjectId;
-  userId?: string;
-  highlightCredits?: number;
-  adCredits?: number;
-  isActive?: boolean;
-  paymentData?: any;
+interface IOwnerData {
+  name?: string
+  phone?: string
+  cellPhone?: string
+  wwpNumber?: string
+  picture?: string
+  creci?: string
+  notifications?: any[]
+  plan?: Schema.Types.ObjectId
+  userId?: string
+  highlightCredits?: number
+  adCredits?: number
+  isActive?: boolean
+  paymentData?: any
 }
 
 const paymentUrl = process.env.PAYMENT_URL
@@ -801,7 +802,7 @@ export class UsersService {
         planData = plans.find(
           e => e._id.toString() === body.owner.plan.toString(),
         )
-        plusPlan = plans.find(e => e.name === 'Locale Plus')
+        //plusPlan = plans.find(e => e.name === 'Locale Plus')
       }
 
       updatedUser = await this.handleEditUser(userId, body)
@@ -827,7 +828,7 @@ export class UsersService {
 
       let newOwner = ownerExists
 
-      const coupon = body?.coupon;
+      const coupon = body?.coupon
 
       // PAYMENT DATA
       if (!coupon) {
@@ -887,11 +888,7 @@ export class UsersService {
           }
         }
       } else {
-        newOwner = await this.handleCoupon(
-          coupon,
-          body.user,
-          newOwner,
-        )
+        newOwner = await this.handleCoupon(coupon, body.user, newOwner)
       }
 
       // Atualiza o User;
@@ -899,10 +896,10 @@ export class UsersService {
         { _id: updatedUser._id },
         { $set: updatedUser },
         { session },
-      );
+      )
 
       // Atualiza o owner;
-      if (!body.owner?._id && isChangePlan || !body.owner?._id && coupon) {
+      if ((!body.owner?._id && isChangePlan) || (!body.owner?._id && coupon)) {
         await this.ownerModel.create([newOwner], { session })
       } else {
         if (isChangePlan) {
@@ -929,12 +926,12 @@ export class UsersService {
 
   async handleCoupon(coupon: string, user: any, owner?: any) {
     try {
-      const paymentData = owner?.paymentData;
-      const { userName, id: userId } = user;
-      let newPaymentData;
-      let updatedOwner: Owner = {};
+      const paymentData = owner?.paymentData
+      const { userName, id: userId } = user
+      let newPaymentData
+      let updatedOwner: IOwnerData = {}
 
-      const couponData = await this.couponModel.findOne({ coupon }).lean();
+      const couponData = await this.couponModel.findOne({ coupon }).lean()
 
       if (!couponData || !couponData.isActive) {
         throw new BadRequestException(`Cupom de desconto inválido.`)
@@ -980,10 +977,10 @@ export class UsersService {
       }
 
       if (updatedOwner && Object.keys(updatedOwner).length > 0) {
-        updatedOwner.paymentData = newPaymentData;
+        updatedOwner.paymentData = newPaymentData
       } else if (owner) {
-        owner.paymentData = newPaymentData;
-        updatedOwner = owner;
+        owner.paymentData = newPaymentData
+        updatedOwner = owner
       }
 
       return updatedOwner
@@ -1003,10 +1000,12 @@ export class UsersService {
         cellPhone,
       } = body.user
 
-      let updatedUser;
+      let updatedUser
 
       // Verifica se há um usuário com o id passado;
-      const userExists: IUser = await this.userModel.findOne({ _id: userId }).lean()
+      const userExists: IUser = await this.userModel
+        .findOne({ _id: userId })
+        .lean()
 
       if (!userExists || !userExists.isActive) {
         throw new NotFoundException(
@@ -1015,7 +1014,7 @@ export class UsersService {
       }
 
       // Verifica se o email informado para edição já está vinculado a outra conta;
-      updatedUser = await this.handleEditEmail(userExists, email);
+      updatedUser = await this.handleEditEmail(userExists, email)
 
       updatedUser.username = userName
       updatedUser.email = email
@@ -1247,32 +1246,36 @@ export class UsersService {
 
   async handleEditEmail(user: IUser, email: string) {
     try {
-      const { email: prevEmail } = user;
+      const { email: prevEmail } = user
 
-      let updatedUser = user;
+      let updatedUser = user
 
-      const isUsed = await this.userModel.findOne({ email });
+      const isUsed = await this.userModel.findOne({ email })
 
       if (isUsed && isUsed.email !== prevEmail) {
-        throw new BadRequestException(`Já há uma conta viculada ao e-mail informado.`)
+        throw new BadRequestException(
+          `Já há uma conta viculada ao e-mail informado.`,
+        )
       }
 
       // Se for novo email, envia um código de verificação e desloga o usuário;
       if (email !== prevEmail) {
-        const emailVerificationCode = generateRandomString();
-        const emailVerificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000)
+        const emailVerificationCode = generateRandomString()
+        const emailVerificationExpiry = new Date(
+          Date.now() + 24 * 60 * 60 * 1000,
+        )
 
-        await sendEmailVerificationCode(email, emailVerificationCode);
+        await sendEmailVerificationCode(email, emailVerificationCode)
 
         updatedUser = {
           ...user,
           emailVerificationCode,
           emailVerificationExpiry,
-          isEmailVerified: false
+          isEmailVerified: false,
         }
       }
 
-      return updatedUser;
+      return updatedUser
     } catch (error) {
       throw new Error(`${error}`)
     }

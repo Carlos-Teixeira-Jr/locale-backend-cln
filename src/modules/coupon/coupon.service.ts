@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, LoggerService, NotFoundException } from '@nestjs/common'
+import {
+  BadRequestException,
+  Injectable,
+  LoggerService,
+  NotFoundException,
+} from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { CouponModelName, ICoupon } from 'common/schemas/Coupon.schema'
 import { generateRandomString } from 'common/utils/generateRandomPassword'
@@ -26,8 +31,12 @@ export class CouponService {
         coupon: couponCode,
       })
 
-      if (!coupon || !coupon.isActive) {
+      if (!coupon) {
         throw new BadRequestException('Cupom de desconto inválido.')
+      }
+
+      if (!coupon.isActive) {
+        throw new BadRequestException('Cupom de desconto já utilizado.')
       }
 
       return coupon
@@ -39,19 +48,17 @@ export class CouponService {
 
   async createCoupon(couponDto: CouponDto): Promise<ICoupon> {
     try {
-      this.logger.log({}, 'start create coupon > [service]');
+      this.logger.log({}, 'start create coupon > [service]')
 
-      const {
-        plan,
-        commonAd,
-        highlightAd,
-      } = couponDto;
+      const { plan, commonAd, highlightAd } = couponDto
 
       const code = await generateRandomString()
 
-      const formattedCoupon = `LOCALE-${code}`;
+      const formattedCoupon = `LOCALE-${code}`
 
-      const planData: IPlan = await this.planModel.findOne({ name: plan }).lean();
+      const planData: IPlan = await this.planModel
+        .findOne({ name: plan })
+        .lean()
 
       if (!planData) {
         throw new NotFoundException(`Não há nenhum plano com o nome ${plan}.`)

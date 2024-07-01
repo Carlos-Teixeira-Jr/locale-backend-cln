@@ -1,6 +1,4 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString, Validate } from "class-validator";
-import { IDValidator } from "common/validators/ID.validator";
-import { Schema } from "mongoose";
+import { IsNumber, IsOptional, IsString } from 'class-validator'
 
 export class CouponDto {
   @IsOptional()
