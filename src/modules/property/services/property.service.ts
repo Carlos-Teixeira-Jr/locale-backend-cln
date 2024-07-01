@@ -272,12 +272,14 @@ export class PropertyService {
           opt,
         )
 
-        // OWNER recebe de volta o crédito correspondente ao imóvel que desativou;
-        await this.ownerModel.updateOne(
-          { userId: userId },
-          { $set: { adCredits: propertyOwner.adCredits + 1 } },
-          opt,
-        )
+        if (propertyOwner.adCredits < 900) {
+          // OWNER recebe de volta o crédito correspondente ao imóvel que desativou;
+          await this.ownerModel.updateOne(
+            { userId: userId },
+            { $set: { adCredits: propertyOwner.adCredits + 1 } },
+            opt,
+          )
+        }
       } else {
         // Ativar
         if (!propertyOwner.adCredits || propertyOwner.adCredits <= 0) {
@@ -291,12 +293,14 @@ export class PropertyService {
             opt,
           )
 
-          // OWNER gasta um crédito referente ao imóvel que está ativando;
-          await this.ownerModel.updateOne(
-            { userId: userId },
-            { $set: { adCredits: propertyOwner.adCredits - 1 } },
-            opt,
-          )
+          if (propertyOwner.adCredits < 900) {
+            // OWNER gasta um crédito referente ao imóvel que está ativando;
+            await this.ownerModel.updateOne(
+              { userId: userId },
+              { $set: { adCredits: propertyOwner.adCredits - 1 } },
+              opt,
+            )
+          }
         }
       }
 

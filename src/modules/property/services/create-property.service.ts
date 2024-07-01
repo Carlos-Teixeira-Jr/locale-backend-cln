@@ -173,7 +173,11 @@ export class CreateProperty_Service {
             }
           }
         } else {
-          updatedOwner.adCredits = updatedOwner.adCredits - 1
+          if (!updatedOwner) {
+            updatedOwner = owner
+          } else {
+            updatedOwner.adCredits = updatedOwner.adCredits - 1
+          }
         }
       } else {
         if (!isPlanFree) {

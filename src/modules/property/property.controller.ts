@@ -104,7 +104,7 @@ export class PropertyController {
   async propertyActivation(
     @Body() propertyActivationDto: PropertyActivationDto,
   ) {
-    this.logger.log({}, 'start propertyActivation > [controller]')
+    this.logger.log({}, 'start propertyActivation > [property controller]')
     return this.propertyService.propertyActivation(propertyActivationDto)
   }
 

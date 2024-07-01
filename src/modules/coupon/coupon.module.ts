@@ -3,6 +3,7 @@ import { CouponController } from './coupon.controller'
 import { CouponService } from './coupon.service'
 import { MongooseModule } from '@nestjs/mongoose'
 import { CouponModelName, CouponSchema } from 'common/schemas/Coupon.schema'
+import { PlanModelName, PlanSchema } from 'common/schemas/Plan.schema'
 
 @Module({
   imports: [
@@ -10,6 +11,10 @@ import { CouponModelName, CouponSchema } from 'common/schemas/Coupon.schema'
       {
         name: CouponModelName,
         schema: CouponSchema,
+      },
+      {
+        name: PlanModelName,
+        schema: PlanSchema,
       },
     ]),
   ],

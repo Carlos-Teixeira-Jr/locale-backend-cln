@@ -1,4 +1,5 @@
-// @typescript-eslint/no-unused-vars
+/* eslint-disable prefer-const */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import mongoose, { Model, Schema } from 'mongoose'
 import {
   BadRequestException,
@@ -25,6 +26,8 @@ import axios from 'axios'
 import { FindByUsernameDto } from './dto/find-by-username.dto'
 import { IPlan, PlanModelName } from 'common/schemas/Plan.schema'
 import { CouponModelName, ICoupon } from 'common/schemas/Coupon.schema'
+import { generateRandomString } from 'common/utils/generateRandomPassword'
+import { sendEmailVerificationCode } from 'common/utils/email/emailHandler'
 
 export type FindUserByOwnerOut = {
   owner: IOwner
@@ -91,6 +94,22 @@ export type UpdateSubscriptionBody = {
   creditCardToken?: string
   creditCard?: CreditCard
   creditCardHolderInfo?: CreditCardHolderInfo
+}
+
+interface IOwnerData {
+  name?: string
+  phone?: string
+  cellPhone?: string
+  wwpNumber?: string
+  picture?: string
+  creci?: string
+  notifications?: any[]
+  plan?: Schema.Types.ObjectId
+  userId?: string
+  highlightCredits?: number
+  adCredits?: number
+  isActive?: boolean
+  paymentData?: any
 }
 
 const paymentUrl = process.env.PAYMENT_URL
@@ -775,6 +794,7 @@ export class UsersService {
       let encryptedPassword
       let planData
       let plusPlan
+
       const plans = await this.planModel.find().lean()
       const freePlan = plans.find(e => e.name === 'Free')
 
@@ -782,21 +802,10 @@ export class UsersService {
         planData = plans.find(
           e => e._id.toString() === body.owner.plan.toString(),
         )
-        plusPlan = plans.find(e => e.name === 'Locale Plus')
+        //plusPlan = plans.find(e => e.name === 'Locale Plus')
       }
 
-      // USER
-      const userExists = await this.userModel.findOne({ _id: userId }).lean()
-
-      if (!userExists || !userExists.isActive) {
-        throw new NotFoundException(
-          `Usuário com o id: ${userId} não foi encontrado`,
-        )
-      }
-
-      const user = userExists
-
-      updatedUser = await this.handleEditUser(user, body)
+      updatedUser = await this.handleEditUser(userId, body)
 
       // PASSWORD
       if (body.password) {
@@ -817,7 +826,7 @@ export class UsersService {
         isChangePlan,
       )
 
-      const newOwner = ownerExists
+      let newOwner = ownerExists
 
       const coupon = body?.coupon
 
@@ -879,26 +888,18 @@ export class UsersService {
           }
         }
       } else {
-        const newPaymentData = await this.handleCoupon(
-          coupon,
-          newOwner?.paymentData,
-        )
-
-        newOwner.adCredits = plusPlan.commonAd
-        newOwner.highlightCredits = plusPlan.highlightAd
-        newOwner.plan = plusPlan._id
-        newOwner.paymentData = newPaymentData
+        newOwner = await this.handleCoupon(coupon, body.user, newOwner)
       }
 
       // Atualiza o User;
       await this.userModel.updateOne(
-        { _id: user._id },
+        { _id: updatedUser._id },
         { $set: updatedUser },
         { session },
       )
 
       // Atualiza o owner;
-      if (!body.owner?._id && isChangePlan) {
+      if ((!body.owner?._id && isChangePlan) || (!body.owner?._id && coupon)) {
         await this.ownerModel.create([newOwner], { session })
       } else {
         if (isChangePlan) {
@@ -923,10 +924,12 @@ export class UsersService {
     }
   }
 
-  async handleCoupon(coupon: string, paymentData: any) {
+  async handleCoupon(coupon: string, user: any, owner?: any) {
     try {
-      const { subscriptionId } = paymentData
+      const paymentData = owner?.paymentData
+      const { userName, id: userId } = user
       let newPaymentData
+      let updatedOwner: IOwnerData = {}
 
       const couponData = await this.couponModel.findOne({ coupon }).lean()
 
@@ -939,11 +942,28 @@ export class UsersService {
         { $set: { isActive: false } },
       )
 
-      if (!subscriptionId) {
+      if (!paymentData) {
+        updatedOwner = {
+          name: userName,
+          phone: '',
+          cellPhone: '',
+          wwpNumber: '',
+          picture: '',
+          creci: '',
+          notifications: [],
+          plan: couponData?.plan,
+          userId,
+          highlightCredits: couponData?.highlightAd,
+          adCredits: couponData?.commonAd,
+          isActive: true,
+        }
+      }
+
+      if (!paymentData?.subscriptionId) {
         newPaymentData = {}
       } else {
         await axios.delete(
-          `${process.env.PAYMENT_URL}/payment/subscription/${subscriptionId}`,
+          `${process.env.PAYMENT_URL}/payment/subscription/${paymentData.subscriptionId}`,
           {
             method: 'DELETE',
             headers: {
@@ -956,13 +976,20 @@ export class UsersService {
         newPaymentData = {}
       }
 
-      return newPaymentData
+      if (updatedOwner && Object.keys(updatedOwner).length > 0) {
+        updatedOwner.paymentData = newPaymentData
+      } else if (owner) {
+        owner.paymentData = newPaymentData
+        updatedOwner = owner
+      }
+
+      return updatedOwner
     } catch (error) {
       throw new Error(`${error}`)
     }
   }
 
-  async handleEditUser(user: any, body: EditUserDto) {
+  async handleEditUser(userId: Schema.Types.ObjectId, body: EditUserDto) {
     try {
       const {
         username: userName,
@@ -972,7 +999,22 @@ export class UsersService {
         phone,
         cellPhone,
       } = body.user
-      const updatedUser = { ...user }
+
+      let updatedUser
+
+      // Verifica se há um usuário com o id passado;
+      const userExists: IUser = await this.userModel
+        .findOne({ _id: userId })
+        .lean()
+
+      if (!userExists || !userExists.isActive) {
+        throw new NotFoundException(
+          `Usuário com o id: ${userId} não foi encontrado`,
+        )
+      }
+
+      // Verifica se o email informado para edição já está vinculado a outra conta;
+      updatedUser = await this.handleEditEmail(userExists, email)
 
       updatedUser.username = userName
       updatedUser.email = email
@@ -1197,6 +1239,43 @@ export class UsersService {
       const formattedDate = `${year}-${month}-${day}`
 
       return formattedDate
+    } catch (error) {
+      throw new Error(`${error}`)
+    }
+  }
+
+  async handleEditEmail(user: IUser, email: string) {
+    try {
+      const { email: prevEmail } = user
+
+      let updatedUser = user
+
+      const isUsed = await this.userModel.findOne({ email })
+
+      if (isUsed && isUsed.email !== prevEmail) {
+        throw new BadRequestException(
+          `Já há uma conta viculada ao e-mail informado.`,
+        )
+      }
+
+      // Se for novo email, envia um código de verificação e desloga o usuário;
+      if (email !== prevEmail) {
+        const emailVerificationCode = generateRandomString()
+        const emailVerificationExpiry = new Date(
+          Date.now() + 24 * 60 * 60 * 1000,
+        )
+
+        await sendEmailVerificationCode(email, emailVerificationCode)
+
+        updatedUser = {
+          ...user,
+          emailVerificationCode,
+          emailVerificationExpiry,
+          isEmailVerified: false,
+        }
+      }
+
+      return updatedUser
     } catch (error) {
       throw new Error(`${error}`)
     }
