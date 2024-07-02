@@ -785,12 +785,12 @@ export class UsersService {
     const session = await this.startSession()
     try {
       await session.startTransaction()
-      this.logger.log({ body }, 'start edit user > [user service]')
+      this.logger.log({ body }, 'start edit user > [user service]');
 
-      const { id: userId } = body.user
-      const { isChangePlan } = body
+      const { id: userId } = body.user;
+      const { isChangePlan } = body;
 
-      let updatedUser
+      let updatedUser;
       let encryptedPassword
       let planData
       let plusPlan
@@ -1056,7 +1056,7 @@ export class UsersService {
     isChangePlan: boolean,
   ) {
     try {
-      const { _id: ownerId, phone, cellPhone, wwpNumber } = owner
+      const { _id: ownerId, phone, cellPhone, wwpNumber } = owner;
       let ownerExists
       let ownerPrevPlan
 
