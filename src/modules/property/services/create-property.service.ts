@@ -192,9 +192,16 @@ export class CreateProperty_Service {
           }
           updatedOwner.paymentData.subscriptionId = ''
 
-          updatedOwner = {
-            ...updatedOwner,
-            adCredits: owner.adCredits - 1,
+          if (selectedPlan && selectedPlan._id !== ownerPreviousPlan._id) {
+            updatedOwner = {
+              ...updatedOwner,
+              adCredits: (owner.adCredits - 1) + selectedPlan.adCredits,
+            }
+          } else {
+            updatedOwner = {
+              ...updatedOwner,
+              adCredits: owner.adCredits - 1,
+            }
           }
         } else {
           if (updatedOwner.adCredits > 0) {
@@ -203,11 +210,17 @@ export class CreateProperty_Service {
         }
       }
 
-      await this.ownerModel.updateOne(
-        { _id: updatedOwner?._id },
-        { $set: updatedOwner },
-        { session },
-      )
+      if (!ownerPreviousPlan) {
+        await this.ownerModel.create([updatedOwner], {
+          session,
+        })
+      } else {
+        await this.ownerModel.updateOne(
+          { _id: updatedOwner?._id },
+          { $set: updatedOwner },
+          { session },
+        )
+      }
 
       // Deactivates the properties that the user choose in case that he changes his plan to a minor one;
       if (
@@ -419,10 +432,7 @@ export class CreateProperty_Service {
         ownerData.highlightCredits = selectedPlan.highlightAd
       }
 
-      const createdOwner = await this.ownerModel.create([ownerData], {
-        session,
-      })
-      owner = createdOwner[0].toObject()
+      owner = ownerData;
 
       if (coupon) {
         await this.couponModel.updateOne(
