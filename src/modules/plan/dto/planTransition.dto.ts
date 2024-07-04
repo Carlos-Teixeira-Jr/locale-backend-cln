@@ -35,4 +35,8 @@ export class PlanTransitionDto {
   @IsNotEmpty()
   @IsBoolean()
   isCreate: boolean
+
+  @IsNotEmpty()
+  @IsArray()
+  ownerActiveProperties: any[]
 }
