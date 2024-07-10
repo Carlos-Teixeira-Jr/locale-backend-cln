@@ -3,12 +3,14 @@ import {
   IsBoolean,
   IsNotEmpty,
   IsObject,
+  IsOptional,
   IsString,
 } from 'class-validator'
 import { IOwner } from 'common/schemas/Owner.schema'
 import { IPlan } from 'common/schemas/Plan.schema'
 import { IUser } from 'common/schemas/User.schema'
 import { ICreditCard } from './creditCard.dto'
+import { ClientSession } from 'mongoose'
 
 export class PlanTransitionDto {
   @IsNotEmpty()
@@ -39,4 +41,7 @@ export class PlanTransitionDto {
   @IsNotEmpty()
   @IsArray()
   ownerActiveProperties: any[]
+
+  @IsOptional()
+  session: ClientSession
 }

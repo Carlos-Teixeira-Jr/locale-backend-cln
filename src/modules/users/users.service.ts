@@ -1,6 +1,6 @@
 /* eslint-disable prefer-const */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import mongoose, { Model, Schema } from 'mongoose'
+import mongoose, { ClientSession, Model, Schema } from 'mongoose'
 import {
   BadRequestException,
   Injectable,
@@ -28,6 +28,8 @@ import { IPlan, PlanModelName } from 'common/schemas/Plan.schema'
 import { CouponModelName, ICoupon } from 'common/schemas/Coupon.schema'
 import { generateRandomString } from 'common/utils/generateRandomPassword'
 import { sendEmailVerificationCode } from 'common/utils/email/emailHandler'
+import { SchedulerRegistry } from '@nestjs/schedule'
+import { CronJob } from 'cron'
 
 export type FindUserByOwnerOut = {
   owner: IOwner
@@ -132,6 +134,7 @@ export class UsersService {
     private readonly planModel: Model<IPlan>,
     @InjectModel(CouponModelName)
     private readonly couponModel: Model<ICoupon>,
+    private schedulerRegistry: SchedulerRegistry,
   ) {}
 
   private async startSession() {
@@ -494,10 +497,14 @@ export class UsersService {
 
         const { creditCardInfo, subscriptionId } =
           await this.handleSubscription(
+            owner,
             ownerData,
             user,
             plan.price,
             creditCardData,
+            plan,
+            ownerData.plan,
+            session
           )
 
         ownerData.paymentData.creditCardInfo = creditCardInfo
@@ -788,12 +795,12 @@ export class UsersService {
       this.logger.log({ body }, 'start edit user > [user service]');
 
       const { id: userId } = body.user;
-      const { isChangePlan } = body;
+      const { isChangePlan, coupon } = body;
 
       let updatedUser;
       let encryptedPassword
       let planData
-      let plusPlan
+      let couponData;
 
       const plans = await this.planModel.find().lean()
       const freePlan = plans.find(e => e.name === 'Free')
@@ -802,7 +809,10 @@ export class UsersService {
         planData = plans.find(
           e => e._id.toString() === body.owner.plan.toString(),
         )
-        //plusPlan = plans.find(e => e.name === 'Locale Plus')
+      }
+
+      if (coupon) {
+        couponData = await this.couponModel.findOne({ coupon }).lean();
       }
 
       updatedUser = await this.handleEditUser(userId, body)
@@ -824,11 +834,10 @@ export class UsersService {
         planData,
         freePlan,
         isChangePlan,
+        couponData
       )
 
       let newOwner = ownerExists
-
-      const coupon = body?.coupon
 
       // PAYMENT DATA
       if (!coupon) {
@@ -848,10 +857,14 @@ export class UsersService {
             }
 
             const newSubscription = await this.handleSubscription(
+              ownerExists,
               newOwner,
               updatedUser,
               planData.price,
               body.creditCard,
+              planData,
+              ownerPrevPlan,
+              session
             )
 
             newOwner.paymentData = {
@@ -860,12 +873,18 @@ export class UsersService {
               creditCardInfo: newSubscription.creditCardInfo,
             }
           } else {
-            await this.handleSubscription(
+            const { updatedOwner } = await this.handleSubscription(
+              ownerExists,
               newOwner,
               updatedUser,
               planData.price,
               body.creditCard,
+              planData,
+              ownerPrevPlan,
+              session
             )
+
+            newOwner = updatedOwner
           }
         } else {
           if (
@@ -888,7 +907,7 @@ export class UsersService {
           }
         }
       } else {
-        newOwner = await this.handleCoupon(coupon, body.user, newOwner)
+        newOwner = await this.handleCoupon(couponData, body.user, session, newOwner)
       }
 
       // Atualiza o User;
@@ -902,7 +921,7 @@ export class UsersService {
       if ((!body.owner?._id && isChangePlan) || (!body.owner?._id && coupon)) {
         await this.ownerModel.create([newOwner], { session })
       } else {
-        if (isChangePlan) {
+        if (isChangePlan || couponData && body.owner?._id) {
           await this.ownerModel.updateOne(
             { _id: newOwner._id },
             { $set: newOwner },
@@ -924,25 +943,27 @@ export class UsersService {
     }
   }
 
-  async handleCoupon(coupon: string, user: any, owner?: any) {
+  async handleCoupon(couponData: any, user: any, session: ClientSession, owner?: any) {
     try {
       const paymentData = owner?.paymentData
       const { userName, id: userId } = user
       let newPaymentData
       let updatedOwner: IOwnerData = {}
 
-      const couponData = await this.couponModel.findOne({ coupon }).lean()
+      // const couponData = await this.couponModel.findOne({ coupon }).lean()
 
       if (!couponData || !couponData.isActive) {
         throw new BadRequestException(`Cupom de desconto inválido.`)
       }
 
+      // To-do: rollback nesse coupon
       await this.couponModel.updateOne(
         { _id: couponData._id },
         { $set: { isActive: false } },
+        session
       )
 
-      if (!paymentData) {
+      if (!paymentData && !owner._id) {
         updatedOwner = {
           name: userName,
           phone: '',
@@ -951,6 +972,16 @@ export class UsersService {
           picture: '',
           creci: '',
           notifications: [],
+          plan: couponData?.plan,
+          userId,
+          highlightCredits: couponData?.highlightAd,
+          adCredits: couponData?.commonAd,
+          isActive: true,
+        }
+      } else {
+        updatedOwner = {
+          ...owner,
+          name: userName,
           plan: couponData?.plan,
           userId,
           highlightCredits: couponData?.highlightAd,
@@ -1054,6 +1085,7 @@ export class UsersService {
     planData: IPlan,
     freePlan: any,
     isChangePlan: boolean,
+    couponData: ICoupon
   ) {
     try {
       const { _id: ownerId, phone, cellPhone, wwpNumber } = owner;
@@ -1062,15 +1094,21 @@ export class UsersService {
 
       // USER já é um OWNER;
       if (ownerId) {
-        ownerExists = await this.ownerModel.findById(ownerId).lean()
+        ownerExists = await this.ownerModel.findById(ownerId).lean();
+        ownerPrevPlan = ownerExists.plan
         // OWNER está trocando de plano;
-        if (isChangePlan) {
-          ownerPrevPlan = ownerExists.plan
+        if (isChangePlan || couponData) {
+          if (couponData) {
+          //   ownerExists.adCredits = ownerExists.adCredits + couponData.commonAd;
+          //   ownerExists.highlightCredits = ownerExists.highlightCredits + couponData.highlightAd
+          ownerExists.plan = couponData.plan
+          } else {
+          //   ownerExists.adCredits = planData?.commonAd ?? ownerExists?.adCredits
+          //   ownerExists.highlightCredits =
+          //     planData?.highlightAd ?? ownerExists?.highlightCredits
+            ownerExists.plan = planData?._id ?? ownerExists?.plan
+          }
 
-          ownerExists.adCredits = planData?.commonAd ?? ownerExists?.adCredits
-          ownerExists.highlightCredits =
-            planData?.highlightAd ?? ownerExists?.highlightCredits
-          ownerExists.plan = planData?._id ?? ownerExists?.plan
           if (wwpNumber) {
             ownerExists.wwpNumber = wwpNumber
           }
@@ -1138,18 +1176,23 @@ export class UsersService {
   }
 
   async handleSubscription(
-    owner: any,
+    prevOwner: any,
+    newOwner: any,
     user: any,
     price: number,
     creditCard: any,
+    plan: IPlan,
+    ownerPrevPlan: IPlan,
+    session
   ) {
     try {
-      const { paymentData } = owner
+      const { paymentData } = prevOwner
       const { cardNumber, cardName, expiry, ccv, cpfCnpj } = creditCard
       const { email, address, cellPhone } = user
       let subscriptionId
       let body
       let creditCardInfo
+      let updatedOwner = newOwner;
 
       const formattedDate = await this.getFormattedDate()
       const expiryYear = `20${expiry[2] + expiry[3]}`
@@ -1158,7 +1201,7 @@ export class UsersService {
       if (!paymentData?.subscriptionId) {
         if (!paymentData?.creditCardInfo?.creditCardToken) {
           body = {
-            customer: owner.paymentData.customerId,
+            customer: prevOwner.paymentData.customerId,
             value: price,
             nextDueDate: formattedDate,
             billingType: 'CREDIT_CARD',
@@ -1204,27 +1247,29 @@ export class UsersService {
 
         subscriptionId = data.id
         creditCardInfo = data.creditCard
+
+        updatedOwner = await this.updateCredits(
+          prevOwner,
+          newOwner,
+          plan,
+          ownerPrevPlan,
+          creditCard,
+          session
+        )
       } else {
-        // Atualizar;
-        subscriptionId = owner.paymentData.subscriptionId
-        body = { value: price }
-        await axios.post(
-          //Atualiza o valor do plano;
-          `${process.env.PAYMENT_URL}/payment/update-subscription/${subscriptionId}`,
-          body,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              access_token: process.env.ASAAS_API_KEY || '',
-            },
-            timeout: 200000,
-          },
+        updatedOwner = await this.updateCredits(
+          prevOwner,
+          newOwner,
+          plan,
+          ownerPrevPlan,
+          creditCard,
+          session
         )
 
         creditCardInfo = paymentData?.creditCardInfo
       }
 
-      return { subscriptionId, creditCardInfo }
+      return { subscriptionId, creditCardInfo, updatedOwner }
     } catch (error) {
       throw new Error(`${error}`)
     }
@@ -1278,6 +1323,101 @@ export class UsersService {
       return updatedUser
     } catch (error) {
       throw new Error(`${error}`)
+    }
+  }
+
+
+  async updateCredits(
+    owner: any,
+    newOwner: any,
+    newPlan: IPlan,
+    previousPlan: any,
+    payment: any,
+    session: ClientSession,
+    ownerProperties?: any,
+    propsToDeactivate?: any,
+  ): Promise<any> {
+    try {
+      const { paymentData, _id } = owner;
+      let ownerId = newOwner?._id ? newOwner._id : owner?._id;
+
+      let updatedOwner = owner;
+      let newAdCredits
+      const newHighlightCredits = owner.highlightCredits + newPlan.highlightAd
+
+      // Verificar se apesar do plano ser grátis o owner ainda possuia créditos de outro plano anterior;
+      if (previousPlan && previousPlan.toString() !== newPlan._id.toString()) {
+        newAdCredits = owner.adCredits + newPlan.commonAd
+      } else {
+        newAdCredits = owner.adCredits;
+      }
+
+      if (newOwner?.paymentData?.subscriptionId) {
+        // Buscar data de vencimento;
+        const { data } = await axios.get(
+          `${process.env.PAYMENT_URL}/payment/subscription/${newOwner?.paymentData?.subscriptionId}`,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              access_token: process.env.ASAAS_API_KEY || '',
+            },
+            timeout: 3000000,
+          },
+        )
+
+        const updateDate = new Date(data.nextDueDate)
+
+        // Lógica de mudança de créditos imediata;
+        updatedOwner = {
+          ...owner,
+          adCredits: newAdCredits,
+          highlightCredits: newHighlightCredits,
+          planTransitionStatus: 'processing',
+        }
+
+        if (!ownerId) {
+          const createdOwner = await this.ownerModel.create([updatedOwner], {
+            session,
+          })
+          ownerId = createdOwner[0]._id
+          updatedOwner = createdOwner[0]
+        }
+        // Verificar se já existe um cron job com este ID
+        if (this.schedulerRegistry.doesExist('cron', _id.toString())) {
+          // Se existe, deletar o cron job atual
+          this.schedulerRegistry.deleteCronJob(_id.toString())
+          this.logger.debug(`Job anterior para o anunciante ${_id} deletado`)
+        }
+
+        // Criar novo cron job
+        const job = new CronJob(updateDate, async () => {
+          await this.ownerModel.updateOne(
+            { _id },
+            {
+              $set: {
+                adCredits: newAdCredits - owner.adCredits,
+                highlightCredits: newHighlightCredits - owner.highlightCredits,
+                planTransitionStatus: 'complete',
+              },
+            },
+          )
+          this.logger.debug(`Anunciante ${_id} atualizado`)
+          this.schedulerRegistry.deleteCronJob(_id.toString()) // remove o job após execução
+        })
+
+        this.schedulerRegistry.addCronJob(_id.toString(), job)
+        job.start()
+        this.logger.debug(
+          `Job para o anunciante ${_id} agendado para: ${updateDate}`,
+        )
+      } else {
+        updatedOwner.adCredits = newAdCredits
+        updatedOwner.highlightCredits = newHighlightCredits
+      }
+
+      return updatedOwner
+    } catch (error) {
+      throw error
     }
   }
 }

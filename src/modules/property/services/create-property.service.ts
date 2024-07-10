@@ -7,7 +7,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose'
 import { PropertyModelName, IProperty } from 'common/schemas/Property.schema'
 import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
-import mongoose, { Model } from 'mongoose'
+import mongoose, { ClientSession, Model } from 'mongoose'
 import {
   CreatePropertyDto,
   CreditCardData,
@@ -165,6 +165,7 @@ export class CreateProperty_Service {
               creditCard: creditCardData,
               isCreate: true,
               ownerActiveProperties,
+              session
             }
             const planTransitionData = await this.createPlanTransition(
               createPlanTransition,
@@ -187,6 +188,7 @@ export class CreateProperty_Service {
               ownerPreviousPlan,
               ownerActiveProperties,
               deactivateProperties,
+              session
             )
           } else {
             // updatedOwner.adCredits = updatedOwner.adCredits - 1;
@@ -201,6 +203,7 @@ export class CreateProperty_Service {
               ownerPreviousPlan,
               ownerActiveProperties,
               deactivateProperties,
+              session
             )
           }
         }
@@ -237,6 +240,7 @@ export class CreateProperty_Service {
               ownerActiveProperties,
               deactivateProperties,
               updatedOwner.paymentData,
+              session
             );
           }
         }
@@ -585,6 +589,7 @@ export class CreateProperty_Service {
     ownerPreviousPlan: string,
     ownerProperties: any,
     propsToDeactivate: any,
+    session: ClientSession
   ) {
     let cpfCnpj: string
     let expiry: string
@@ -697,6 +702,7 @@ export class CreateProperty_Service {
             ownerProperties,
             propsToDeactivate,
             updatedOwner.paymentData,
+            session
           );
         } else {
           throw new Error(`Falha ao gerar a cobrança: ${response.statusText}`)
@@ -1135,6 +1141,7 @@ export class CreateProperty_Service {
         creditCard,
         ownerActiveProperties,
         propertiesToDeactivate,
+        session
       } = planTransitionDto
 
       let updatedOwner: any = owner
@@ -1171,6 +1178,7 @@ export class CreateProperty_Service {
         ownerActiveProperties,
         propertiesToDeactivate,
         updatedOwner.paymentData,
+        session
       );
 
       return updatedOwner
@@ -1302,9 +1310,11 @@ export class CreateProperty_Service {
     ownerProperties: any,
     propsToDeactivate: any,
     payment: any,
+    session: any
   ): Promise<any> {
     try {
-      const { paymentData, _id } = owner
+      const { paymentData, _id } = owner;
+      let ownerId;
 
       let updatedOwner = owner;
       let newAdCredits
@@ -1342,6 +1352,13 @@ export class CreateProperty_Service {
           planTransitionStatus: 'processing',
         }
 
+        if (!ownerId) {
+          const createdOwner = await this.ownerModel.create([updatedOwner], {
+            session,
+          })
+          ownerId = createdOwner[0]._id
+          updatedOwner = createdOwner[0]
+        }
         // Verificar se já existe um cron job com este ID
         if (this.schedulerRegistry.doesExist('cron', _id.toString())) {
           // Se existe, deletar o cron job atual
