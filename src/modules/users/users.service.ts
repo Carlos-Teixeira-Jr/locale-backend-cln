@@ -791,7 +791,7 @@ export class UsersService {
   async editUser(body: EditUserDto) {
     const session = await this.startSession()
     try {
-      await session.startTransaction()
+      await session.startTransaction();
       this.logger.log({ body }, 'start edit user > [user service]');
 
       const { id: userId } = body.user;
@@ -842,7 +842,7 @@ export class UsersService {
       // PAYMENT DATA
       if (!coupon) {
         // Selecionou um plano;
-        if (isChangePlan && planData.price > 0) {
+        if (isChangePlan && planData && planData.price > 0) {
           if (!newOwner?.paymentData?.subscriptionId) {
             if (!newOwner?.paymentData?.customerId) {
               const newPaymentData = await this.handleCustomer(
@@ -903,7 +903,16 @@ export class UsersService {
               },
             )
 
-            newOwner.paymentData = {}
+            newOwner.paymentData = {};
+
+            newOwner = await this.updateCredits(
+              ownerExists,
+              newOwner,
+              planData,
+              ownerPrevPlan,
+              body.creditCard,
+              session
+            )
           }
         }
       } else {
@@ -918,10 +927,10 @@ export class UsersService {
       )
 
       // Atualiza o owner;
-      if ((!body.owner?._id && isChangePlan) || (!body.owner?._id && coupon)) {
+      if ((!body.owner?._id && isChangePlan && body.owner.plan) || (!body.owner?._id && coupon)) {
         await this.ownerModel.create([newOwner], { session })
       } else {
-        if (isChangePlan || couponData && body.owner?._id) {
+        if (isChangePlan && body.owner.plan || couponData && body.owner?._id) {
           await this.ownerModel.updateOne(
             { _id: newOwner._id },
             { $set: newOwner },
@@ -961,9 +970,15 @@ export class UsersService {
         { _id: couponData._id },
         { $set: { isActive: false } },
         session
-      )
+      );
 
-      if (!paymentData && !owner._id) {
+      function isObjectEmpty(obj: object): boolean {
+        return Object.keys(obj).length === 0;
+      }
+      
+      const isPaymentDataEmpty = paymentData === undefined || paymentData === null || (typeof paymentData === 'object' && isObjectEmpty(paymentData));
+
+      if (isPaymentDataEmpty && !owner._id.toString()) {
         updatedOwner = {
           name: userName,
           phone: '',
@@ -1031,7 +1046,7 @@ export class UsersService {
         cellPhone,
       } = body.user
 
-      let updatedUser
+      let updatedUser;
 
       // Verifica se há um usuário com o id passado;
       const userExists: IUser = await this.userModel
@@ -1090,7 +1105,7 @@ export class UsersService {
     try {
       const { _id: ownerId, phone, cellPhone, wwpNumber } = owner;
       let ownerExists
-      let ownerPrevPlan
+      let ownerPrevPlan;
 
       // USER já é um OWNER;
       if (ownerId) {
@@ -1099,24 +1114,19 @@ export class UsersService {
         // OWNER está trocando de plano;
         if (isChangePlan || couponData) {
           if (couponData) {
-          //   ownerExists.adCredits = ownerExists.adCredits + couponData.commonAd;
-          //   ownerExists.highlightCredits = ownerExists.highlightCredits + couponData.highlightAd
-          ownerExists.plan = couponData.plan
+            ownerExists.plan = couponData.plan
           } else {
-          //   ownerExists.adCredits = planData?.commonAd ?? ownerExists?.adCredits
-          //   ownerExists.highlightCredits =
-          //     planData?.highlightAd ?? ownerExists?.highlightCredits
             ownerExists.plan = planData?._id ?? ownerExists?.plan
           }
 
           if (wwpNumber) {
-            ownerExists.wwpNumber = wwpNumber
+            ownerExists.wwpNumber = wwpNumber;
           }
         }
         // USER ainda não é um OWNER;
       } else {
         // USER tem plano grátis e ainda não usou o crédito para anúnciar, logo, não é OWNER e deseja trocar seu plano;
-        if (isChangePlan) {
+        if (isChangePlan && owner.plan.toString() !== '') {
           ownerExists = {
             name: userName,
             phone,
