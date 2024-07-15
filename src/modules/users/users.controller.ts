@@ -57,7 +57,7 @@ export class UsersController {
   async findOwnerByUserId(
     @Body() userId: GetOwnerByUserId,
   ): Promise<User_Owner> {
-    this.logger.log({ userId }, 'start find owner by user id > [controller]');
+    this.logger.log({ userId }, 'start find owner by user id > [controller]')
 
     const owner = await this.usersService.findOwnerByUserId(userId)
 

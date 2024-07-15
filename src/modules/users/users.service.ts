@@ -504,7 +504,7 @@ export class UsersService {
             creditCardData,
             plan,
             ownerData.plan,
-            session
+            session,
           )
 
         ownerData.paymentData.creditCardInfo = creditCardInfo
@@ -791,16 +791,16 @@ export class UsersService {
   async editUser(body: EditUserDto) {
     const session = await this.startSession()
     try {
-      await session.startTransaction();
-      this.logger.log({ body }, 'start edit user > [user service]');
+      await session.startTransaction()
+      this.logger.log({ body }, 'start edit user > [user service]')
 
-      const { id: userId } = body.user;
-      const { isChangePlan, coupon } = body;
+      const { id: userId } = body.user
+      const { isChangePlan, coupon } = body
 
-      let updatedUser;
+      let updatedUser
       let encryptedPassword
       let planData
-      let couponData;
+      let couponData
 
       const plans = await this.planModel.find().lean()
       const freePlan = plans.find(e => e.name === 'Free')
@@ -812,7 +812,7 @@ export class UsersService {
       }
 
       if (coupon) {
-        couponData = await this.couponModel.findOne({ coupon }).lean();
+        couponData = await this.couponModel.findOne({ coupon }).lean()
       }
 
       updatedUser = await this.handleEditUser(userId, body)
@@ -834,7 +834,7 @@ export class UsersService {
         planData,
         freePlan,
         isChangePlan,
-        couponData
+        couponData,
       )
 
       let newOwner = ownerExists
@@ -864,7 +864,7 @@ export class UsersService {
               body.creditCard,
               planData,
               ownerPrevPlan,
-              session
+              session,
             )
 
             newOwner.paymentData = {
@@ -881,7 +881,7 @@ export class UsersService {
               body.creditCard,
               planData,
               ownerPrevPlan,
-              session
+              session,
             )
 
             newOwner = updatedOwner
@@ -903,7 +903,7 @@ export class UsersService {
               },
             )
 
-            newOwner.paymentData = {};
+            newOwner.paymentData = {}
 
             newOwner = await this.updateCredits(
               ownerExists,
@@ -911,12 +911,17 @@ export class UsersService {
               planData,
               ownerPrevPlan,
               body.creditCard,
-              session
+              session,
             )
           }
         }
       } else {
-        newOwner = await this.handleCoupon(couponData, body.user, session, newOwner)
+        newOwner = await this.handleCoupon(
+          couponData,
+          body.user,
+          session,
+          newOwner,
+        )
       }
 
       // Atualiza o User;
@@ -927,10 +932,16 @@ export class UsersService {
       )
 
       // Atualiza o owner;
-      if ((!body.owner?._id && isChangePlan && body.owner.plan) || (!body.owner?._id && coupon)) {
+      if (
+        (!body.owner?._id && isChangePlan && body.owner.plan) ||
+        (!body.owner?._id && coupon)
+      ) {
         await this.ownerModel.create([newOwner], { session })
       } else {
-        if (isChangePlan && body.owner.plan || couponData && body.owner?._id) {
+        if (
+          (isChangePlan && body.owner.plan) ||
+          (couponData && body.owner?._id)
+        ) {
           await this.ownerModel.updateOne(
             { _id: newOwner._id },
             { $set: newOwner },
@@ -952,7 +963,12 @@ export class UsersService {
     }
   }
 
-  async handleCoupon(couponData: any, user: any, session: ClientSession, owner?: any) {
+  async handleCoupon(
+    couponData: any,
+    user: any,
+    session: ClientSession,
+    owner?: any,
+  ) {
     try {
       const paymentData = owner?.paymentData
       const { userName, id: userId } = user
@@ -969,14 +985,17 @@ export class UsersService {
       await this.couponModel.updateOne(
         { _id: couponData._id },
         { $set: { isActive: false } },
-        session
-      );
+        session,
+      )
 
       function isObjectEmpty(obj: object): boolean {
-        return Object.keys(obj).length === 0;
+        return Object.keys(obj).length === 0
       }
-      
-      const isPaymentDataEmpty = paymentData === undefined || paymentData === null || (typeof paymentData === 'object' && isObjectEmpty(paymentData));
+
+      const isPaymentDataEmpty =
+        paymentData === undefined ||
+        paymentData === null ||
+        (typeof paymentData === 'object' && isObjectEmpty(paymentData))
 
       if (isPaymentDataEmpty && !owner._id.toString()) {
         updatedOwner = {
@@ -1046,7 +1065,7 @@ export class UsersService {
         cellPhone,
       } = body.user
 
-      let updatedUser;
+      let updatedUser
 
       // Verifica se há um usuário com o id passado;
       const userExists: IUser = await this.userModel
@@ -1100,16 +1119,16 @@ export class UsersService {
     planData: IPlan,
     freePlan: any,
     isChangePlan: boolean,
-    couponData: ICoupon
+    couponData: ICoupon,
   ) {
     try {
-      const { _id: ownerId, phone, cellPhone, wwpNumber } = owner;
+      const { _id: ownerId, phone, cellPhone, wwpNumber } = owner
       let ownerExists
-      let ownerPrevPlan;
+      let ownerPrevPlan
 
       // USER já é um OWNER;
       if (ownerId) {
-        ownerExists = await this.ownerModel.findById(ownerId).lean();
+        ownerExists = await this.ownerModel.findById(ownerId).lean()
         ownerPrevPlan = ownerExists.plan
         // OWNER está trocando de plano;
         if (isChangePlan || couponData) {
@@ -1120,7 +1139,7 @@ export class UsersService {
           }
 
           if (wwpNumber) {
-            ownerExists.wwpNumber = wwpNumber;
+            ownerExists.wwpNumber = wwpNumber
           }
         }
         // USER ainda não é um OWNER;
@@ -1193,7 +1212,7 @@ export class UsersService {
     creditCard: any,
     plan: IPlan,
     ownerPrevPlan: IPlan,
-    session
+    session,
   ) {
     try {
       const { paymentData } = prevOwner
@@ -1202,7 +1221,7 @@ export class UsersService {
       let subscriptionId
       let body
       let creditCardInfo
-      let updatedOwner = newOwner;
+      let updatedOwner = newOwner
 
       const formattedDate = await this.getFormattedDate()
       const expiryYear = `20${expiry[2] + expiry[3]}`
@@ -1264,7 +1283,7 @@ export class UsersService {
           plan,
           ownerPrevPlan,
           creditCard,
-          session
+          session,
         )
       } else {
         updatedOwner = await this.updateCredits(
@@ -1273,7 +1292,7 @@ export class UsersService {
           plan,
           ownerPrevPlan,
           creditCard,
-          session
+          session,
         )
 
         creditCardInfo = paymentData?.creditCardInfo
@@ -1336,7 +1355,6 @@ export class UsersService {
     }
   }
 
-
   async updateCredits(
     owner: any,
     newOwner: any,
@@ -1348,10 +1366,10 @@ export class UsersService {
     propsToDeactivate?: any,
   ): Promise<any> {
     try {
-      const { paymentData, _id } = owner;
-      let ownerId = newOwner?._id ? newOwner._id : owner?._id;
+      const { paymentData, _id } = owner
+      let ownerId = newOwner?._id ? newOwner._id : owner?._id
 
-      let updatedOwner = owner;
+      let updatedOwner = owner
       let newAdCredits
       const newHighlightCredits = owner.highlightCredits + newPlan.highlightAd
 
@@ -1359,7 +1377,7 @@ export class UsersService {
       if (previousPlan && previousPlan.toString() !== newPlan._id.toString()) {
         newAdCredits = owner.adCredits + newPlan.commonAd
       } else {
-        newAdCredits = owner.adCredits;
+        newAdCredits = owner.adCredits
       }
 
       if (newOwner?.paymentData?.subscriptionId) {
