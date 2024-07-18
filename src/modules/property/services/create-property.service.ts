@@ -7,7 +7,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose'
 import { PropertyModelName, IProperty } from 'common/schemas/Property.schema'
 import { InjectorLoggerService } from 'modules/logger/InjectorLoggerService'
-import mongoose, { Model } from 'mongoose'
+import mongoose, { ClientSession, Model } from 'mongoose'
 import {
   CreatePropertyDto,
   CreditCardData,
@@ -164,6 +164,8 @@ export class CreateProperty_Service {
               propertiesToDeactivate: deactivateProperties,
               creditCard: creditCardData,
               isCreate: true,
+              ownerActiveProperties,
+              session,
             }
             const planTransitionData = await this.createPlanTransition(
               createPlanTransition,
@@ -175,8 +177,33 @@ export class CreateProperty_Service {
         } else {
           if (!updatedOwner) {
             updatedOwner = owner
+            await this.handlePayment(
+              isPlanFree,
+              selectedPlan,
+              owner,
+              updatedOwner,
+              user,
+              creditCardData,
+              cellPhone,
+              ownerPreviousPlan,
+              ownerActiveProperties,
+              deactivateProperties,
+              session,
+            )
           } else {
-            updatedOwner.adCredits = updatedOwner.adCredits - 1
+            updatedOwner = await this.handlePayment(
+              isPlanFree,
+              selectedPlan,
+              owner,
+              updatedOwner,
+              user,
+              creditCardData,
+              cellPhone,
+              ownerPreviousPlan,
+              ownerActiveProperties,
+              deactivateProperties,
+              session,
+            )
           }
         }
       } else {
@@ -192,22 +219,44 @@ export class CreateProperty_Service {
           }
           updatedOwner.paymentData.subscriptionId = ''
 
-          updatedOwner = {
-            ...updatedOwner,
-            adCredits: owner.adCredits - 1,
+          if (selectedPlan && selectedPlan._id !== ownerPreviousPlan._id) {
+            updatedOwner = {
+              ...updatedOwner,
+              adCredits: owner.adCredits - 1 + selectedPlan.adCredits,
+            }
+          } else {
+            updatedOwner = {
+              ...updatedOwner,
+              adCredits: owner.adCredits - 1,
+            }
           }
         } else {
           if (updatedOwner.adCredits > 0) {
-            updatedOwner = await this.updateCredits(updatedOwner, selectedPlan)
+            updatedOwner = await this.updateCredits(
+              owner,
+              selectedPlan,
+              ownerPreviousPlan,
+              ownerActiveProperties,
+              deactivateProperties,
+              updatedOwner.paymentData,
+              session,
+            )
           }
         }
       }
 
-      await this.ownerModel.updateOne(
-        { _id: updatedOwner?._id },
-        { $set: updatedOwner },
-        { session },
-      )
+      if (!ownerPreviousPlan) {
+        const createdOwner = await this.ownerModel.create([updatedOwner], {
+          session,
+        })
+        updatedOwner = createdOwner[0]
+      } else {
+        await this.ownerModel.updateOne(
+          { _id: updatedOwner?._id },
+          { $set: updatedOwner },
+          { session },
+        )
+      }
 
       // Deactivates the properties that the user choose in case that he changes his plan to a minor one;
       if (
@@ -215,13 +264,14 @@ export class CreateProperty_Service {
           deactivateProperties.length > 0) ||
         (selectedPlan.name === 'Free' &&
           ownerActiveProperties.length > 0 &&
-          ownerPreviousPlan._id !== selectedPlan._id)
+          ownerPreviousPlan?._id !== selectedPlan?._id)
       ) {
         const deactivatepropertiesBody: PropertyActivationDto = {
           propertyId: [],
           userId: userData._id,
           isActive: false,
           session: session,
+          updatedOwner,
         }
         if (selectedPlan.name === 'Free' && ownerActiveProperties.length > 0) {
           ownerActiveProperties.forEach(e => {
@@ -242,7 +292,7 @@ export class CreateProperty_Service {
       const createdProperty = await this.createProperty(
         propertyData,
         ownerInfo,
-        owner._id,
+        updatedOwner._id,
       )
 
       await session.commitTransaction()
@@ -419,10 +469,7 @@ export class CreateProperty_Service {
         ownerData.highlightCredits = selectedPlan.highlightAd
       }
 
-      const createdOwner = await this.ownerModel.create([ownerData], {
-        session,
-      })
-      owner = createdOwner[0].toObject()
+      owner = ownerData
 
       if (coupon) {
         await this.couponModel.updateOne(
@@ -533,15 +580,15 @@ export class CreateProperty_Service {
   private async handlePayment(
     isPlanFree: boolean,
     selectedPlan: IPlan,
+    prevOwner: any,
     owner: IOwner,
     userData: UserData,
     creditCardData: CreditCardData,
     cellPhone: string,
-    ownerPreviousPlan: string,
-    propertiesToDeactivate: number,
-    ownerActiveProperties: number,
-    creditsLeft: number | null,
-    session: any,
+    ownerPreviousPlan: string | IPlan,
+    ownerProperties: any,
+    propsToDeactivate: any,
+    session: ClientSession,
   ) {
     let cpfCnpj: string
     let expiry: string
@@ -638,41 +685,24 @@ export class CreateProperty_Service {
           const creditCardInfo = responseData.creditCard
           const subscriptionId = responseData.id
 
-          // newAdCredits =
-          //   selectedPlan.price > previousPlanData.price
-          //     ? owner.adCredits + selectedPlan.commonAd
-          //     : owner.adCredits - selectedPlan.commonAd - propertiesToDeactivate
-
-          // newHighlightCredits =
-          //   selectedPlan.price > previousPlanData.price
-          //     ? owner.highlightCredits + selectedPlan.highlightAd
-          //     : owner.highlightCredits - selectedPlan.highlightAd
-
-          if (creditsLeft) {
-            updatedOwner = {
-              ...owner,
-              plan: selectedPlan._id,
-              adCredits: creditsLeft,
-              highlightCredits: selectedPlan.highlightAd,
-              paymentData: {
-                ...owner.paymentData,
-                creditCardInfo,
-                subscriptionId,
-              },
-            }
-          } else {
-            updatedOwner = {
-              ...owner,
-              plan: selectedPlan._id,
-              adCredits: selectedPlan.commonAd - 1,
-              highlightCredits: selectedPlan.highlightAd,
-              paymentData: {
-                ...owner.paymentData,
-                creditCardInfo,
-                subscriptionId,
-              },
-            }
+          updatedOwner = {
+            ...updatedOwner,
+            paymentData: {
+              ...updatedOwner.paymentData,
+              subscriptionId,
+              creditCardInfo,
+            },
           }
+
+          await this.updateCredits(
+            updatedOwner,
+            selectedPlan,
+            ownerPreviousPlan,
+            ownerProperties,
+            propsToDeactivate,
+            updatedOwner.paymentData,
+            session,
+          )
         } else {
           throw new Error(`Falha ao gerar a cobrança: ${response.statusText}`)
         }
@@ -731,28 +761,6 @@ export class CreateProperty_Service {
                   `Falha ao atualizar a assinatura: ${response.statusText}`,
                 )
               }
-
-              const responseData = response.data
-              const updatedSubscriptionId = responseData.id
-              const newAdcredits = owner.adCredits - 1 + selectedPlan.commonAd
-              const newHighlightCredits =
-                owner.highlightCredits > 0
-                  ? owner.highlightCredits - 1 + selectedPlan.highlightAd
-                  : owner.highlightCredits
-
-              //Atualizar os créditos do usuário
-              await this.ownerModel.updateOne(
-                { _id: owner._id },
-                {
-                  $set: {
-                    adCredits: newAdcredits,
-                    highlightCredits: newHighlightCredits,
-                    plan: selectedPlan._id,
-                    'paymentData.subscriptionId': updatedSubscriptionId,
-                  },
-                },
-                { session },
-              )
             } else {
               throw new Error(
                 `O usuário não tem mais créditos disponíveis para anunciar.`,
@@ -815,15 +823,6 @@ export class CreateProperty_Service {
                 },
               },
             )
-
-            // Atualização dos créditos;
-            if (typeof creditsLeft === 'number') {
-              updatedOwner.adCredits = creditsLeft
-            } else {
-              updatedOwner.adCredits =
-                selectedPlan.commonAd - 1 - ownerActiveProperties
-              updatedOwner.plan = selectedPlan._id
-            }
           } catch (error) {}
         } else {
           throw new NotFoundException('Assinatura não encontrada.')
@@ -877,14 +876,8 @@ export class CreateProperty_Service {
 
             // Condicional dos créditos para casos em que já havia um plano anterior ou não;
             if (!previousPlanData) {
-              // newAdCredits = selectedPlan.commonAd
               newHighlightCredits = selectedPlan.highlightAd
             } else if (ownerActualPlanString !== planIdString) {
-              // newAdCredits =
-              //   selectedPlan.price > previousPlanData.price
-              //     ? owner.adCredits + selectedPlan.commonAd
-              //     : owner.adCredits - selectedPlan.commonAd
-
               newHighlightCredits =
                 selectedPlan.price > previousPlanData.price
                   ? owner.highlightCredits + selectedPlan.highlightAd
@@ -909,43 +902,57 @@ export class CreateProperty_Service {
             }
           }
         } else {
-          if (owner.paymentData?.subscriptionId) {
-            // Cancelar a assinatura
-            const { data } = await axios.delete(
-              `${process.env.PAYMENT_URL}/payment/subscription/${owner?.paymentData?.subscriptionId}`,
-              {
-                method: 'DELETE',
-                headers: {
-                  'Content-Type': 'application/json',
-                  access_token: process.env.ASSAS_API_KEY || '',
+          if (
+            typeof ownerPreviousPlan !== 'string' &&
+            ownerActualPlanString !== ownerPreviousPlan?._id.toString()
+          ) {
+            if (owner.paymentData?.subscriptionId) {
+              // Cancelar a assinatura
+              const { data } = await axios.delete(
+                `${process.env.PAYMENT_URL}/payment/subscription/${owner?.paymentData?.subscriptionId}`,
+                {
+                  method: 'DELETE',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    access_token: process.env.ASSAS_API_KEY || '',
+                  },
                 },
-              },
-            )
+              )
 
-            const success = data.deleted
+              const success = data.deleted
 
-            if (!success) {
-              throw new Error('Não foi possível remover a assinatura')
-            }
+              if (!success) {
+                throw new Error('Não foi possível remover a assinatura')
+              }
 
-            updatedOwner.paymentData.creditCardInfo = {
-              creditCardBrand: '',
-              creditCardNumber: '',
-              creditCardToken: '',
-            }
-            updatedOwner.paymentData.subscriptionId = ''
+              updatedOwner.paymentData.creditCardInfo = {
+                creditCardBrand: '',
+                creditCardNumber: '',
+                creditCardToken: '',
+              }
+              updatedOwner.paymentData.subscriptionId = ''
 
-            updatedOwner = {
-              ...updatedOwner,
-              adCredits: owner.adCredits - 1,
-            }
-          } else {
-            updatedOwner = {
-              ...updatedOwner,
-              adCredits: owner.adCredits - 1,
-              highlightCredits: 0,
+              updatedOwner = {
+                ...updatedOwner,
+                adCredits: owner.adCredits - 1,
+              }
+            } else {
+              updatedOwner = {
+                ...updatedOwner,
+                adCredits: owner.adCredits - 1,
+                highlightCredits: 0,
+              }
             }
           }
+          updatedOwner = await this.updateCredits(
+            updatedOwner,
+            selectedPlan,
+            ownerPreviousPlan,
+            ownerProperties,
+            propsToDeactivate,
+            updatedOwner.paymentData,
+            session,
+          )
         }
       } else {
         throw new BadRequestException(
@@ -1033,19 +1040,21 @@ export class CreateProperty_Service {
     propertyActivationDto: PropertyActivationDto,
   ) {
     try {
-      const { isActive, propertyId, userId, session } = propertyActivationDto
+      const { isActive, propertyId, userId, updatedOwner, session } =
+        propertyActivationDto
+      let propertyOwner
 
-      const propertyOwner = await this.ownerModel
+      const ownerExists = await this.ownerModel
         .findOne({
           userId: userId,
           isActive: true,
         })
         .lean()
 
-      if (!propertyOwner) {
-        throw new NotFoundException(
-          `O anunciante com o id ${userId} não foi encontrado.`,
-        )
+      if (!ownerExists) {
+        propertyOwner = updatedOwner
+      } else {
+        propertyOwner = ownerExists
       }
 
       // Verifica se algum dos ids passados não é válido;
@@ -1100,7 +1109,16 @@ export class CreateProperty_Service {
     try {
       this.logger.log({}, 'start create plan transition > [plan service]')
 
-      const { owner, user, prevPlan, newPlan, creditCard } = planTransitionDto
+      const {
+        owner,
+        user,
+        prevPlan,
+        newPlan,
+        creditCard,
+        ownerActiveProperties,
+        propertiesToDeactivate,
+        session,
+      } = planTransitionDto
 
       let updatedOwner: any = owner
 
@@ -1129,7 +1147,15 @@ export class CreateProperty_Service {
         await this.updateSubscription(owner, newPlan)
       }
 
-      updatedOwner = await this.updateCredits(updatedOwner, newPlan)
+      updatedOwner = await this.updateCredits(
+        updatedOwner,
+        newPlan,
+        prevPlan._id,
+        ownerActiveProperties,
+        propertiesToDeactivate,
+        updatedOwner.paymentData,
+        session,
+      )
 
       return updatedOwner
     } catch (error) {
@@ -1253,73 +1279,96 @@ export class CreateProperty_Service {
     }
   }
 
-  async updateCredits(owner: IOwnerData, newPlan: IPlan): Promise<any> {
+  async updateCredits(
+    owner: any,
+    newPlan: IPlan,
+    previousPlan: any,
+    ownerProperties: any,
+    propsToDeactivate: any,
+    payment: any,
+    session: any,
+  ): Promise<any> {
     try {
-      const { paymentData, _id } = owner
+      const { _id } = owner
+      let ownerId = _id
 
       let updatedOwner = owner
       let newAdCredits
       const newHighlightCredits = owner.highlightCredits + newPlan.highlightAd
 
       // Verificar se apesar do plano ser grátis o owner ainda possuia créditos de outro plano anterior;
-      if (owner.plan.toString() !== newPlan._id.toString()) {
+      if (
+        previousPlan &&
+        previousPlan._id.toString() !== newPlan._id.toString()
+      ) {
         newAdCredits = owner.adCredits + newPlan.commonAd
-      } else {
-        newAdCredits = owner.adCredits - 1
-      }
+        newAdCredits =
+          newAdCredits - (ownerProperties.length - propsToDeactivate.length)
 
-      if (paymentData?.customerId) {
-        // Buscar data de vencimento;
-        const { data } = await axios.get(
-          `${process.env.PAYMENT_URL}/payment/subscription/${paymentData?.subscriptionId}`,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              access_token: process.env.ASAAS_API_KEY || '',
-            },
-            timeout: 3000000,
-          },
-        )
-
-        const updateDate = new Date(data.nextDueDate)
-
-        // Lógica de mudança de créditos imediata;
-        updatedOwner = {
-          ...owner,
-          adCredits: newAdCredits,
-          highlightCredits: newHighlightCredits,
-          planTransitionStatus: 'processing',
-        }
-
-        // Verificar se já existe um cron job com este ID
-        if (this.schedulerRegistry.doesExist('cron', _id.toString())) {
-          // Se existe, deletar o cron job atual
-          this.schedulerRegistry.deleteCronJob(_id.toString())
-          this.logger.debug(`Job anterior para o anunciante ${_id} deletado`)
-        }
-
-        // Criar novo cron job
-        const job = new CronJob(updateDate, async () => {
-          await this.ownerModel.updateOne(
-            { _id },
+        if (payment?.subscriptionId) {
+          // Buscar data de vencimento;
+          const { data } = await axios.get(
+            `${process.env.PAYMENT_URL}/payment/subscription/${payment?.subscriptionId}`,
             {
-              $set: {
-                adCredits: newAdCredits - owner.adCredits,
-                highlightCredits: newHighlightCredits - owner.highlightCredits,
-                planTransitionStatus: 'complete',
+              headers: {
+                'Content-Type': 'application/json',
+                access_token: process.env.ASAAS_API_KEY || '',
               },
+              timeout: 3000000,
             },
           )
-          this.logger.debug(`Anunciante ${_id} atualizado`)
-          this.schedulerRegistry.deleteCronJob(_id.toString()) // remove o job após execução
-        })
 
-        this.schedulerRegistry.addCronJob(_id.toString(), job)
-        job.start()
-        this.logger.debug(
-          `Job para o anunciante ${_id} agendado para: ${updateDate}`,
-        )
+          const updateDate = new Date(data.nextDueDate)
+
+          // Lógica de mudança de créditos imediata;
+          updatedOwner = {
+            ...owner,
+            adCredits: newAdCredits,
+            highlightCredits: newHighlightCredits,
+            planTransitionStatus: 'processing',
+          }
+
+          if (!ownerId) {
+            const createdOwner = await this.ownerModel.create([updatedOwner], {
+              session,
+            })
+            ownerId = createdOwner[0]._id
+            updatedOwner = createdOwner[0]
+          }
+          // Verificar se já existe um cron job com este ID
+          if (this.schedulerRegistry.doesExist('cron', _id.toString())) {
+            // Se existe, deletar o cron job atual
+            this.schedulerRegistry.deleteCronJob(_id.toString())
+            this.logger.debug(`Job anterior para o anunciante ${_id} deletado`)
+          }
+
+          // Criar novo cron job
+          const job = new CronJob(updateDate, async () => {
+            await this.ownerModel.updateOne(
+              { _id },
+              {
+                $set: {
+                  adCredits: newAdCredits - owner.adCredits,
+                  highlightCredits:
+                    newHighlightCredits - owner.highlightCredits,
+                  planTransitionStatus: 'complete',
+                },
+              },
+            )
+            this.logger.debug(`Anunciante ${_id} atualizado`)
+            this.schedulerRegistry.deleteCronJob(_id.toString()) // remove o job após execução
+          })
+
+          this.schedulerRegistry.addCronJob(_id.toString(), job)
+          job.start()
+          this.logger.debug(
+            `Job para o anunciante ${_id} agendado para: ${updateDate}`,
+          )
+        } else {
+          updatedOwner.adCredits = newAdCredits - 1
+        }
       } else {
+        newAdCredits = owner.adCredits - 1
         updatedOwner.adCredits = newAdCredits
       }
 
