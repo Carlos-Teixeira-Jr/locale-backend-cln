@@ -23,4 +23,7 @@ export class PropertyActivationDto {
 
   @IsOptional()
   session: any
+
+  @IsOptional()
+  updatedOwner: any
 }
