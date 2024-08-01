@@ -559,6 +559,7 @@ export class PropertyService {
       let profilePicture: string | string[]
       let userFound
       let ownerFound
+      let updatedUser
 
       if (type === 'user') {
         isUser = true
@@ -583,9 +584,13 @@ export class PropertyService {
           )
         }
 
-        await this.userModel.updateOne(
+        updatedUser = await this.userModel.findOneAndUpdate(
           { _id: userId },
           { $set: { picture: profilePicture } },
+          {
+            returnDocument: 'after',
+            select: 'picture',
+          },
         )
       }
 
@@ -614,7 +619,7 @@ export class PropertyService {
         )
       }
 
-      return { success: true }
+      return { success: true, updatedUser }
     } catch (error) {
       this.logger.error({
         error: JSON.stringify(error),

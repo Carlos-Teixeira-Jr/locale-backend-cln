@@ -29,6 +29,7 @@ import { IUser, UserModelName } from 'common/schemas/User.schema'
 export interface IUserPartialData {
   username: string
   email: string
+  picture: string
 }
 
 export interface IUserReturn extends IUserPartialData {
@@ -157,6 +158,7 @@ export class AuthService {
         emailVerificationExpiry,
         phone: '',
         cellPhone: '',
+        picture: '',
       })
 
       await sendEmailVerificationCode(email, emailVerificationCode)
@@ -168,6 +170,7 @@ export class AuthService {
         isEmailVerified: createdUser.isEmailVerified,
         emailVerificationCode: createdUser.emailVerificationCode,
         emailVerificationExpiry: createdUser.emailVerificationExpiry,
+        picture: createdUser.picture,
       }
     } catch (error) {
       this.logger.error(error, 'exception')
@@ -389,6 +392,7 @@ export class AuthService {
         _id: user._id,
         username: user.username,
         email: user.email,
+        picture: user.picture,
       }
     } catch (error) {
       if (error.name === 'JsonWebTokenError') {
