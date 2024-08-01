@@ -1,6 +1,4 @@
-import { IsNotEmpty, IsString, Validate } from 'class-validator'
-import { IDValidator } from 'common/validators/ID.validator'
-import { Schema } from 'mongoose'
+import { IsNotEmpty, IsString } from 'class-validator'
 
 export class CreateMessageDto {
   @IsNotEmpty()
@@ -20,10 +18,10 @@ export class CreateMessageDto {
   message: string
 
   @IsNotEmpty()
-  @Validate(IDValidator)
-  ownerId: Schema.Types.ObjectId
+  @IsString()
+  ownerId: string
 
   @IsNotEmpty()
-  @Validate(IDValidator)
-  propertyId: Schema.Types.ObjectId
+  @IsString()
+  propertyId: string
 }

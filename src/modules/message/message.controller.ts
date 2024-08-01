@@ -23,6 +23,7 @@ export class MessageController {
   ) {}
 
   @Post()
+  // @UsePipes(new ParseObjectIdPipe())
   async createOne(
     @Body() createMessageDto: CreateMessageDto,
   ): Promise<IMessageOwner> {
