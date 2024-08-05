@@ -29,6 +29,7 @@ import { AuthService } from 'modules/auth/auth.service'
 import { JwtService } from '@nestjs/jwt'
 import { UserModelName, UserSchema } from 'common/schemas/User.schema'
 import { CouponModule } from './modules/coupon/coupon.module'
+import { BlogModule } from './modules/blog/blog.module'
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { CouponModule } from './modules/coupon/coupon.module'
     LocationModule,
     PropertyTypeModule,
     CouponModule,
+    BlogModule,
   ],
   controllers: [AppController, PaymentController, PlanController],
   providers: [
