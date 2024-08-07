@@ -33,6 +33,7 @@ import {
 import { findActiveOwner } from 'modules/users/auxiliar/auxiliarFunctions'
 import { findOwnerMessages } from 'modules/message/auxiliar/auxiliarFunctions'
 import { GetPropertyParams } from '../dto/getProperty.params'
+import { ILocation, LocationModelName } from 'common/schemas/Location.schema'
 
 export interface IDocsWithPagination {
   docs: IProperty[]
@@ -79,6 +80,8 @@ export class PropertyService {
     private readonly userModel: Model<IUser>,
     @InjectModel(MessageOwnerModelName)
     private readonly messageModel: Model<IMessageOwner>,
+    @InjectModel(LocationModelName)
+    private readonly locationModel: Model<ILocation>,
     @InjectModel(TagModelName)
     private readonly tagModel: Model<ITag>,
     private readonly propertyFilter_Service: PropertyFilter_Service,
@@ -266,6 +269,37 @@ export class PropertyService {
 
       // Desativar
       if (!isActive) {
+        // Obtém as tags associadas às propriedades do owner
+        const properties: IProperty[] = await this.propertyModel
+          .find({ owner: propertyOwner._id, isActive: true })
+          .lean()
+        const propertyTags: string[] = properties.flatMap(
+          property => property.tags,
+        )
+
+        // Atualiza as tags decrementando a quantidade
+        for (const tag of propertyTags) {
+          const updatedTag = await this.tagModel.findOneAndUpdate(
+            { name: tag },
+            { $inc: { amount: -1 } },
+            opt,
+          )
+
+          if (updatedTag) {
+            console.log(
+              `Tag atualizada: ${updatedTag.name}, quantidade: ${updatedTag.amount}`,
+            )
+          } else {
+            console.log(`Tag não encontrada ou não atualizada: ${tag}`)
+          }
+
+          // Verifica se o amount é menor ou igual a 0 após a atualização
+          if (updatedTag && updatedTag.amount <= 0) {
+            // Exclui a tag se o amount for menor ou igual a 0
+            await this.tagModel.deleteOne({ name: tag }, opt)
+          }
+        }
+
         await this.propertyModel.updateMany(
           { _id: { $in: propertyId } },
           { $set: { isActive: isActive } },
@@ -279,6 +313,30 @@ export class PropertyService {
             { $set: { adCredits: propertyOwner.adCredits + 1 } },
             opt,
           )
+        }
+
+        // Location
+
+        const propertyAddresses: Array<{ category: string; name: string }> =
+          properties.flatMap(property =>
+            Object.entries(property.address).map(([category, name]) => ({
+              category,
+              name,
+            })),
+          )
+
+        for (const { category, name } of propertyAddresses) {
+          const propertyCountWithLocation =
+            await this.propertyModel.countDocuments({
+              [`address.${category}`]: name,
+              isActive: true,
+              owner: { $ne: propertyOwner._id },
+            })
+
+          // Se não houver mais propriedades usando esta localização, exclua-a
+          if (propertyCountWithLocation === 0) {
+            await this.locationModel.deleteOne({ category, name })
+          }
         }
       } else {
         // Ativar
