@@ -812,7 +812,11 @@ export class UsersService {
       }
 
       if (coupon) {
-        couponData = await this.couponModel.findOne({ coupon }).lean()
+        couponData = await this.couponModel
+          .findOne({
+            coupon: { $regex: new RegExp(`^${coupon}$`, 'i') },
+          })
+          .lean()
       }
 
       updatedUser = await this.handleEditUser(userId, body)
@@ -997,7 +1001,7 @@ export class UsersService {
         paymentData === null ||
         (typeof paymentData === 'object' && isObjectEmpty(paymentData))
 
-      if (isPaymentDataEmpty && !owner._id.toString()) {
+      if (isPaymentDataEmpty && !owner?._id?.toString()) {
         updatedOwner = {
           name: userName,
           phone: '',
